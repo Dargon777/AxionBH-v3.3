@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ru" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AxionBH – Симулятор (Pro)</title>
+    <!-- Bootstrap Darkly Theme -->
+    <link href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.0/dist/darkly/bootstrap.min.css" rel="stylesheet">
+    <!-- Plotly -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <!-- Pyodide -->
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"></script>
+    <style>
+        body { padding-top: 70px; }
+        .slider-value { font-weight: bold; color: #62c462; }
+        .card { background: #303030; border: 1px solid #444; }
+        .result-card { background: #222; border-left: 4px solid #62c462; }
+        #loading-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); display: flex; justify-content: center;
+            align-items: center; z-index: 9999;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading-overlay">
+        <div class="text-center">
+            <div class="spinner-border text-success" style="width: 3rem; height: 3rem;"></div>
+            <p class="mt-3">Загрузка Python-окружения…</p>
+        </div>
+    </div>
+
+    <nav class="navbar navbar-expand-lg bg-primary fixed-top" data-bs-theme="dark">
+        <div class="container">
+            <a class="navbar-brand" href="index.html">AxionBH</a>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="index.html">Теория</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="#">Симулятор Pro</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h1 class="text-success">AxionBH Pro</h1>
+        <p class="lead">Интерактивное моделирование аксионного облака и рождения позитронов</p>
+
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card p-3 mb-3">
+                    <h5>Параметры чёрной дыры</h5>
+                    <!-- Масса -->
+                    <label class="form-label">Масса (M☉): <span id="massVal" class="slider-value">4.15e6</span></label>
+                    <input type="range" class="form-range" id="mass" min="1e5" max="1e8" value="4.15e6" step="1e5"
+                           oninput="updateSlider('mass', 'massVal', false)">
+                    <!-- Спин -->
+                    <label class="form-label">Спин a/M: <span id="spinVal" class="slider-value">0.90</span></label>
+                    <input type="range" class="form-range" id="spin" min="0" max="0.998" value="0.9" step="0.001"
+                           oninput="updateSlider('spin', 'spinVal', true, 3)">
+                    <!-- Магнитное поле -->
+                    <label class="form-label">B (Гс): <span id="bfieldVal" class="slider-value">100000</span></label>
+                    <input type="range" class="form-range" id="bfield" min="1e3" max="1e7" value="100000" step="1000"
+                           oninput="updateSlider('bfield', 'bfieldVal', false)">
+                    <!-- Температура -->
+                    <label class="form-label">T (K): <span id="tempVal" class="slider-value">1e7</span></label>
+                    <input type="range" class="form-range" id="temp" min="1e6" max="1e8" value="1e7" step="1e6"
+                           oninput="updateSlider('temp', 'tempVal', false)">
+                    <!-- beta_turb -->
+                    <label class="form-label">β_turb: <span id="betaVal" class="slider-value">1.0</span></label>
+                    <input type="range" class="form-range" id="beta" min="0.1" max="5.0" value="1.0" step="0.1"
+                           oninput="updateSlider('beta', 'betaVal', true, 1)">
+                    <!-- f_a -->
+                    <label class="form-label">f_a (ГэВ): <span id="faVal" class="slider-value">1e16</span></label>
+                    <input type="range" class="form-range" id="fa" min="1e10" max="1e18" value="1e16" step="1e10"
+                           oninput="updateSlider('fa', 'faVal', false)">
+                </div>
+                <button id="calcBtn" class="btn btn-success btn-lg w-100 mb-3">Рассчитать</button>
+                <button id="plotBtn" class="btn btn-primary w-100 mb-3">Построить график κ(spin)</button>
+                <button id="csvBtn" class="btn btn-outline-light w-100">Скачать CSV</button>
+                <div id="resultCard" class="card result-card p-3 mt-3" style="display:none;">
+                    <h5>Результаты</h5>
+                    <ul id="resultList" style="list-style: none; padding-left: 0;"></ul>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div id="plotContainer" style="background:#222; border-radius:8px; padding:10px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-dark text-center py-3 mt-5">
+        AxionBH Collaboration © 2026
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Глобальные переменные
+        let pyodide;
+        let pythonReady = false;
+        const G = 6.67430e-8, c = 2.99792458e10, Msun = 1.98847e33;
+        const kB = 1.380649e-16, hbar = 1.0545718e-27, mu_B = 9.274e-21;
+
+        // Обновление отображения слайдера
+        function updateSlider(sliderId, valId, isFloat, digits) {
+            const slider = document.getElementById(sliderId);
+            const val = parseFloat(slider.value);
+            document.getElementById(valId).textContent = isFloat ? val.toFixed(digits) : val.toExponential(3);
+        }
+
+        // Загрузка Pyodide
+        (async function init() {
+            pyodide = await loadPyodide();
+            await pyodide.loadPackage(['numpy', 'scipy']);
+            await pyodide.runPythonAsync(`
+import numpy as np
+from scipy.optimize import fsolve
+import warnings
+warnings.filterwarnings("ignore")
+
+G = 6.67430e-8; c = 2.99792458e10; Msun = 1.98847e33
+kB = 1.380649e-16; hbar = 1.0545718e-27; mu_B = 9.274e-21
+alpha_F = 1.0; m_p = 1.672e-24
+fa_erg = 1e16 * 1.602e-3   # default
+
+def omega_h(M, a):
+    a_phys = a * G * M / c**2
+    r_plus = G * M / c**2 + np.sqrt((G*M/c**2)**2 - a_phys**2)
+    return a_phys * c / (2 * G * M * r_plus)
+
+def r_ergosphere(theta, M, a):
+    a_phys = a * G * M / c**2
+    r_g = G * M / c**2
+    return r_g + np.sqrt(r_g**2 - a_phys**2 * np.cos(theta)**2)
+
+def C_turb(B, T_K, beta_turb=1.0, M_A=0.4):
+    B_eq = 3e4; T_norm = 1e7
+    b_norm = B / B_eq; t_norm = T_K / T_norm
+    return 8000.0 * (1.0 + 150.0 * b_norm**0.7 * t_norm**0.5 * M_A**1.8)
+
+def mu5_from_a(a_bar, B, T_K, beta_turb):
+    if a_bar <= 0: return 0.0
+    return (alpha_F * a_bar / fa_erg) * (mu_B * B) / (kB * T_K) * C_turb(B, T_K, beta_turb)
+
+def hiral_conductivity(mu5, T_erg):
+    factor = (kB * T_erg)**2 / (hbar * c)**3
+    return factor * (mu5**2/(2*np.pi**2) + (np.pi*kB*T_erg)**2/(6*np.pi**2))
+
+def self_consistency_eq(a_bar, M, a, B, T_K, beta_turb, m_eff):
+    T_erg = kB * T_K
+    omega = omega_h(M, a)
+    r_erg = r_ergosphere(np.pi/2, M, a)
+    L_eff = r_erg * 1.2
+    mu5 = mu5_from_a(a_bar, B, T_K, beta_turb)
+    sigma5 = hiral_conductivity(mu5, T_erg)
+    rhs = sigma5 * omega * L_eff / (fa_erg * m_eff**2 + 1e-40)
+    return a_bar - rhs
+
+def find_cloud(M, a, B, T_K, beta_turb, m_eff):
+    if a < 0.35: return 0.0
+    guesses = [1e-20, 1e-18, 1e-15, 1e-12, 1e-10, 1e-8, 1e-6]
+    best = 0.0
+    for x0 in guesses:
+        sol = fsolve(self_consistency_eq, x0, args=(M, a, B, T_K, beta_turb, m_eff), xtol=1e-14, maxfev=2000)
+        if sol[0] > 1e-25 and sol[0] > best: best = float(sol[0])
+    return best
+
+def kappa_effective(M, a, B, T_K, beta_turb, m_eff):
+    a_bar = find_cloud(M, a, B, T_K, beta_turb, m_eff)
+    if a_bar <= 0: return 0.0
+    r_h = G*M/c**2 + np.sqrt((G*M/c**2)**2 - (a*G*M/c**2)**2)
+    r_erg = r_ergosphere(np.pi/2, M, a)
+    avg_B = B * r_h * np.log(r_erg/r_h) / (r_erg - r_h)  # n=1 approx
+    mu5_avg = mu5_from_a(a_bar, avg_B, T_K, beta_turb)
+    return mu5_avg / (m_p * c**2)
+
+def positron_luminosity(M, a, B, Mdot, T_K, beta_turb, m_eff):
+    return kappa_effective(M, a, B, T_K, beta_turb, m_eff) * Mdot * c**2
+            `);
+            pythonReady = true;
+            document.getElementById('loading-overlay').style.display = 'none';
+        })();
+
+        // Обработчик расчёта
+        document.getElementById('calcBtn').addEventListener('click', async () => {
+            if (!pythonReady) return;
+            const params = {
+                M: parseFloat(document.getElementById('mass').value) * Msun,
+                a: parseFloat(document.getElementById('spin').value),
+                B: parseFloat(document.getElementById('bfield').value),
+                Mdot: 6.3e22,  // фиксируем для простоты
+                T_K: parseFloat(document.getElementById('temp').value),
+                beta: parseFloat(document.getElementById('beta').value),
+                fa_gev: parseFloat(document.getElementById('fa').value),
+                m_eff: 2.8e-16
+            };
+            await pyodide.runPythonAsync(`fa_erg = ${params.fa_gev * 1.602e-3}`);
+            const res = JSON.parse(await pyodide.runPythonAsync(`
+import json
+a_bar = find_cloud(${params.M}, ${params.a}, ${params.B}, ${params.T_K}, ${params.beta}, ${params.m_eff})
+kappa = kappa_effective(${params.M}, ${params.a}, ${params.B}, ${params.T_K}, ${params.beta}, ${params.m_eff})
+L = positron_luminosity(${params.M}, ${params.a}, ${params.B}, ${params.Mdot}, ${params.T_K}, ${params.beta}, ${params.m_eff})
+L_obs = 1e43
+json.dumps({
+    "a_bar": a_bar, "kappa": kappa, "L": L,
+    "rate": L / (1.602e-6), "ratio": L / L_obs,
+    "status": a_bar > 0 ? "Активно" : "Отсутствует"
+})
+            `));
+            const list = document.getElementById('resultList');
+            list.innerHTML = `
+                <li>ā = ${res.a_bar.toExponential(3)} эрг</li>
+                <li>κ = ${res.kappa.toExponential(3)}</li>
+                <li>L = ${res.L.toExponential(3)} эрг/с</li>
+                <li>Поток e⁺ ≈ ${res.rate.toExponential(3)} с⁻¹</li>
+                <li>L/L<sub>obs</sub> = ${res.ratio.toExponential(3)}</li>
+                <li>Статус: ${res.status}</li>
+            `;
+            document.getElementById('resultCard').style.display = 'block';
+            // Сохраняем для CSV
+            window.lastResult = { ...params, ...res };
+        });
+
+        // График Plotly
+        document.getElementById('plotBtn').addEventListener('click', async () => {
+            if (!pythonReady) return;
+            const params = {
+                M: parseFloat(document.getElementById('mass').value) * Msun,
+                B: parseFloat(document.getElementById('bfield').value),
+                T_K: parseFloat(document.getElementById('temp').value),
+                beta: parseFloat(document.getElementById('beta').value),
+                fa_gev: parseFloat(document.getElementById('fa').value),
+                m_eff: 2.8e-16
+            };
+            await pyodide.runPythonAsync(`fa_erg = ${params.fa_gev * 1.602e-3}`);
+            const spins = Array.from({length:50}, (_, i) => 0.35 + i * (0.998-0.35)/49);
+            const kappas = [];
+            for (const s of spins) {
+                const k = await pyodide.runPythonAsync(`float(kappa_effective(${params.M}, ${s}, ${params.B}, ${params.T_K}, ${params.beta}, ${params.m_eff}))`);
+                kappas.push(k);
+            }
+            const trace = {
+                x: spins, y: kappas,
+                mode: 'lines', line: { color: '#62c462', width: 3 },
+                name: 'κ(spin)'
+            };
+            const layout = {
+                title: 'Зависимость κ от спина',
+                xaxis: { title: 'a/M' },
+                yaxis: { title: 'κ', type: 'log' },
+                paper_bgcolor: '#222', plot_bgcolor: '#303030',
+                font: { color: '#ccc' }
+            };
+            Plotly.newPlot('plotContainer', [trace], layout);
+        });
+
+        // CSV экспорт
+        document.getElementById('csvBtn').addEventListener('click', () => {
+            if (!window.lastResult) return alert('Сначала выполните расчёт!');
+            const r = window.lastResult;
+            const csv = 'M_sun,a,B,T_K,beta,fa_gev,a_bar,kappa,L_erg_s,ratio\n' +
+                `${r.M/Msun},${r.a},${r.B},${r.T_K},${r.beta},${r.fa_gev},${r.a_bar},${r.kappa},${r.L},${r.ratio}`;
+            const blob = new Blob([csv], {type: 'text/csv'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'axionbh_result.csv'; a.click();
+        });
+    </script>
+</body>
+</html>
