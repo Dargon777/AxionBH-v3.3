@@ -114,6 +114,7 @@
                             <option value="cme">CME (стационарное облако)</option>
                             <option value="bosenova">Bosenova (вспышки)</option>
                             <option value="superradiant">Суперрадиантный рост</option>
+                            <option value="superradiant_bosenova">Superradiant + Bosenova (связанный)</option>
                         </select>
                         <div id="bosenovaParams" style="display:none;">
                             <h6>Параметры Bosenova</h6>
@@ -156,7 +157,7 @@
     <!-- Футер -->
     <footer>
         <div class="container text-center">
-            <p>AxionBH Collaboration © 2026</p>
+            <p>AxionBH Collaboration © 2026 | Авторы: Dg, G., D., C.</p>
         </div>
     </footer>
 
@@ -180,7 +181,12 @@
         // Показать/скрыть параметры Bosenova
         document.getElementById('modeSelect').addEventListener('change', function() {
             const mode = this.value;
-            document.getElementById('bosenovaParams').style.display = (mode === 'bosenova') ? 'block' : 'none';
+            const bsDiv = document.getElementById('bosenovaParams');
+            if (mode === 'bosenova') {
+                bsDiv.style.display = 'block';
+            } else {
+                bsDiv.style.display = 'none';
+            }
         });
 
         // Загрузка Pyodide и инициализация
@@ -313,7 +319,6 @@ class SuperradiantCloud:
 
 def bosenova_pipeline(M, a, B, Mdot, T_K, beta_turb, m_eff, f_a_gev, n_profile,
                       bosenova_energy, bosenova_interval_yr, bosenova_duration, bosenova_efficiency):
-    # Средний темп позитронов от вспышек
     e_pos_per_burst = bosenova_energy * bosenova_efficiency
     n_pos_per_burst = e_pos_per_burst / 1.6e-6
     interval_s = bosenova_interval_yr * 365.25 * 86400
@@ -321,6 +326,49 @@ def bosenova_pipeline(M, a, B, Mdot, T_K, beta_turb, m_eff, f_a_gev, n_profile,
     L_avg = e_pos_per_burst / interval_s * c**2
     L_burst = bosenova_energy / bosenova_duration
     return avg_rate, L_avg, L_burst
+
+# Новый класс – связанный Superradiant + Bosenova
+class SuperradiantBosenova:
+    def __init__(self, M, a, m_a_ev=1e-17):
+        self.cloud = SuperradiantCloud(M, a, m_a_ev)
+        self.M = M
+        self.a = a
+        self.accumulated_energy = 0.0
+        self.time = 0.0
+        self.burst_count = 0
+        self.last_burst_time = 0.0
+        self.threshold_reached = False
+        self.burst_energy = 0.0
+
+    def evolve(self, dt=1e7):
+        self.time += dt
+        frac = self.cloud.energy_fraction(self.time)
+        self.accumulated_energy = frac * self.M * c**2
+        if frac >= 0.05 and not self.threshold_reached:
+            self.threshold_reached = True
+            return self.trigger_burst()
+        elif frac < 0.05:
+            self.threshold_reached = False
+        return False
+
+    def trigger_burst(self):
+        self.burst_energy = 0.1 * self.accumulated_energy
+        self.burst_count += 1
+        self.last_burst_time = self.time
+        self.time = 0.0
+        self.accumulated_energy = 0.0
+        self.threshold_reached = False
+        return True
+
+    def average_positron_rate(self, efficiency=1e-3):
+        if self.burst_count == 0:
+            return 0.0
+        total_positrons = self.burst_count * self.burst_energy * efficiency / 1.6e-6
+        return total_positrons / self.time if self.time > 0 else 0.0
+
+    def instantaneous_luminosity(self):
+        rate = self.average_positron_rate()
+        return rate * 1.6e-6
             `);
             pythonReady = true;
             document.getElementById('loading').style.display = 'none';
@@ -370,13 +418,45 @@ ratio = L_avg / L_obs
             } else if (mode === 'superradiant') {
                 result = await pyodide.runPythonAsync(`
 cloud = SuperradiantCloud(${M_val}, ${a_val})
-t_peak = 500 * 365.25 * 86400  # 500 лет
+t_peak = 500 * 365.25 * 86400
 rate = cloud.instantaneous_positron_rate(t_peak, efficiency=1e-3)
 L = rate * 1.6e-6
 L_obs = 1.07e43
 ratio = L / L_obs
 (cloud.Gamma, 0.0, L, rate, ratio, 'Суперрадиантный')
                 `);
+            } else if (mode === 'superradiant_bosenova') {
+                result = await pyodide.runPythonAsync(`
+sb = SuperradiantBosenova(${M_val}, ${a_val})
+# Симулируем 1000 лет эволюции с шагом 1 год
+dt = 365.25 * 86400
+for i in range(1000):
+    burst = sb.evolve(dt)
+    if burst:
+        pass
+avg_rate = sb.average_positron_rate(efficiency=1e-3)
+L_avg = sb.instantaneous_luminosity()
+L_obs = 1.07e43
+ratio = L_avg / L_obs
+energy_frac = sb.cloud.energy_fraction(sb.time)
+accum_energy = sb.accumulated_energy
+time_to_burst = (np.log(0.05/1e-10) / sb.cloud.Gamma - sb.time) if sb.cloud.Gamma > 0 else -1
+(energy_frac, accum_energy, time_to_burst, avg_rate, L_avg, ratio, 'Superradiant + Bosenova')
+                `);
+                const [energy_frac, accum_energy, time_to_burst, rate, L, ratio, modeStr] = result;
+                const list = document.getElementById('resultList');
+                list.innerHTML = `
+                    <li><strong>Режим:</strong> ${modeStr}</li>
+                    <li><strong>Текущая доля энергии облака:</strong> ${energy_frac.toExponential(3)} (от Mc²)</li>
+                    <li><strong>Накопленная энергия облака:</strong> ${accum_energy.toExponential(3)} эрг</li>
+                    <li><strong>Время до следующей вспышки:</strong> ${time_to_burst > 0 ? (time_to_burst/(365.25*86400)).toFixed(1) + ' лет' : 'уже в нелинейном режиме'}</li>
+                    <li><strong>Средний темп позитронов:</strong> ≈ ${rate.toExponential(3)} с⁻¹</li>
+                    <li><strong>Светимость L:</strong> ${L.toExponential(3)} эрг/с</li>
+                    <li><strong>L / L<sub>511</sub>:</strong> ${ratio.toExponential(3)}</li>
+                    <li><strong>Статус:</strong> ${ratio >= 1 ? '✓ Достигает наблюдаемой светимости' : '✗ Ниже наблюдаемой'}
+                `;
+                document.getElementById('resultBox').style.display = 'block';
+                return;
             }
 
             const [a_bar, kappa, L, rate, ratio, modeStr] = result;
