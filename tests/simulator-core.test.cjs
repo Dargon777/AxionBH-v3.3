@@ -1264,6 +1264,7 @@ console.log("AxionBH simulator-core tests passed");
   const pipe=A.positronTransportPipeline(A.DEFAULTS,{
     mode:"cme",
     sourceKind:"mode-proxy",
+    transportModel:"legacy-factors",
     sourceEscapeFraction:0.5,
     smearingScalePc:150,
     bulgeAcceptanceRadiusPc:1000,
@@ -1284,6 +1285,7 @@ console.log("AxionBH simulator-core tests passed");
   const highE=A.positronTransportPipeline(A.DEFAULTS,{
     mode:"cme",
     sourceKind:"mode-proxy",
+    transportModel:"legacy-factors",
     injectionEnergyMeV:2,
     smearingScalePc:250
   });
