@@ -236,7 +236,7 @@
   function primaryMetrics(result) {
     if (result.mode === "cme") {
       return [
-        ["ā", A.formatScientific(result.aBar), "самосогласованное поле"],
+        ["ā", A.formatScientific(result.aBar) + " GeV", "устойчивая natural-unit ветвь"],
         ["κ", A.formatScientific(result.kappa), "эффективность конверсии"],
         ["Lₑ₊", A.formatScientific(result.luminosity) + " erg/s", "позитронная светимость"],
         ["L / L₅₁₁", formatRatio(result.ratio511), "относительно 1.07×10⁴³ erg/s"]
@@ -272,7 +272,11 @@
       rows.push(
         ["Спиновый порог", result.thresholdPassed ? "пройден" : "не пройден (a/M < 0.35)"],
         ["Среднее B в эргосфере", A.formatScientific(result.avgB) + " G"],
-        ["μ₅", A.formatScientific(result.mu5)],
+        ["ā", A.formatScientific(result.aBar) + " GeV"],
+        ["μ₅", A.formatScientific(result.mu5) + " GeV"],
+        ["η₅ = μ₅/T", A.formatScientific(result.eta5)],
+        ["Closure D", result.closure ? A.formatScientific(result.closure.discriminant) : "—"],
+        ["Fixed-point slope", result.closure ? A.formatScientific(result.closure.stableSlope) : "—"],
         ["r₊", A.formatScientific(result.geometry.rPlus) + " cm"],
         ["Ω_H", A.formatScientific(result.geometry.omegaH) + " s⁻¹"],
         ["Lₑ₊", A.formatScientific(result.luminosity) + " erg/s"],
@@ -318,7 +322,7 @@
       ordered[key] = Number(p[key]);
     });
     const source = JSON.stringify({
-      model: "AxionBH-v7.3",
+      model: "AxionBH-v7.4",
       mode,
       parameters: ordered
     });
@@ -984,7 +988,7 @@
     const diagnostics = currentDiagnostics();
     const payload = {
       generatedAt: new Date().toISOString(),
-      model: "AxionBH research workbench v7.3",
+      model: "AxionBH research workbench v7.4",
       stateId: runStateId(state.lastMode, state.lastParams),
       mode: state.lastMode,
       parameters: state.lastParams,
@@ -1012,7 +1016,7 @@
     const lines = [
       "# AxionBH reproducibility report",
       "",
-      "- Model: AxionBH Research Workbench v7.3",
+      "- Model: AxionBH Research Workbench v7.4",
       "- Generated: " + new Date().toISOString(),
       "- State ID: " + stateId,
       "- Mode: " + modeNames[state.lastMode],

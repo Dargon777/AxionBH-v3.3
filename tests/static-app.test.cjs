@@ -109,5 +109,19 @@ for (const feature of [
   );
 }
 
-assert.ok(html.includes("v7.3"));
-assert.ok(app.includes("AxionBH research workbench v7.3"));
+for (const feature of [
+  "selfConsistencyCoefficients",
+  "selfConsistencyBranches",
+  "temperatureGeV",
+  "magneticFieldGeV2",
+  "fixed_point_slope",
+  "unit_system"
+]) {
+  assert.ok(
+    core.includes(feature) || app.includes(feature),
+    "missing v7.4 CME unit-audit feature: " + feature
+  );
+}
+
+assert.ok(html.includes("v7.4"));
+assert.ok(app.includes("AxionBH research workbench v7.4"));

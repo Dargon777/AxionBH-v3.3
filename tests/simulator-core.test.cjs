@@ -200,24 +200,45 @@ console.log("AxionBH simulator-core tests passed");
   assert.equal(diagnostics.mode, "cme");
   assert.ok(Array.isArray(diagnostics.checks));
   assert.ok(!diagnostics.checks.some((item) => item.level === "error"));
-  assert.ok(diagnostics.checks.some((item) => item.code === "cloud_root"));
+  assert.ok(result.aBar > 0);
+  assert.ok(result.mu5 > 0);
+  assert.ok(result.eta5 > 0);
+  assert.ok(result.closure.hasRealRoots);
+  assert.ok(result.closure.discriminant >= 0);
+  assert.ok(result.closure.stableSlope < 1);
+  assert.ok(diagnostics.checks.some((item) => item.code === "root_residual"));
+  assert.ok(diagnostics.checks.some((item) => item.code === "fixed_point_slope"));
+  assert.ok(diagnostics.checks.some((item) => item.code === "unit_system"));
 }
 
 {
-  const p = {
-    ...A.DEFAULTS,
-    spin: 0.9,
-    B0: 10,
-    mEff: 1,
-    faGev: 1e16
-  };
-  const result = A.cme(p);
-  assert.ok(result.aBar > 0);
-  const diagnostics = A.diagnoseRun("cme", p, result);
-  const residual = diagnostics.checks.find((item) => item.code === "root_residual");
-  assert.ok(residual);
-  assert.ok(Number.isFinite(residual.value));
-  assert.ok(residual.value <= 1e-8);
+  const coefficients = A.selfConsistencyCoefficients(A.DEFAULTS);
+  assert.ok(Number.isFinite(coefficients.c0) && coefficients.c0 > 0);
+  assert.ok(Number.isFinite(coefficients.c2) && coefficients.c2 > 0);
+  assert.ok(Number.isFinite(coefficients.discriminant));
+  const branches = A.selfConsistencyBranches(A.DEFAULTS);
+  assert.ok(branches.stableRoot > 0);
+  assert.ok(branches.unstableRoot > branches.stableRoot);
+  const residual = A.selfConsistencyResidual(branches.stableRoot, A.DEFAULTS);
+  assert.ok(
+    Math.abs(residual) / branches.stableRoot < 1e-10
+  );
+}
+
+{
+  const t = A.temperatureGeV(1e7);
+  assert.ok(Math.abs(t / 8.617333262e-7 - 1) < 1e-12);
+  const b = A.magneticFieldGeV2(1);
+  assert.ok(Math.abs(b / 1.95e-20 - 1) < 1e-12);
+  const sigma = A.chiralConductivity(0, 1e7);
+  assert.ok(Math.abs(sigma / (t * t / 6) - 1) < 1e-12);
+}
+
+{
+  const mu1 = A.mu5FromA(1e-20, 100, 1e7, 1e16, 1);
+  const mu2 = A.mu5FromA(2e-20, 100, 1e7, 1e16, 1);
+  assert.ok(mu1 > 0);
+  assert.ok(Math.abs(mu2 / mu1 - 2) < 1e-12);
 }
 
 {
