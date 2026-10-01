@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="AxionBH interactive browser simulator and parameter-analysis workbench.">
-  <title>AxionBH — Research Workbench v7.5</title>
+  <title>AxionBH — Research Workbench v7.6</title>
   <link rel="stylesheet" href="simulator.css">
   <script defer src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <script defer src="simulator-core.js"></script>
@@ -15,7 +15,7 @@
     <div class="topbar-inner">
       <a class="brand" href="index.html">
         <span class="brand-mark">A</span>
-        <span>AxionBH<small>research workbench · v7.5</small></span>
+        <span>AxionBH<small>research workbench · v7.6</small></span>
       </a>
       <nav class="nav">
         <a href="index.html">Теория</a>
@@ -30,7 +30,7 @@
       <div>
         <div class="eyebrow">AxionBH · research workbench</div>
         <h1>Аксионное облако вокруг вращающейся чёрной дыры</h1>
-        <p>Локальный интерактивный расчёт CME, Bosenova, суперрадиантного и гибридного режимов — теперь со сравнением сценариев, картой параметров, анализом чувствительности, inverse inference, картой дефицита и размерностно согласованной CME closure.</p>
+        <p>Локальный интерактивный расчёт CME, Bosenova, суперрадиантного и гибридного режимов — теперь со сравнением сценариев, картой параметров, анализом чувствительности, inverse inference, картой дефицита и лабораторией Missing Physics с аналитическим потолком CME closure.</p>
       </div>
       <div class="status-stack">
         <span class="badge"><span id="runStatusDot" class="dot"></span><span id="runStatus">Движок готов</span></span>
@@ -39,14 +39,14 @@
     </section>
 
     <div class="notice">
-      <strong>Исследовательский калькулятор.</strong> AxionBH реализует текущие допущения модели и не является подтверждённым инструментом наблюдательной астрофизики. В v7.5 CME-ветка считается в единой системе natural units; порог a/M = 0.35 остаётся феноменологическим gate, а не выведенным результатом.
+      <strong>Исследовательский калькулятор.</strong> AxionBH реализует текущие допущения модели и не является подтверждённым инструментом наблюдательной астрофизики. В v7.6 CME-ветка считается в единой системе natural units; порог a/M = 0.35 остаётся феноменологическим gate, а не выведенным результатом.
     </div>
 
     <section class="workspace">
       <aside class="panel controls">
         <div class="panel-title">
           <h2>Параметры</h2>
-          <span class="muted">v7.5</span>
+          <span class="muted">v7.6</span>
         </div>
 
         <div class="field">
@@ -156,6 +156,7 @@
               <button class="analysis-tab" data-analysis="explorer" type="button">3D Explorer</button>
               <button class="analysis-tab" data-analysis="sensitivity" type="button">Sensitivity</button>
               <button class="analysis-tab" data-analysis="inference" type="button">Inference</button>
+              <button class="analysis-tab" data-analysis="missing" type="button">New Physics</button>
               <button class="analysis-tab" data-analysis="compare" type="button">Сценарии</button>
             </div>
           </div>
@@ -196,6 +197,24 @@
             <div class="explorer-field explorer-export">
               <label>Данные</label>
               <button id="explorerCsvBtn" class="mini-btn" type="button">CSV grid</button>
+            </div>
+          </div>
+
+          <div id="missingPhysicsControls" class="explorer-controls missing-controls hidden">
+            <div class="explorer-field">
+              <label for="missingPlacement">Куда входит g_extra</label>
+              <select id="missingPlacement" class="select compact-select">
+                <option value="source">Closure source</option>
+                <option value="chiral">Axion → μ₅ coupling</option>
+                <option value="conversion">Post-closure e⁺ conversion</option>
+              </select>
+            </div>
+            <div class="explorer-field explorer-fa">
+              <label for="missingGainExp">log₁₀ g_extra</label>
+              <div class="range-row">
+                <input id="missingGainExp" type="range" min="0" max="60" step="0.1" value="0">
+                <span id="missingGainOut" class="range-value">1.00e+0</span>
+              </div>
             </div>
           </div>
 
