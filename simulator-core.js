@@ -918,6 +918,279 @@
     };
   }
 
+
+  const MISSING_PHYSICS_CHANNELS = Object.freeze({
+    source: Object.freeze({
+      label: "closure source",
+      description: "Множитель источника div J5 / геометрической closure."
+    }),
+    chiral: Object.freeze({
+      label: "axion → μ5",
+      description: "Множитель эффективной связи поля a с хиральным дисбалансом."
+    }),
+    conversion: Object.freeze({
+      label: "post-closure e+ conversion",
+      description: "Множитель финальной конверсии после вычисления μ5; не влияет на closure."
+    })
+  });
+
+  function normalizeMissingPhysicsGains(input = {}) {
+    const gains = {
+      source: Number(input.source ?? 1),
+      chiral: Number(input.chiral ?? 1),
+      conversion: Number(input.conversion ?? 1)
+    };
+    Object.entries(gains).forEach(([key, value]) => {
+      assertFinitePositive(value, "missingPhysics." + key);
+    });
+    return gains;
+  }
+
+  function cmeWithGains(input, gainInput = {}) {
+    const p = normalizeParams(input);
+    const gains = normalizeMissingPhysicsGains(gainInput);
+    const base = selfConsistencyCoefficients(p);
+    const geometry = base.geometry;
+
+    if (p.spin < CONSTANTS.SPIN_THRESHOLD) {
+      return {
+        mode: "cme-missing-physics",
+        gains,
+        aBar: 0,
+        mu5: 0,
+        eta5: 0,
+        kappa: 0,
+        luminosity: 0,
+        ratio511: 0,
+        avgB: base.fieldG,
+        geometry,
+        closure: {
+          ...base,
+          c0: 0,
+          c2: 0,
+          discriminant: 1,
+          stableRoot: 0,
+          stableSlope: null,
+          hasRealRoots: false
+        },
+        closureValid: false,
+        thresholdPassed: false
+      };
+    }
+
+    const c0 = base.c0 * gains.source;
+    const c2 = base.c2 * gains.source * gains.chiral * gains.chiral;
+    const discriminant = 1 - 4 * c0 * c2;
+
+    if (
+      !Number.isFinite(c0) ||
+      !Number.isFinite(c2) ||
+      !Number.isFinite(discriminant) ||
+      discriminant < 0
+    ) {
+      return {
+        mode: "cme-missing-physics",
+        gains,
+        aBar: 0,
+        mu5: 0,
+        eta5: 0,
+        kappa: 0,
+        luminosity: 0,
+        ratio511: 0,
+        avgB: base.fieldG,
+        geometry,
+        closure: {
+          ...base,
+          c0,
+          c2,
+          discriminant,
+          stableRoot: 0,
+          stableSlope: null,
+          hasRealRoots: false
+        },
+        closureValid: false,
+        thresholdPassed: true
+      };
+    }
+
+    const sqrtD = Math.sqrt(Math.max(0, discriminant));
+    const aBar = 2 * c0 / Math.max(1 + sqrtD, 1e-300);
+    const stableSlope = 2 * c2 * aBar;
+    const mu5 = base.qMu * gains.chiral * aBar;
+    const eta5 = chiralDegeneracy(mu5, p.temperature);
+    const baseKappa = mu5 / CONSTANTS.PROTON_MASS_GEV;
+    const kappa = baseKappa * gains.conversion;
+    const luminosity = kappa * p.mdot * CONSTANTS.C * CONSTANTS.C;
+    const safeLuminosity =
+      Number.isFinite(luminosity) && luminosity > 0 ? luminosity : 0;
+
+    return {
+      mode: "cme-missing-physics",
+      gains,
+      aBar,
+      mu5,
+      eta5,
+      baseKappa,
+      kappa: Number.isFinite(kappa) && kappa > 0 ? kappa : 0,
+      luminosity: safeLuminosity,
+      ratio511: safeLuminosity / CONSTANTS.L_OBS_511,
+      avgB: base.fieldG,
+      geometry,
+      closure: {
+        ...base,
+        c0,
+        c2,
+        discriminant,
+        stableRoot: aBar,
+        stableSlope,
+        hasRealRoots: true
+      },
+      closureValid: true,
+      thresholdPassed: true
+    };
+  }
+
+  function cmeClosureCeiling(input, target = 1) {
+    const p = normalizeParams(input);
+    const coefficients = selfConsistencyCoefficients(p);
+    const current = cme(p);
+    const thermal = coefficients.temperatureGeV;
+    const discriminantFactor = 4 * coefficients.c0 * coefficients.c2;
+    const criticalUpstreamProduct =
+      discriminantFactor > 0 && Number.isFinite(discriminantFactor)
+        ? 1 / Math.sqrt(discriminantFactor)
+        : Number.POSITIVE_INFINITY;
+
+    const mu5Max = Math.PI * thermal / Math.sqrt(3);
+    const kappaMax = mu5Max / CONSTANTS.PROTON_MASS_GEV;
+    const luminosityMax = kappaMax * p.mdot * CONSTANTS.C * CONSTANTS.C;
+    const ratioMax = luminosityMax / CONSTANTS.L_OBS_511;
+    const goal = Number(target);
+    if (!Number.isFinite(goal) || goal <= 0) {
+      throw new RangeError("target must be positive");
+    }
+
+    return {
+      target: goal,
+      currentRatio: current.ratio511,
+      currentDeficitOrders: deficitOrders(current.ratio511, goal),
+      thermalGeV: thermal,
+      mu5Max,
+      kappaMax,
+      luminosityMax,
+      ratioMax,
+      ceilingDeficitOrders: deficitOrders(ratioMax, goal),
+      upstreamHeadroom:
+        current.ratio511 > 0 ? ratioMax / current.ratio511 : Number.POSITIVE_INFINITY,
+      criticalUpstreamProduct,
+      requiredPostGainAtCurrent:
+        current.ratio511 > 0 ? goal / current.ratio511 : Number.POSITIVE_INFINITY,
+      requiredPostGainAtCeiling:
+        ratioMax > 0 ? goal / ratioMax : Number.POSITIVE_INFINITY
+    };
+  }
+
+  function missingPhysicsPoint(input, placement, gain) {
+    const value = assertFinitePositive(Number(gain), "g_extra");
+    let gains;
+    if (placement === "source") {
+      gains = { source: value, chiral: 1, conversion: 1 };
+    } else if (placement === "chiral") {
+      gains = { source: 1, chiral: value, conversion: 1 };
+    } else if (placement === "conversion") {
+      gains = { source: 1, chiral: 1, conversion: value };
+    } else {
+      throw new RangeError("Unknown missing-physics placement: " + placement);
+    }
+    return cmeWithGains(input, gains);
+  }
+
+  function missingPhysicsSweep(
+    input,
+    placement,
+    { minExp = 0, maxExp = 60, steps = 181 } = {}
+  ) {
+    if (!MISSING_PHYSICS_CHANNELS[placement]) {
+      throw new RangeError("Unknown missing-physics placement: " + placement);
+    }
+    const count = Math.max(24, Math.min(400, Math.trunc(steps)));
+    const exponents = linearSpace(minExp, maxExp, count);
+    return {
+      placement,
+      points: exponents.map((exponent) => {
+        const gain = Math.pow(10, exponent);
+        const result = missingPhysicsPoint(input, placement, gain);
+        return {
+          exponent,
+          gain,
+          ratio511: result.closureValid ? result.ratio511 : null,
+          discriminant: result.closure.discriminant,
+          closureValid: result.closureValid
+        };
+      })
+    };
+  }
+
+  function missingPhysicsAnalysis(input, target = 1) {
+    const p = normalizeParams(input);
+    const goal = Number(target);
+    if (!Number.isFinite(goal) || goal <= 0) {
+      throw new RangeError("target must be positive");
+    }
+
+    const ceiling = cmeClosureCeiling(p, goal);
+    const nearCriticalGain =
+      Number.isFinite(ceiling.criticalUpstreamProduct)
+        ? ceiling.criticalUpstreamProduct * (1 - 1e-12)
+        : 1;
+
+    const sourceBoundary = missingPhysicsPoint(p, "source", nearCriticalGain);
+    const chiralBoundary = missingPhysicsPoint(p, "chiral", nearCriticalGain);
+    const conversionRequired = ceiling.requiredPostGainAtCurrent;
+    const conversionTarget =
+      Number.isFinite(conversionRequired)
+        ? missingPhysicsPoint(p, "conversion", conversionRequired)
+        : null;
+
+    const upstreamStatus =
+      ceiling.ratioMax >= goal ? "solved" : "ceiling-limited";
+
+    return {
+      target: goal,
+      ceiling,
+      rows: [
+        {
+          placement: "source",
+          status: upstreamStatus,
+          criticalGain: ceiling.criticalUpstreamProduct,
+          bestMetric: sourceBoundary.ratio511,
+          remainingDeficitOrders: deficitOrders(sourceBoundary.ratio511, goal)
+        },
+        {
+          placement: "chiral",
+          status: upstreamStatus,
+          criticalGain: ceiling.criticalUpstreamProduct,
+          bestMetric: chiralBoundary.ratio511,
+          remainingDeficitOrders: deficitOrders(chiralBoundary.ratio511, goal)
+        },
+        {
+          placement: "conversion",
+          status:
+            conversionTarget &&
+            Math.abs(conversionTarget.ratio511 / goal - 1) < 1e-9
+              ? "solved"
+              : "unreachable",
+          requiredGain: conversionRequired,
+          achievedMetric: conversionTarget ? conversionTarget.ratio511 : null,
+          remainingDeficitOrders:
+            conversionTarget
+              ? Math.max(0, deficitOrders(conversionTarget.ratio511, goal))
+              : Number.POSITIVE_INFINITY
+        }
+      ]
+    };
+  }
+
   const SENSITIVITY_KEYS = Object.freeze({
     cme: Object.freeze([
       "massSolar",
@@ -1237,6 +1510,13 @@
     inferParameterTarget,
     parameterInference,
     INFERENCE_BOUNDS,
+    MISSING_PHYSICS_CHANNELS,
+    normalizeMissingPhysicsGains,
+    cmeWithGains,
+    cmeClosureCeiling,
+    missingPhysicsPoint,
+    missingPhysicsSweep,
+    missingPhysicsAnalysis,
     sensitivityAnalysis,
     comparePresets,
     diagnoseRun,
