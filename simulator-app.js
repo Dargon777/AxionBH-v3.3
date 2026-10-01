@@ -958,7 +958,14 @@
     url.search = "";
     url.searchParams.set("state", encodeState({
       mode: $("mode").value,
-      params: p
+      params: p,
+      analysis: state.analysis,
+      explorer: {
+        view: $("explorerView").value,
+        reference: $("explorerReference").value,
+        faExp: Number($("explorerFaExp").value),
+        resolution: $("explorerResolution").value
+      }
     }));
 
     try {
@@ -977,6 +984,28 @@
       const restored = A.normalizeParams(payload.params || {});
       applyParameters(restored);
       if (modeNames[payload.mode]) $("mode").value = payload.mode;
+
+      if (["spin", "explorer", "sensitivity", "compare"].includes(payload.analysis)) {
+        state.analysis = payload.analysis;
+      }
+
+      if (payload.explorer && typeof payload.explorer === "object") {
+        if (["surface", "contour", "difference"].includes(payload.explorer.view)) {
+          $("explorerView").value = payload.explorer.view;
+        }
+        if (referenceNames[payload.explorer.reference]) {
+          $("explorerReference").value = payload.explorer.reference;
+        }
+        const faExp = Number(payload.explorer.faExp);
+        if (Number.isFinite(faExp) && faExp >= 14 && faExp <= 18) {
+          $("explorerFaExp").value = faExp;
+        }
+        if (explorerResolutions[payload.explorer.resolution]) {
+          $("explorerResolution").value = payload.explorer.resolution;
+        }
+      }
+
+      updateExplorerFaLabel();
       $("preset").value = "custom";
       updateConditionalFields();
       updatePresetButtons();
@@ -993,6 +1022,16 @@
     document.documentElement.dataset.theme = next;
     localStorage.setItem("axionbh-theme", next);
     if (state.lastResult) renderAnalysis(state.analysis);
+  }
+
+  let explorerRenderTimer;
+  function scheduleExplorerRender(delay = 180) {
+    clearTimeout(explorerRenderTimer);
+    explorerRenderTimer = setTimeout(() => {
+      if (state.analysis === "explorer" && state.lastResult) {
+        renderAnalysis("explorer");
+      }
+    }, delay);
   }
 
   let toastTimer;
@@ -1015,7 +1054,8 @@
       if ($(key)) setValue(key, value);
     });
 
-    document.querySelectorAll('input[type="range"]').forEach((input) => {
+    ["spin", "B0", "betaTurb"].forEach((id) => {
+      const input = $(id);
       input.addEventListener("input", () => {
         const output = $(input.id + "Out");
         if (output) output.textContent = displayInput(input.value);
@@ -1048,7 +1088,16 @@
       button.addEventListener("click", () => renderAnalysis(button.dataset.analysis));
     });
 
+    $("explorerFaExp").addEventListener("input", () => {
+      updateExplorerFaLabel();
+      scheduleExplorerRender();
+    });
+    $("explorerView").addEventListener("change", () => scheduleExplorerRender(0));
+    $("explorerReference").addEventListener("change", () => scheduleExplorerRender(0));
+    $("explorerResolution").addEventListener("change", () => scheduleExplorerRender(0));
+
     updateConditionalFields();
+    updateExplorerFaLabel();
     restoreSharedState();
     run();
   }
