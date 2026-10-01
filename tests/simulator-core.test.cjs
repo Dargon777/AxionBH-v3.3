@@ -92,3 +92,60 @@ function finiteOrInfinity(value) {
 }
 
 console.log("AxionBH simulator-core tests passed");
+
+
+{
+  const grid = A.parameterMap(A.DEFAULTS, {
+    mode: "cme",
+    xValues: [0.2, 0.5, 0.9],
+    yValues: [10, 1000],
+    metric: "ratio511"
+  });
+  assert.equal(grid.xValues.length, 3);
+  assert.equal(grid.yValues.length, 2);
+  assert.equal(grid.z.length, 2);
+  assert.equal(grid.z[0].length, 3);
+  assert.equal(grid.z[0][0], 0);
+  assert.ok(grid.z.flat().every((value) => value === null || Number.isFinite(value)));
+}
+
+{
+  const sensitivity = A.sensitivityAnalysis("cme", A.DEFAULTS, {
+    fraction: 0.1,
+    keys: ["spin", "B0", "mdot"]
+  });
+  assert.equal(sensitivity.rows.length, 3);
+  assert.ok(sensitivity.rows.every((row) => Number.isFinite(row.impact)));
+  assert.ok(sensitivity.rows.every((row) => row.minusParam < row.plusParam));
+}
+
+{
+  const comparison = A.comparePresets("cme");
+  assert.deepEqual(
+    comparison.map((item) => item.name),
+    ["baseline", "breakthrough", "optimistic"]
+  );
+  assert.ok(comparison.every((item) => Number.isFinite(item.metric)));
+}
+
+{
+  assert.deepEqual(
+    A.linearSpace(0, 1, 3),
+    [0, 0.5, 1]
+  );
+  const log = A.logSpace(1, 100, 3);
+  assert.ok(Math.abs(log[0] - 1) < 1e-12);
+  assert.ok(Math.abs(log[1] - 10) < 1e-10);
+  assert.ok(Math.abs(log[2] - 100) < 1e-9);
+}
+
+{
+  assert.throws(
+    () => A.sensitivityAnalysis("cme", A.DEFAULTS, { fraction: 1 }),
+    /fraction/
+  );
+  assert.throws(
+    () => A.parameterMap(A.DEFAULTS, { xValues: [1], yValues: [1, 2] }),
+    /xValues/
+  );
+}
