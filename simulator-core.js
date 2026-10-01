@@ -578,6 +578,352 @@
     };
   }
 
+
+  function stableFermi(y) {
+    const value = Number(y);
+    if (!Number.isFinite(value)) {
+      return value === Number.NEGATIVE_INFINITY ? 1 : 0;
+    }
+    if (value > 40) return Math.exp(-value);
+    if (value < -40) return 1;
+    return 1 / (Math.exp(value) + 1);
+  }
+
+  function stableSoftplus(value) {
+    const x = Number(value);
+    if (!Number.isFinite(x)) {
+      return x === Number.POSITIVE_INFINITY ? Number.POSITIVE_INFINITY : 0;
+    }
+    if (x > 40) return x;
+    if (x < -40) return Math.exp(x);
+    return Math.log1p(Math.exp(x));
+  }
+
+  function simpsonIntegral(fn, start, stop, intervals = 600) {
+    if (!Number.isFinite(start) || !Number.isFinite(stop) || stop < start) {
+      throw new RangeError("simpsonIntegral requires finite stop >= start");
+    }
+    if (stop === start) return 0;
+    let n = Math.max(40, Math.min(2400, Math.trunc(intervals)));
+    if (n % 2 !== 0) n += 1;
+    const h = (stop - start) / n;
+    let sum = fn(start) + fn(stop);
+    for (let i = 1; i < n; i += 1) {
+      sum += (i % 2 === 0 ? 2 : 4) * fn(start + i * h);
+    }
+    return sum * h / 3;
+  }
+
+  function finiteMassIntegrationLimit(massOverT, muOverT) {
+    const z = Math.max(0, Number(massOverT));
+    const nu = Math.abs(Number(muOverT));
+    const energyMax = Math.max(z, nu) + 42;
+    return Math.sqrt(
+      Math.max(0, energyMax * energyMax - z * z)
+    );
+  }
+
+  function finiteMassFermiKernel(
+    massGeV,
+    temperature,
+    vectorMuGeV = 0,
+    intervals = 700
+  ) {
+    const mass = assertFinitePositive(Number(massGeV), "carrierMassGeV", true);
+    const thermal = temperatureGeV(temperature);
+    const mu = Number(vectorMuGeV);
+    if (!Number.isFinite(mu)) {
+      throw new RangeError("vectorMuGeV must be finite");
+    }
+
+    const z = mass / thermal;
+    const nu = mu / thermal;
+    const xMax = finiteMassIntegrationLimit(z, nu);
+
+    function energyBar(x) {
+      return Math.sqrt(x * x + z * z);
+    }
+
+    const f2 = simpsonIntegral((x) => {
+      const e = energyBar(x);
+      if (e === 0) return 0;
+      return (
+        stableFermi(e - nu) +
+        stableFermi(e + nu)
+      ) / e;
+    }, 0, xMax, intervals);
+
+    const f3Dimensionless = simpsonIntegral((x) => {
+      const e = energyBar(x);
+      return (
+        stableSoftplus(nu - e) +
+        stableSoftplus(-nu - e)
+      );
+    }, 0, xMax, intervals);
+
+    const electronIntegral = simpsonIntegral((x) => {
+      const e = energyBar(x);
+      return x * x * stableFermi(e - nu);
+    }, 0, xMax, intervals);
+
+    const positronIntegral = simpsonIntegral((x) => {
+      const e = energyBar(x);
+      return x * x * stableFermi(e + nu);
+    }, 0, xMax, intervals);
+
+    const susceptibilityIntegral = simpsonIntegral((x) => {
+      const e = energyBar(x);
+      const fm = stableFermi(e - nu);
+      const fp = stableFermi(e + nu);
+      return x * x * (
+        fm * (1 - fm) +
+        fp * (1 - fp)
+      );
+    }, 0, xMax, intervals);
+
+    return {
+      massGeV: mass,
+      temperatureGeV: thermal,
+      vectorMuGeV: mu,
+      massOverT: z,
+      muOverT: nu,
+      integrationLimit: xMax,
+      f2,
+      f3Dimensionless,
+      electronIntegral,
+      positronIntegral,
+      susceptibilityIntegral
+    };
+  }
+
+  function finiteMassAxialVorticalConductivity(
+    massGeV,
+    temperature,
+    vectorMuGeV = 0,
+    intervals = 700
+  ) {
+    const kernel = finiteMassFermiKernel(
+      massGeV,
+      temperature,
+      vectorMuGeV,
+      intervals
+    );
+    const T = kernel.temperatureGeV;
+    const z = kernel.massOverT;
+
+    // Lin & Yang, Phys. Rev. D 98, 114022 (2018), eqs. (8)-(10):
+    // sigma_V = [2 F3 + m^2 F2] / (2 pi^2).
+    // The implementation below is the dimensionless q/T form at constant
+    // vector chemical potential.
+    const dimensionless =
+      (
+        2 * kernel.f3Dimensionless +
+        z * z * kernel.f2
+      ) /
+      (2 * Math.PI * Math.PI);
+
+    const sigmaV = dimensionless * T * T;
+    const masslessReference =
+      (
+        kernel.vectorMuGeV * kernel.vectorMuGeV /
+          (2 * Math.PI * Math.PI)
+      ) +
+      T * T / 6;
+    const suppression =
+      masslessReference > 0
+        ? sigmaV / masslessReference
+        : null;
+
+    return {
+      ...kernel,
+      sigmaV,
+      dimensionless,
+      masslessReference,
+      suppression
+    };
+  }
+
+  function finiteMassVectorSusceptibility(
+    massGeV,
+    temperature,
+    vectorMuGeV = 0,
+    intervals = 700
+  ) {
+    const kernel = finiteMassFermiKernel(
+      massGeV,
+      temperature,
+      vectorMuGeV,
+      intervals
+    );
+    const T = kernel.temperatureGeV;
+    // g=2 spin states; derivative of n_e - n_pos with respect to vector mu.
+    const susceptibility =
+      T * T *
+      kernel.susceptibilityIntegral /
+      (Math.PI * Math.PI);
+    return {
+      ...kernel,
+      susceptibility,
+      masslessAtZeroMu: T * T / 3,
+      zeroMuSuppression:
+        (T * T / 3) > 0
+          ? susceptibility / (T * T / 3)
+          : null
+    };
+  }
+
+  function finiteMassCarrierDensities(
+    massGeV,
+    temperature,
+    vectorMuGeV = 0,
+    intervals = 700
+  ) {
+    const kernel = finiteMassFermiKernel(
+      massGeV,
+      temperature,
+      vectorMuGeV,
+      intervals
+    );
+    const T = kernel.temperatureGeV;
+    const prefactor = T * T * T / (Math.PI * Math.PI);
+    const electronGeV3 = prefactor * kernel.electronIntegral;
+    const positronGeV3 = prefactor * kernel.positronIntegral;
+    const toCm3 = Math.pow(CONSTANTS.CM_TO_GEV_INV, 3);
+
+    return {
+      ...kernel,
+      electronGeV3,
+      positronGeV3,
+      netGeV3: electronGeV3 - positronGeV3,
+      totalGeV3: electronGeV3 + positronGeV3,
+      electronCm3: electronGeV3 * toCm3,
+      positronCm3: positronGeV3 * toCm3,
+      netCm3: (electronGeV3 - positronGeV3) * toCm3,
+      totalCm3: (electronGeV3 + positronGeV3) * toCm3
+    };
+  }
+
+  function finiteMassPlasmaDiagnostics(
+    input,
+    {
+      carrierMassGeV = CONSTANTS.ELECTRON_MASS_GEV,
+      vectorMuOverMass = 0,
+      intervals = 700
+    } = {}
+  ) {
+    const p = normalizeParams(input);
+    const mass = assertFinitePositive(
+      Number(carrierMassGeV),
+      "carrierMassGeV",
+      true
+    );
+    const ratio = Number(vectorMuOverMass);
+    if (!Number.isFinite(ratio)) {
+      throw new RangeError("vectorMuOverMass must be finite");
+    }
+    const vectorMuGeV = mass * ratio;
+
+    const result = cme(p);
+    const geometry = result.geometry;
+    const omegaGeV = angularFrequencyGeV(geometry.omegaH);
+    const cve = finiteMassAxialVorticalConductivity(
+      mass,
+      p.temperature,
+      vectorMuGeV,
+      intervals
+    );
+    const susceptibility = finiteMassVectorSusceptibility(
+      mass,
+      p.temperature,
+      vectorMuGeV,
+      intervals
+    );
+    const densities = finiteMassCarrierDensities(
+      mass,
+      p.temperature,
+      vectorMuGeV,
+      intervals
+    );
+
+    const finiteMassCurrent = cve.sigmaV * omegaGeV;
+    const masslessCurrent = cve.masslessReference * omegaGeV;
+    const coefficients = selfConsistencyCoefficients(p);
+    const finiteMassSourceProxy =
+      Math.abs(finiteMassCurrent) /
+      Math.max(coefficients.effectiveLengthGeVInv, 1e-300);
+    const masslessThermalSourceProxy =
+      Math.abs(masslessCurrent) /
+      Math.max(coefficients.effectiveLengthGeVInv, 1e-300);
+
+    return {
+      carrier: "Dirac fermion",
+      carrierMassGeV: mass,
+      vectorMuGeV,
+      vectorMuOverMass: ratio,
+      temperatureGeV: cve.temperatureGeV,
+      massOverT: cve.massOverT,
+      sigmaVFiniteGeV2: cve.sigmaV,
+      sigmaVMasslessReferenceGeV2: cve.masslessReference,
+      cveSuppression: cve.suppression,
+      finiteMassCurrentGeV3: finiteMassCurrent,
+      masslessReferenceCurrentGeV3: masslessCurrent,
+      finiteMassSourceProxyGeV4: finiteMassSourceProxy,
+      masslessReferenceSourceProxyGeV4: masslessThermalSourceProxy,
+      vectorSusceptibilityGeV2: susceptibility.susceptibility,
+      susceptibilityReferenceGeV2: susceptibility.masslessAtZeroMu,
+      susceptibilityZeroMuSuppression: susceptibility.zeroMuSuppression,
+      electronDensityCm3: densities.electronCm3,
+      positronDensityCm3: densities.positronCm3,
+      netDensityCm3: densities.netCm3,
+      totalDensityCm3: densities.totalCm3,
+      electronDensityGeV3: densities.electronGeV3,
+      positronDensityGeV3: densities.positronGeV3,
+      omegaGeV,
+      baselineMu5GeV: result.mu5,
+      assumptions: {
+        vectorChemicalPotential: true,
+        axialChemicalPotentialConserved: false,
+        finiteMassCmeImplemented: false,
+        acveFormula:
+          "Lin & Yang PRD 98 114022 eqs 8-10, constant T and vector mu",
+        densityModel:
+          "ideal free Dirac gas; no charge-neutrality or accretion-flow closure"
+      }
+    };
+  }
+
+  function finiteMassPlasmaSweep(
+    input,
+    {
+      carrierMassGeV = CONSTANTS.ELECTRON_MASS_GEV,
+      muRatioMin = 0,
+      muRatioMax = 2,
+      points = 65,
+      intervals = 420
+    } = {}
+  ) {
+    const count = Math.max(16, Math.min(160, Math.trunc(points)));
+    const ratios = linearSpace(muRatioMin, muRatioMax, count);
+    return {
+      carrierMassGeV,
+      points: ratios.map((vectorMuOverMass) => {
+        const d = finiteMassPlasmaDiagnostics(input, {
+          carrierMassGeV,
+          vectorMuOverMass,
+          intervals
+        });
+        return {
+          vectorMuOverMass,
+          suppression: d.cveSuppression,
+          sigmaVFiniteGeV2: d.sigmaVFiniteGeV2,
+          electronDensityCm3: d.electronDensityCm3,
+          positronDensityCm3: d.positronDensityCm3,
+          netDensityCm3: d.netDensityCm3
+        };
+      })
+    };
+  }
+
   function averageMagneticField(B0, geometry, nProfile) {
     const n = assertFinitePositive(nProfile, "nProfile");
     const x = geometry.rErgEquator / geometry.rPlus;
@@ -1913,6 +2259,15 @@
     evolveAxialDensity,
     chiralityDynamics,
     chiralityDynamicsSeries,
+    stableFermi,
+    stableSoftplus,
+    simpsonIntegral,
+    finiteMassFermiKernel,
+    finiteMassAxialVorticalConductivity,
+    finiteMassVectorSusceptibility,
+    finiteMassCarrierDensities,
+    finiteMassPlasmaDiagnostics,
+    finiteMassPlasmaSweep,
     averageMagneticField,
     selfConsistencyCoefficients,
     selfConsistencyRhs,

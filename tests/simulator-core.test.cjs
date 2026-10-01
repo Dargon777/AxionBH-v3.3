@@ -508,3 +508,84 @@ console.log("AxionBH simulator-core tests passed");
   assert.ok(regime);
   assert.equal(regime.level, "warning");
 }
+
+
+{
+  const masslessLike = A.finiteMassAxialVorticalConductivity(
+    1e-12,
+    1e7,
+    0,
+    900
+  );
+  assert.ok(Number.isFinite(masslessLike.sigmaV));
+  assert.ok(Math.abs(masslessLike.suppression - 1) < 1e-4);
+}
+
+{
+  const electron = A.finiteMassAxialVorticalConductivity(
+    A.CONSTANTS.ELECTRON_MASS_GEV,
+    1e7,
+    0,
+    1000
+  );
+  assert.ok(electron.sigmaV > 0);
+  assert.ok(electron.suppression > 0);
+  assert.ok(electron.suppression < 1e-250);
+  assert.ok(
+    Math.log10(electron.suppression) < -253 &&
+    Math.log10(electron.suppression) > -254
+  );
+}
+
+{
+  const atThreshold = A.finiteMassPlasmaDiagnostics(
+    A.DEFAULTS,
+    {
+      carrierMassGeV: A.CONSTANTS.ELECTRON_MASS_GEV,
+      vectorMuOverMass: 1,
+      intervals: 800
+    }
+  );
+  assert.ok(atThreshold.cveSuppression > 0.02);
+  assert.ok(atThreshold.cveSuppression < 0.05);
+  assert.ok(atThreshold.electronDensityCm3 > 1e25);
+  assert.ok(atThreshold.positronDensityCm3 < 1);
+}
+
+{
+  const baseline = A.finiteMassPlasmaDiagnostics(
+    A.DEFAULTS,
+    {
+      carrierMassGeV: A.CONSTANTS.ELECTRON_MASS_GEV,
+      vectorMuOverMass: 0,
+      intervals: 900
+    }
+  );
+  assert.ok(baseline.massOverT > 500);
+  assert.ok(baseline.finiteMassCurrentGeV3 > 0);
+  assert.ok(
+    baseline.finiteMassCurrentGeV3 <
+    baseline.masslessReferenceCurrentGeV3
+  );
+  assert.equal(
+    baseline.assumptions.finiteMassCmeImplemented,
+    false
+  );
+}
+
+{
+  const sweep = A.finiteMassPlasmaSweep(
+    A.DEFAULTS,
+    {
+      muRatioMin: 0,
+      muRatioMax: 1,
+      points: 20,
+      intervals: 260
+    }
+  );
+  assert.equal(sweep.points.length, 20);
+  assert.ok(
+    sweep.points[0].suppression <
+    sweep.points[sweep.points.length - 1].suppression
+  );
+}

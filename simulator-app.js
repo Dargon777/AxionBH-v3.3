@@ -322,7 +322,7 @@
       ordered[key] = Number(p[key]);
     });
     const source = JSON.stringify({
-      model: "AxionBH-v7.8",
+      model: "AxionBH-v7.9",
       mode,
       parameters: ordered
     });
@@ -984,7 +984,7 @@
     if ($("mode").value !== "cme") {
       setAnalysisMeta(
         "Parameter Inference",
-        "v7.8 inverse solver сейчас определён для CVE closure"
+        "v7.9 inverse solver сейчас определён для CVE closure"
       );
       setAnalysisTable(
         '<div class="inference-empty">Переключи режим на CME, чтобы оценить дефицит и требуемые однопараметрические сдвиги.</div>'
@@ -1241,6 +1241,172 @@
       horizonSeconds: chiralityHorizonValue(),
       electricAlignment: chiralityElectricAlignment()
     };
+  }
+
+
+  function massiveMuRatioValue() {
+    return Number($("massiveMuRatio").value);
+  }
+
+  function updateMassiveLabels() {
+    $("massiveMuRatioOut").textContent =
+      massiveMuRatioValue().toFixed(2);
+  }
+
+  function renderMassivePlasma() {
+    if ($("mode").value !== "cme") {
+      setAnalysisMeta(
+        "Finite-Mass Plasma",
+        "Massive ACVE diagnostic привязан к стационарной CVE closure"
+      );
+      setAnalysisTable(
+        '<div class="inference-empty">Переключи режим на CVE closure. Эта вкладка не меняет основную luminosity-ветку.</div>'
+      );
+      if (window.Plotly) Plotly.purge("plot");
+      return;
+    }
+
+    const p = params();
+    const analysis = A.finiteMassPlasmaDiagnostics(p, {
+      carrierMassGeV: A.CONSTANTS.ELECTRON_MASS_GEV,
+      vectorMuOverMass: massiveMuRatioValue(),
+      intervals: 760
+    });
+
+    setAnalysisMeta(
+      "Finite-Mass Plasma",
+      "Massive axial CVE · free Dirac gas · vector μ · electron mass · exact Fermi–Dirac integrals"
+    );
+
+    const suppressionDex =
+      analysis.cveSuppression > 0
+        ? Math.log10(analysis.cveSuppression)
+        : Number.NEGATIVE_INFINITY;
+
+    const summary = [
+      '<div class="massive-summary">',
+      '<div><span>mₑ/T</span><strong>' +
+        A.formatScientific(analysis.massOverT, 3) + '</strong></div>',
+      '<div><span>μ_vec/mₑ</span><strong>' +
+        analysis.vectorMuOverMass.toFixed(3) + '</strong></div>',
+      '<div><span>σV massive</span><strong>' +
+        A.formatScientific(
+          analysis.sigmaVFiniteGeV2,
+          3
+        ) + ' GeV²</strong></div>',
+      '<div><span>σV / massless</span><strong>' +
+        A.formatScientific(
+          analysis.cveSuppression,
+          3
+        ) + '</strong></div>',
+      '<div><span>suppression</span><strong>' +
+        (Number.isFinite(suppressionDex)
+          ? suppressionDex.toFixed(2) + ' dex'
+          : '−∞') + '</strong></div>',
+      '<div><span>nₑ implied</span><strong>' +
+        A.formatScientific(
+          analysis.electronDensityCm3,
+          3
+        ) + ' cm⁻³</strong></div>',
+      '</div>'
+    ].join("");
+
+    const table = [
+      '<div class="analysis-row analysis-row-head massive"><span>Quantity</span><span>Finite-mass</span><span>Reference / note</span></div>',
+      '<div class="analysis-row massive"><strong>Axial CVE current</strong><span>' +
+        A.formatScientific(
+          analysis.finiteMassCurrentGeV3,
+          3
+        ) + ' GeV³</span><span>massless ref ' +
+        A.formatScientific(
+          analysis.masslessReferenceCurrentGeV3,
+          3
+        ) + ' GeV³</span></div>',
+      '<div class="analysis-row massive"><strong>Source proxy</strong><span>' +
+        A.formatScientific(
+          analysis.finiteMassSourceProxyGeV4,
+          3
+        ) + ' GeV⁴</span><span>|J₅|/L_eff</span></div>',
+      '<div class="analysis-row massive"><strong>χ_vec</strong><span>' +
+        A.formatScientific(
+          analysis.vectorSusceptibilityGeV2,
+          3
+        ) + ' GeV²</span><span>vector susceptibility; not conserved axial χ₅</span></div>',
+      '<div class="analysis-row massive"><strong>nₑ</strong><span>' +
+        A.formatScientific(
+          analysis.electronDensityCm3,
+          3
+        ) + ' cm⁻³</span><span>ideal free gas at selected μ_vec</span></div>',
+      '<div class="analysis-row massive"><strong>nₑ⁺</strong><span>' +
+        A.formatScientific(
+          analysis.positronDensityCm3,
+          3
+        ) + ' cm⁻³</span><span>thermal positron density</span></div>',
+      '<div class="analysis-row massive"><strong>n_net</strong><span>' +
+        A.formatScientific(
+          analysis.netDensityCm3,
+          3
+        ) + ' cm⁻³</span><span>nₑ − nₑ⁺</span></div>'
+    ].join("");
+
+    const caveat =
+      '<div class="missing-note"><strong>Interpretation:</strong> ' +
+      'the finite-mass formula here is the axial CVE coefficient at finite vector chemical potential. ' +
+      'For m≠0 axial charge is explicitly non-conserved, so v7.9 does not pretend that replacing the massless χ₅ by χ_vec creates a complete massive chirality theory. ' +
+      'The selected μ_vec is an exploratory plasma state; charge neutrality and accretion dynamics are not solved here.</div>';
+
+    setAnalysisTable(summary + table + caveat);
+
+    if (!window.Plotly) return;
+
+    const sweep = A.finiteMassPlasmaSweep(p, {
+      carrierMassGeV: A.CONSTANTS.ELECTRON_MASS_GEV,
+      muRatioMin: 0,
+      muRatioMax: 2,
+      points: 61,
+      intervals: 360
+    });
+
+    const valid = sweep.points.filter((point) =>
+      Number.isFinite(point.suppression) &&
+      point.suppression > 0
+    );
+    const colors = themeColors();
+    const layout = plotLayout(
+      "μ_vec / mₑ",
+      "log₁₀(σV massive / massless)"
+    );
+    layout.shapes = [{
+      type: "line",
+      x0: 0,
+      x1: 2,
+      y0: 0,
+      y1: 0,
+      line: { color: colors.muted, dash: "dash", width: 1 }
+    }];
+
+    Plotly.react("plot", [{
+      type: "scatter",
+      mode: "lines",
+      x: valid.map((point) => point.vectorMuOverMass),
+      y: valid.map((point) =>
+        Math.log10(point.suppression)
+      ),
+      customdata: valid.map((point) => [
+        point.electronDensityCm3,
+        point.positronDensityCm3
+      ]),
+      line: { color: colors.accent2, width: 2 },
+      hovertemplate:
+        "μ/m=%{x:.3f}" +
+        "<br>log₁₀ suppression=%{y:.2f}" +
+        "<br>nₑ=%{customdata[0]:.3e} cm⁻³" +
+        "<br>nₑ⁺=%{customdata[1]:.3e} cm⁻³" +
+        "<extra></extra>"
+    }], layout, {
+      responsive: true,
+      displaylogo: false
+    });
   }
 
   function renderChirality() {
@@ -1563,6 +1729,7 @@
     });
 
     $("explorerControls").classList.toggle("hidden", kind !== "explorer");
+    $("massivePlasmaControls").classList.toggle("hidden", kind !== "massive");
     $("chiralityControls").classList.toggle("hidden", kind !== "chirality");
     $("missingPhysicsControls").classList.toggle("hidden", kind !== "missing");
     $("plot").classList.toggle("plot-tall", kind === "explorer");
@@ -1574,6 +1741,7 @@
         else if (kind === "sensitivity") renderSensitivity();
         else if (kind === "inference") renderInference();
         else if (kind === "transport") renderTransport();
+        else if (kind === "massive") renderMassivePlasma();
         else if (kind === "chirality") renderChirality();
         else if (kind === "missing") renderMissingPhysics();
         else if (kind === "compare") renderComparison();
@@ -1621,7 +1789,7 @@
     const diagnostics = currentDiagnostics();
     const payload = {
       generatedAt: new Date().toISOString(),
-      model: "AxionBH research workbench v7.8",
+      model: "AxionBH research workbench v7.9",
       stateId: runStateId(state.lastMode, state.lastParams),
       mode: state.lastMode,
       parameters: state.lastParams,
@@ -1637,6 +1805,15 @@
         ? A.anomalousTransportDiagnostics(
             state.lastParams,
             state.lastResult
+          )
+        : null,
+      finiteMassPlasma: state.lastMode === "cme"
+        ? A.finiteMassPlasmaDiagnostics(
+            state.lastParams,
+            {
+              carrierMassGeV: A.CONSTANTS.ELECTRON_MASS_GEV,
+              vectorMuOverMass: massiveMuRatioValue()
+            }
           )
         : null,
       chirality: state.lastMode === "cme"
@@ -1668,7 +1845,7 @@
     const lines = [
       "# AxionBH reproducibility report",
       "",
-      "- Model: AxionBH Research Workbench v7.8",
+      "- Model: AxionBH Research Workbench v7.9",
       "- Generated: " + new Date().toISOString(),
       "- State ID: " + stateId,
       "- Mode: " + modeNames[state.lastMode],
@@ -1819,6 +1996,9 @@
         faExp: Number($("explorerFaExp").value),
         resolution: $("explorerResolution").value
       },
+      massivePlasma: {
+        vectorMuOverMass: massiveMuRatioValue()
+      },
       chirality: {
         flipExp: Number($("chiralityFlipExp").value),
         timeExp: Number($("chiralityTimeExp").value),
@@ -1848,7 +2028,7 @@
       applyParameters(restored);
       if (modeNames[payload.mode]) $("mode").value = payload.mode;
 
-      if (["spin", "explorer", "sensitivity", "inference", "transport", "chirality", "missing", "compare"].includes(payload.analysis)) {
+      if (["spin", "explorer", "sensitivity", "inference", "transport", "massive", "chirality", "missing", "compare"].includes(payload.analysis)) {
         state.analysis = payload.analysis;
       }
 
@@ -1865,6 +2045,19 @@
         }
         if (explorerResolutions[payload.explorer.resolution]) {
           $("explorerResolution").value = payload.explorer.resolution;
+        }
+      }
+
+      if (payload.massivePlasma && typeof payload.massivePlasma === "object") {
+        const vectorMuOverMass = Number(
+          payload.massivePlasma.vectorMuOverMass
+        );
+        if (
+          Number.isFinite(vectorMuOverMass) &&
+          vectorMuOverMass >= 0 &&
+          vectorMuOverMass <= 2
+        ) {
+          $("massiveMuRatio").value = vectorMuOverMass;
         }
       }
 
@@ -1897,6 +2090,7 @@
       }
 
       updateExplorerFaLabel();
+      updateMassiveLabels();
       updateChiralityLabels();
       updateMissingGainLabel();
       $("preset").value = "custom";
@@ -1991,6 +2185,13 @@
     $("explorerReference").addEventListener("change", () => scheduleExplorerRender(0));
     $("explorerResolution").addEventListener("change", () => scheduleExplorerRender(0));
 
+    $("massiveMuRatio").addEventListener("input", () => {
+      updateMassiveLabels();
+      if (state.analysis === "massive" && state.lastResult) {
+        renderAnalysis("massive");
+      }
+    });
+
     ["chiralityFlipExp", "chiralityTimeExp", "chiralityEExp"].forEach((id) => {
       $(id).addEventListener("input", () => {
         updateChiralityLabels();
@@ -2019,6 +2220,7 @@
 
     updateConditionalFields();
     updateExplorerFaLabel();
+    updateMassiveLabels();
     updateChiralityLabels();
     updateMissingGainLabel();
     restoreSharedState();

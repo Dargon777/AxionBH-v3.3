@@ -123,8 +123,8 @@ for (const feature of [
   );
 }
 
-assert.ok(html.includes("v7.8"));
-assert.ok(app.includes("AxionBH research workbench v7.8"));
+assert.ok(html.includes("v7.9"));
+assert.ok(app.includes("AxionBH research workbench v7.9"));
 
 
 for (const feature of [
@@ -222,3 +222,33 @@ for (const feature of [
 }
 
 assert.ok(html.includes('data-analysis="chirality"'));
+
+
+for (const id of [
+  "massivePlasmaControls",
+  "massiveCarrier",
+  "massiveMuRatio",
+  "massiveMuRatioOut"
+]) {
+  assert.ok(
+    html.includes('id="' + id + '"'),
+    "missing v7.9 finite-mass UI id: " + id
+  );
+}
+
+for (const feature of [
+  "finiteMassFermiKernel",
+  "finiteMassAxialVorticalConductivity",
+  "finiteMassVectorSusceptibility",
+  "finiteMassCarrierDensities",
+  "finiteMassPlasmaDiagnostics",
+  "finiteMassPlasmaSweep",
+  "renderMassivePlasma"
+]) {
+  assert.ok(
+    core.includes(feature) || app.includes(feature),
+    "missing v7.9 finite-mass feature: " + feature
+  );
+}
+
+assert.ok(html.includes('data-analysis="massive"'));
