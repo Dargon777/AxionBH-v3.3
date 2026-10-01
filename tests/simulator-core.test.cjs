@@ -869,7 +869,7 @@ console.log("AxionBH simulator-core tests passed");
 {
   assert.equal(A.CONSTANTS.POSITRON_RATE_OBS_511,2e43);
   const obs=A.positronObservableFromPower(
-    A.CONSTANTS.POSITRON_ENERGY * 1e43
+    A.CONSTANTS.PAIR_REST_ENERGY_ERG * 1e43
   );
   assert.ok(Math.abs(obs.positronRatePerSecond-1e43)/1e43<1e-12);
   assert.ok(Math.abs(obs.ratio511-0.5)<1e-12);
