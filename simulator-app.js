@@ -260,17 +260,19 @@
     if (result.mode === "cme") {
       return [
         ["ā", A.formatScientific(result.aBar) + " GeV", "устойчивая natural-unit ветвь"],
-        ["κ", A.formatScientific(result.kappa), "эффективность конверсии"],
-        ["Lₑ₊", A.formatScientific(result.luminosity) + " erg/s", "позитронная светимость"],
-        ["L / L₅₁₁", formatRatio(result.ratio511), "относительно 1.07×10⁴³ erg/s"]
+        ["κ", A.formatScientific(result.kappa), "legacy phenomenological conversion factor"],
+        ["P_pair", A.formatScientific(result.luminosity) + " erg/s", "legacy μ₅→pair-power ansatz"],
+        ["Ṅₑ₊", A.formatScientific(result.positronRate) + " s⁻¹", "pair power / 1.022 MeV"],
+        ["Ṅₑ₊ / Ṅ₅₁₁", formatRatio(result.ratio511), "reference ≈2×10⁴³ e⁺/s"]
       ];
     }
     if (result.mode === "bosenova") {
       return [
         ["Eₑ₊ / burst", A.formatScientific(result.convertedEnergy) + " erg", "энергия после эффективности"],
         ["Nₑ₊ / burst", A.formatScientific(result.positronsPerBurst), "оценка числа позитронов"],
-        ["⟨L⟩", A.formatScientific(result.averageLuminosity) + " erg/s", "средняя светимость"],
-        ["⟨L⟩ / L₅₁₁", formatRatio(result.ratio511), "относительно наблюдаемой"]
+        ["⟨P_pair⟩", A.formatScientific(result.averageLuminosity) + " erg/s", "средняя энергия в pair channel"],
+        ["⟨Ṅₑ₊⟩", A.formatScientific(result.averageRate) + " s⁻¹", "средний positron production rate"],
+        ["Ṅₑ₊ / Ṅ₅₁₁", formatRatio(result.ratio511), "reference ≈2×10⁴³ e⁺/s"]
       ];
     }
     if (result.mode === "superradiant") {
@@ -278,14 +280,14 @@
         ["α", A.formatScientific(result.alpha), "гравитационная связь"],
         ["Γ", A.formatScientific(result.gamma) + " s⁻¹", "темп роста"],
         ["t_sat", A.formatDuration(result.saturationTime), "до 5% массы облака"],
-        ["Lₑ₊ / L₅₁₁", formatRatio(result.ratio511), "при заданной эффективности"]
+        ["Ṅₑ₊ / Ṅ₅₁₁", formatRatio(result.ratio511), "при заданной pair efficiency"]
       ];
     }
     return [
       ["α", A.formatScientific(result.alpha), "гравитационная связь"],
       ["t_sat", A.formatDuration(result.saturationTime), "время накопления"],
       ["⟨L_burst⟩", A.formatScientific(result.averageLuminosity) + " erg/s", "среднее по циклу"],
-      ["⟨L⟩ / L₅₁₁", formatRatio(result.ratio511), "относительно наблюдаемой"]
+      ["Ṅₑ₊ / Ṅ₅₁₁", formatRatio(result.ratio511), "относительно positron-rate reference"]
     ];
   }
 
@@ -315,8 +317,10 @@
         ["Fixed-point slope", result.closure ? A.formatScientific(result.closure.stableSlope) : "—"],
         ["r₊", A.formatScientific(result.geometry.rPlus) + " cm"],
         ["Ω_H", A.formatScientific(result.geometry.omegaH) + " s⁻¹"],
-        ["Lₑ₊", A.formatScientific(result.luminosity) + " erg/s"],
-        ["Lₑ₊ / Lobs", formatRatio(result.ratio511)]
+        ["P_pair, ansatz", A.formatScientific(result.luminosity) + " erg/s"],
+        ["Ṅₑ₊, ansatz", A.formatScientific(result.positronRate) + " s⁻¹"],
+        ["Ṅₑ₊ / Ṅobs", formatRatio(result.ratio511)],
+        ["Legacy mixed-unit ratio", formatRatio(result.legacyRatio511)]
       );
     } else if (result.mode === "bosenova") {
       rows.push(
@@ -358,7 +362,7 @@
       ordered[key] = Number(p[key]);
     });
     const source = JSON.stringify({
-      model: "AxionBH-v8.4",
+      model: "AxionBH-v8.4.1",
       mode,
       parameters: ordered
     });
@@ -434,8 +438,8 @@
 
     const ratio = Number(result.ratio511 || 0);
     $("interpretation").textContent = ratio >= 1
-      ? "В этой точке реализация модели достигает или превышает выбранную опорную светимость."
-      : "В этой точке реализация модели остаётся ниже выбранной опорной светимости.";
+      ? "В этой точке реализация модели достигает или превышает выбранный опорный темп производства позитронов."
+      : "В этой точке реализация модели остаётся ниже выбранного опорного темпа производства позитронов.";
     renderDiagnostics(result);
   }
 
@@ -659,7 +663,7 @@
         gridcolor: colors.grid
       },
       zaxis: {
-        title: "log₁₀ L/L₅₁₁",
+        title: "log₁₀ Ṅₑ₊/Ṅ₅₁₁",
         color: colors.text,
         gridcolor: colors.grid
       },
@@ -720,7 +724,7 @@
         showscale: false,
         hovertemplate:
           "A<br>a/M=%{x:.3f}<br>B₀=%{y:.3e} G" +
-          "<br>L/L₅₁₁=%{customdata:.3e}<extra></extra>"
+          "<br>Ṅₑ₊/Ṅ₅₁₁=%{customdata:.3e}<extra></extra>"
       },
       {
         type: "surface",
@@ -733,10 +737,10 @@
         cmax,
         colorscale: "Viridis",
         showscale: true,
-        colorbar: { title: "log₁₀ L/L₅₁₁", len: 0.72 },
+        colorbar: { title: "log₁₀ Ṅₑ₊/Ṅ₅₁₁", len: 0.72 },
         hovertemplate:
           "B<br>a/M=%{x:.3f}<br>B₀=%{y:.3e} G" +
-          "<br>L/L₅₁₁=%{customdata:.3e}<extra></extra>"
+          "<br>Ṅₑ₊/Ṅ₅₁₁=%{customdata:.3e}<extra></extra>"
       }
     ], layout, { responsive: true, displaylogo: false });
   }
@@ -764,7 +768,7 @@
         contours: { coloring: "heatmap", showlabels: false },
         hovertemplate:
           "A<br>a/M=%{x:.3f}<br>B₀=%{y:.3e} G" +
-          "<br>L/L₅₁₁=%{customdata:.3e}<extra></extra>"
+          "<br>Ṅₑ₊/Ṅ₅₁₁=%{customdata:.3e}<extra></extra>"
       },
       {
         type: "contour",
@@ -778,11 +782,11 @@
         zmax: cmax,
         colorscale: "Viridis",
         showscale: true,
-        colorbar: { title: "log₁₀ L/L₅₁₁", len: 0.75 },
+        colorbar: { title: "log₁₀ Ṅₑ₊/Ṅ₅₁₁", len: 0.75 },
         contours: { coloring: "heatmap", showlabels: false },
         hovertemplate:
           "B<br>a/M=%{x:.3f}<br>B₀=%{y:.3e} G" +
-          "<br>L/L₅₁₁=%{customdata:.3e}<extra></extra>"
+          "<br>Ṅₑ₊/Ṅ₅₁₁=%{customdata:.3e}<extra></extra>"
       }
     ], {
       paper_bgcolor: "transparent",
@@ -916,7 +920,7 @@
       colorbar: { title: "orders short" },
       hovertemplate:
         "a/M=%{x:.3f}<br>B₀=%{y:.3e} G" +
-        "<br>L/L₅₁₁=%{customdata:.3e}" +
+        "<br>Ṅₑ₊/Ṅ₅₁₁=%{customdata:.3e}" +
         "<br>gap=%{z:.2f} dex<extra></extra>"
     }], {
       ...layout,
@@ -929,7 +933,7 @@
     setAnalysisMeta(
       view === "deficit" ? "CME deficit map" : "3D Parameter Explorer",
       view === "deficit"
-        ? "Сколько порядков величины отделяет L/L₅₁₁ от единицы; нулевые точки не имеют конечного log-gap"
+        ? "Сколько порядков величины отделяет Ṅₑ₊/Ṅ₅₁₁ от единицы; нулевые точки не имеют конечного log-gap"
         : "CVE closure · spin × B₀ · fₐ задаёт логарифмический срез; A и B используют один fₐ"
     );
 
@@ -966,7 +970,7 @@
 
     setAnalysisMeta(
       "Чувствительность ±10%",
-      modeNames[mode] + " · отклик L/L₅₁₁ на изменение одного параметра"
+      modeNames[mode] + " · отклик Ṅₑ₊/Ṅ₅₁₁ на изменение одного параметра"
     );
 
     const rows = analysis.rows;
@@ -985,7 +989,7 @@
     setAnalysisTable(html);
 
     if (!window.Plotly) return;
-    const layout = plotLayout("параметр", "макс. |Δ(L/L₅₁₁)|, %");
+    const layout = plotLayout("параметр", "макс. |Δ(Ṅₑ₊/Ṅ₅₁₁)|, %");
     Plotly.react("plot", [{
       type: "bar",
       x: rows.map((row) => parameterLabels[row.key] || row.key),
@@ -1020,7 +1024,7 @@
     if ($("mode").value !== "cme") {
       setAnalysisMeta(
         "Parameter Inference",
-        "v8.4 inverse solver сейчас определён для CVE closure"
+        "v8.4.1 inverse solver сейчас определён для CVE closure"
       );
       setAnalysisTable(
         '<div class="inference-empty">Переключи режим на CME, чтобы оценить дефицит и требуемые однопараметрические сдвиги.</div>'
@@ -1037,7 +1041,7 @@
 
     setAnalysisMeta(
       "Parameter Inference",
-      "Однопараметрический inverse scan до L/L₅₁₁ = 1 · диапазоны диагностические, не физические priors"
+      "Однопараметрический inverse scan до Ṅₑ₊/Ṅ₅₁₁ = 1 · диапазоны диагностические, не физические priors"
     );
 
     const deficit = analysis.deficitOrders;
@@ -1046,7 +1050,7 @@
 
     const summary = [
       '<div class="inference-summary">',
-      '<div><span>Current L/L₅₁₁</span><strong>' +
+      '<div><span>Current Ṅₑ₊/Ṅ₅₁₁</span><strong>' +
         A.formatScientific(analysis.currentMetric, 3) + '</strong></div>',
       '<div><span>Deficit</span><strong>' +
         (Number.isFinite(deficit) ? deficit.toFixed(2) + ' dex' : '∞') +
@@ -1537,7 +1541,7 @@
     ].join("");
 
     const table = [
-      '<div class="analysis-row analysis-row-head calibration"><span>Case</span><span>Ṁ, M☉/yr</span><span>nₑ,net cm⁻³</span><span>μ_V MeV</span><span>CVE suppression</span><span>L/L₅₁₁</span><span>Deficit</span><span>Context</span></div>',
+      '<div class="analysis-row analysis-row-head calibration"><span>Case</span><span>Ṁ, M☉/yr</span><span>nₑ,net cm⁻³</span><span>μ_V MeV</span><span>CVE suppression</span><span>Ṅₑ₊/Ṅ₅₁₁</span><span>Deficit</span><span>Context</span></div>',
       calibrationRow(
         analysis.current,
         "current input · forced accretion closure"
@@ -1639,7 +1643,7 @@
           "<br>deficit=%{y:.2f} dex" +
           "<br>nₑ=%{customdata[0]:.3e} cm⁻³" +
           "<br>μ_V=%{customdata[1]:.4f} MeV" +
-          "<br>L/L₅₁₁=%{customdata[2]:.3e}" +
+          "<br>Ṅₑ₊/Ṅ₅₁₁=%{customdata[2]:.3e}" +
           "<extra></extra>"
       },
       {
@@ -1757,7 +1761,7 @@
     ].join("");
 
     const table = [
-      '<div class="analysis-row analysis-row-head flow-geometry"><span>Case</span><span>r/r_g</span><span>H/r</span><span>α</span><span>|v_r|/c</span><span>Y_e</span><span>nₑ,net</span><span>L/L₅₁₁</span><span>Deficit</span></div>',
+      '<div class="analysis-row analysis-row-head flow-geometry"><span>Case</span><span>r/r_g</span><span>H/r</span><span>α</span><span>|v_r|/c</span><span>Y_e</span><span>nₑ,net</span><span>Ṅₑ₊/Ṅ₅₁₁</span><span>Deficit</span></div>',
       flowGeometryRow(
         analysis.current,
         context
@@ -1851,47 +1855,76 @@
       if (window.Plotly) Plotly.purge("plot");
       return;
     }
+
     const audit = A.microphysicsAudit(params());
+    const derivative =
+      audit.axionToMu5.derivativeBenchmark;
+    const pairAudit =
+      audit.mu5ToPositrons.schwingerAudit;
+
     setAnalysisMeta(
       "Microphysics Audit",
-      "dimensional observable fix + explicit phenomenological bridges"
+      "rate-consistent 511 observable + derivative axion-electron benchmark + explicit Schwinger comparator"
     );
+
     const html = [
       '<div class="micro-summary">',
-      '<div><span>Observed 511 quantity</span><strong>' +
+      '<div><span>Observed Ṅₑ₊</span><strong>' +
         A.formatScientific(audit.observed511.valuePerSecond,3) +
-        ' e⁺/s</strong></div>',
-      '<div><span>Historical deficit</span><strong>' +
-        audit.historicalDeficitDex.toFixed(2) + ' dex</strong></div>',
+        ' s⁻¹</strong></div>',
       '<div><span>Corrected deficit</span><strong>' +
         audit.correctedDeficitDex.toFixed(2) + ' dex</strong></div>',
-      '<div><span>Dimensional correction</span><strong>' +
+      '<div><span>Legacy deficit</span><strong>' +
+        audit.historicalDeficitDex.toFixed(2) + ' dex</strong></div>',
+      '<div><span>Metric correction</span><strong>' +
         audit.dimensionalCorrectionDex.toFixed(2) + ' dex</strong></div>',
       '</div>',
-      '<div class="analysis-row analysis-row-head micro"><span>Bridge</span><span>Status</span><span>Current relation</span><span>Meaning</span></div>',
-      '<div class="analysis-row micro"><strong>axion → μ₅</strong><span>phenomenological</span><span>' +
+      '<div class="analysis-row analysis-row-head micro"><span>Bridge</span><span>AxionBH relation</span><span>Independent benchmark</span><span>Diagnostic</span></div>',
+      '<div class="analysis-row micro"><strong>axion → μ₅</strong><span>' +
         audit.axionToMu5.modelRelation +
-        '</span><span>' + audit.axionToMu5.warning + '</span></div>',
-      '<div class="analysis-row micro"><strong>μ₅ → e⁺</strong><span>phenomenological energy proxy</span><span>' +
+        '</span><span>Cₑ ∂a·J₅/(2fₐ), harmonic |dot a|≈mₐ|a|</span><span>Cₑ=1 scale=' +
+        A.formatScientific(derivative.mu5UnitCeGeV,3) +
+        ' GeV; Cₑ to reproduce legacy≈' +
+        A.formatScientific(derivative.requiredCeForLegacy,3) +
+        '</span></div>',
+      '<div class="analysis-row micro"><strong>μ₅ → e⁺</strong><span>' +
         audit.mu5ToPositrons.modelRelation +
-        '</span><span>E_cost=' +
-        A.formatScientific(audit.mu5ToPositrons.energyCostErg,3) +
-        ' erg/e⁺; no microscopic pair-production rate is derived.</span></div>',
-      '<div class="missing-note"><strong>Observable correction:</strong> the Galactic ~10⁴³ quantity is an annihilation/injection rate in e⁺/s, not an energy luminosity in erg/s. v8.4 therefore audits the corrected rate ratio separately; the legacy numerical L/L₅₁₁ fields remain untouched for backward reproducibility.</div>'
+        '</span><span>minimum pair rest-energy budget</span><span>required Ṁc² efficiency≈' +
+        A.formatScientific(audit.mu5ToPositrons.requiredRestMassEfficiency,3) +
+        '</span></div>',
+      '<div class="analysis-row micro"><strong>Schwinger pairs</strong><span>not added to main CVE result</span><span>explicit idealized constant-field QED channel</span><span>E/Ecrit needed≈' +
+        A.formatScientific(pairAudit.required.electricFieldOverCritical,3) +
+        '</span></div>',
+      '<div class="missing-note"><strong>v8.4.1:</strong> ratio511 is now rate/rate everywhere. The historical mixed-unit output is exported as legacyRatio511 instead of remaining the primary observable.</div>'
     ].join("");
-    setAnalysisTable(html);
-    if (!window.Plotly) return;
-    const colors=themeColors();
-    const layout=plotLayout("comparison","remaining deficit, dex");
-    Plotly.react("plot",[{
-      type:"bar",
-      x:["legacy dimensional mismatch","rate-corrected proxy"],
-      y:[audit.historicalDeficitDex,audit.correctedDeficitDex],
-      marker:{color:colors.accent2},
-      hovertemplate:"%{x}<br>%{y:.2f} dex<extra></extra>"
-    }],layout,{responsive:true,displaylogo:false});
-  }
 
+    setAnalysisTable(html);
+
+    if (!window.Plotly) return;
+    const colors = themeColors();
+    const layout = plotLayout(
+      "benchmark",
+      "log₁₀ |μ₅|, GeV"
+    );
+    Plotly.react("plot", [{
+      type: "bar",
+      x: ["legacy μ₅", "Cₑ=1 derivative"],
+      y: [
+        derivative.legacyMu5GeV > 0
+          ? Math.log10(derivative.legacyMu5GeV)
+          : null,
+        derivative.mu5UnitCeGeV > 0
+          ? Math.log10(derivative.mu5UnitCeGeV)
+          : null
+      ],
+      marker: { color: colors.accent2 },
+      hovertemplate:
+        "%{x}<br>log₁₀|μ₅|=%{y:.2f}<extra></extra>"
+    }], layout, {
+      responsive: true,
+      displaylogo: false
+    });
+  }
 
   function renderPairProduction() {
     if ($("mode").value !== "cme") {setAnalysisMeta("Pair Production","Schwinger diagnostic");setAnalysisTable('<div class="inference-empty">Переключи режим на CVE closure.</div>');if(window.Plotly)Plotly.purge("plot");return;}
@@ -2147,7 +2180,7 @@
         A.formatScientific(ceiling.mu5Max, 3) + ' GeV</strong></div>',
       '<div><span>Selected g_extra</span><strong>' +
         A.formatScientific(gain, 3) + '×</strong></div>',
-      '<div><span>Selected L/L₅₁₁</span><strong>' +
+      '<div><span>Selected Ṅₑ₊/Ṅ₅₁₁</span><strong>' +
         selectedState + '</strong></div>',
       '</div>'
     ].join("");
@@ -2215,7 +2248,7 @@
         ? Math.log10(selected.ratio511)
         : null;
     const colors = themeColors();
-    const layout = plotLayout("log₁₀ g_extra", "log₁₀ L/L₅₁₁");
+    const layout = plotLayout("log₁₀ g_extra", "log₁₀ Ṅₑ₊/Ṅ₅₁₁");
     layout.shapes = [{
       type: "line",
       x0: 0,
@@ -2232,7 +2265,7 @@
       y,
       line: { color: colors.accent, width: 2 },
       hovertemplate:
-        "log₁₀ g=%{x:.2f}<br>log₁₀ L/L₅₁₁=%{y:.2f}<extra></extra>"
+        "log₁₀ g=%{x:.2f}<br>log₁₀ Ṅₑ₊/Ṅ₅₁₁=%{y:.2f}<extra></extra>"
     }];
 
     if (selectedY !== null) {
@@ -2243,7 +2276,7 @@
         y: [selectedY],
         marker: { size: 10, color: colors.accent2 },
         hovertemplate:
-          "selected<br>log₁₀ g=%{x:.2f}<br>log₁₀ L/L₅₁₁=%{y:.2f}<extra></extra>"
+          "selected<br>log₁₀ g=%{x:.2f}<br>log₁₀ Ṅₑ₊/Ṅ₅₁₁=%{y:.2f}<extra></extra>"
       });
     }
 
@@ -2273,11 +2306,11 @@
 
     setAnalysisMeta(
       "Сравнение сценариев",
-      modeNames[mode] + " · одна и та же метрика L/L₅₁₁"
+      modeNames[mode] + " · одна и та же метрика Ṅₑ₊/Ṅ₅₁₁"
     );
 
     const html = [
-      '<div class="analysis-row analysis-row-head compare"><span>Сценарий</span><span>a/M</span><span>B₀</span><span>L/L₅₁₁</span></div>',
+      '<div class="analysis-row analysis-row-head compare"><span>Сценарий</span><span>a/M</span><span>B₀</span><span>Ṅₑ₊/Ṅ₅₁₁</span></div>',
       ...scenarios.map((item) =>
         '<div class="analysis-row compare"><strong>' +
         names[item.name] +
@@ -2290,14 +2323,14 @@
     setAnalysisTable(html);
 
     if (!window.Plotly) return;
-    const layout = plotLayout("сценарий", "L/L₅₁₁");
+    const layout = plotLayout("сценарий", "Ṅₑ₊/Ṅ₅₁₁");
     layout.yaxis.type = "log";
     Plotly.react("plot", [{
       type: "bar",
       x: scenarios.map((item) => names[item.name]),
       y: scenarios.map((item) => item.metric > 0 ? item.metric : null),
       marker: { color: themeColors().accent2 },
-      hovertemplate: "%{x}<br>L/L₅₁₁=%{y:.3e}<extra></extra>"
+      hovertemplate: "%{x}<br>Ṅₑ₊/Ṅ₅₁₁=%{y:.3e}<extra></extra>"
     }], layout, { responsive: true, displaylogo: false });
   }
 
@@ -2372,7 +2405,7 @@
     const diagnostics = currentDiagnostics();
     const payload = {
       generatedAt: new Date().toISOString(),
-      model: "AxionBH research workbench v8.4",
+      model: "AxionBH research workbench v8.4.1",
       modelVersion: A.MODEL_VERSION,
       stateSchemaVersion: A.STATE_SCHEMA_VERSION,
       stateId: runStateId(state.lastMode, state.lastParams),
@@ -2446,7 +2479,7 @@
     const lines = [
       "# AxionBH reproducibility report",
       "",
-      "- Model: AxionBH Research Workbench v8.4",
+      "- Model: AxionBH Research Workbench v8.4.1",
       "- Generated: " + new Date().toISOString(),
       "- State ID: " + stateId,
       "- Mode: " + modeNames[state.lastMode],
