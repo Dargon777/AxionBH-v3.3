@@ -3910,6 +3910,9 @@
     "axion_chiral_coupling",
     "stationary_closure",
     "chirality_dynamics",
+    "gap_charge_supply",
+    "gap_potential",
+    "pair_cascade",
     "superradiance_rate",
     "cloud_saturation",
     "positron_conversion",
@@ -3996,6 +3999,30 @@
         state: "diagnostic only",
         detail:
           "S_proxy = |J5,CVE|/L_eff and massless axial susceptibility are not a finite-mass kinetic derivation."
+      },
+      {
+        id: "gap_charge_supply",
+        category: "diagnostic-proxy",
+        title: "Gap charge starvation",
+        state: mode === "cme" ? "available in Gap tab" : "not selected",
+        detail:
+          "Compares a classical Goldreich-Julian density scale with a continuity-based accretion charge-supply proxy. The fraction of disk plasma injected into the funnel is an explicit exploratory parameter."
+      },
+      {
+        id: "gap_potential",
+        category: "literature-model",
+        title: "Gap potential",
+        state: mode === "cme" ? "analytic scaling" : "not selected",
+        detail:
+          "Uses the Rieger/Katsoulakos vacuum-gap h^2 or near-GJ h^3/6 voltage scaling. The linear charge-deficit factor is a closure heuristic, not a GR Poisson solution."
+      },
+      {
+        id: "pair_cascade",
+        category: "diagnostic-proxy",
+        title: "Curvature → gamma-gamma pair cascade",
+        state: mode === "cme" ? "one-generation diagnostic" : "not selected",
+        detail:
+          "Curvature radiation, head-on Breit-Wheeler conversion and pair multiplicity are evaluated in a monoenergetic isotropic soft-photon bath. Inverse Compton, spectra, feedback and time-dependent GR PIC evolution are omitted."
       },
       {
         id: "superradiance_rate",
