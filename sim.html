@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="AxionBH interactive browser simulator and parameter-analysis workbench.">
-  <title>AxionBH — Research Workbench v7.2</title>
+  <title>AxionBH — Research Workbench v7.3</title>
   <link rel="stylesheet" href="simulator.css">
   <script defer src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <script defer src="simulator-core.js"></script>
@@ -15,7 +15,7 @@
     <div class="topbar-inner">
       <a class="brand" href="index.html">
         <span class="brand-mark">A</span>
-        <span>AxionBH<small>research workbench · v7.2</small></span>
+        <span>AxionBH<small>research workbench · v7.3</small></span>
       </a>
       <nav class="nav">
         <a href="index.html">Теория</a>
@@ -30,7 +30,7 @@
       <div>
         <div class="eyebrow">AxionBH · research workbench</div>
         <h1>Аксионное облако вокруг вращающейся чёрной дыры</h1>
-        <p>Локальный интерактивный расчёт CME, Bosenova, суперрадиантного и гибридного режимов — теперь со сравнением сценариев, картой параметров и анализом чувствительности.</p>
+        <p>Локальный интерактивный расчёт CME, Bosenova, суперрадиантного и гибридного режимов — теперь со сравнением сценариев, картой параметров, анализом чувствительности и диагностикой воспроизводимости.</p>
       </div>
       <div class="status-stack">
         <span class="badge"><span id="runStatusDot" class="dot"></span><span id="runStatus">Движок готов</span></span>
@@ -46,7 +46,7 @@
       <aside class="panel controls">
         <div class="panel-title">
           <h2>Параметры</h2>
-          <span class="muted">v7.2</span>
+          <span class="muted">v7.3</span>
         </div>
 
         <div class="field">
@@ -136,10 +136,12 @@
               <div class="inline-actions">
                 <button id="copyBtn" class="ghost-btn" type="button">Копировать</button>
                 <button id="exportBtn" class="ghost-btn" type="button">JSON</button>
+                <button id="reportBtn" class="ghost-btn" type="button">Report</button>
               </div>
             </div>
             <div id="resultTable" class="result-table"></div>
             <p id="interpretation" class="muted" style="margin:13px 0 0"></p>
+            <div id="diagnostics" class="diagnostics"></div>
           </div>
         </div>
 
@@ -188,6 +190,10 @@
                 <option value="medium" selected>Medium · 20×15</option>
                 <option value="high">High · 28×20</option>
               </select>
+            </div>
+            <div class="explorer-field explorer-export">
+              <label>Данные</label>
+              <button id="explorerCsvBtn" class="mini-btn" type="button">CSV grid</button>
             </div>
           </div>
 

@@ -193,3 +193,59 @@ input[type="range"]{width:100%;accent-color:var(--accent)}
   .explorer-summary>div:nth-last-child(-n+2){border-bottom:none}
   #plot.plot-tall{height:480px}
 }
+
+
+.diagnostics{
+  margin-top:14px;
+  border:1px solid var(--border);
+  border-radius:13px;
+  overflow:hidden;
+}
+.diagnostics-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:9px 11px;
+  background:var(--panel-2);
+  border-bottom:1px solid var(--border);
+  font-size:12px;
+}
+.state-id{
+  font-family:"SFMono-Regular",Consolas,monospace;
+  color:var(--muted);
+  font-size:11px;
+}
+.diagnostics-list{display:grid}
+.diag-item{
+  display:grid;
+  grid-template-columns:64px 1fr auto;
+  gap:10px;
+  align-items:center;
+  padding:9px 11px;
+  border-bottom:1px solid var(--border);
+  font-size:11px;
+}
+.diag-item:last-child{border-bottom:none}
+.diag-level{
+  font-weight:800;
+  font-size:9px;
+  letter-spacing:.08em;
+}
+.diag-message{color:var(--muted);line-height:1.4}
+.diag-value{
+  font-family:"SFMono-Regular",Consolas,monospace;
+  font-size:10px;
+}
+.diag-ok .diag-level{color:var(--ok)}
+.diag-warning .diag-level{color:var(--warn)}
+.diag-error .diag-level{color:var(--danger)}
+.diag-info .diag-level{color:var(--accent)}
+.explorer-export .mini-btn{
+  min-height:34px;
+  color:var(--text);
+}
+@media(max-width:560px){
+  .diag-item{grid-template-columns:54px 1fr}
+  .diag-value{grid-column:2}
+}
