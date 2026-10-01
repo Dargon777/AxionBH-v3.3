@@ -3,7 +3,7 @@
 
 AxionBH is an exploratory browser simulator for the black-hole / axion model documented in `index.html`.
 
-## Research Workbench v8.6.0
+## Research Workbench v8.7.0
 
 Open `sim.html` in a modern browser.
 
@@ -253,3 +253,22 @@ The implementation adds:
 - a direct comparison with the already implemented vacuum Schwinger channel.
 
 The gap model remains deliberately diagnostic. The full Kerr Goldreich-Julian density, gap Poisson equation, photon spectra, inverse-Compton losses, pair feedback and time-dependent GR PIC evolution are not solved. The funnel-injection fraction and soft-photon bath are exploratory inputs rather than observational posteriors.
+
+
+## v8.7 self-consistent spectral gap closure
+
+v8.7 promotes the v8.6 one-energy gap diagnostic into a spectral radiative closure model.
+
+The new layer:
+
+- replaces the monoenergetic soft-photon bath with an isotropic power-law photon-number spectrum, `dN/dε ∝ ε^-p`, normalized to an explicit bolometric soft-photon luminosity;
+- integrates Breit-Wheeler `γγ -> e+e-` opacity over that discretized spectrum;
+- adds inverse-Compton cooling over the same photon field;
+- applies the Moderski et al. approximation `F_KN ~= (1+b)^(-3/2)`, with `b = 4 γ ε/(m_e c^2)`, to expose Klein-Nishina suppression explicitly;
+- solves the electron Lorentz factor from electric acceleration versus curvature + inverse-Compton losses, capped by the available gap potential;
+- propagates both curvature and IC photons into the one-generation pair budget;
+- scans and refines `h/r_g` to find where both pair multiplicity and the Goldreich-Julian refill proxy reach unity.
+
+The closure solver deliberately returns `closure-not-found` if either criterion fails throughout the configured `10^-3 <= h/r_g <= 1` interval.
+
+This is still an exploratory stationary closure. The photon spectrum is not a fitted Sgr A* SED, the IC treatment does not use the exact Klein-Nishina redistribution kernel, angular radiative transfer is simplified, and secondary pairs are not evolved recursively. GRPIC calculations show that real black-hole spark gaps can be intermittent even when steady algebraic closure criteria appear possible.

@@ -742,3 +742,25 @@
   time-dependent GR PIC solution.
 </p>
 </section>
+
+
+<section id="v87-spectral-gap">
+<h2>AxionBH v8.7: spectral photon field, IC losses and gap-height closure</h2>
+<p>
+  v8.7 replaces the one-energy soft-photon proxy with a normalized power-law
+  spectrum and integrates gamma-gamma opacity across that field. Electron
+  acceleration is limited by the available potential or by the combined
+  curvature and inverse-Compton radiative drag. The IC term includes an
+  explicit Klein-Nishina suppression approximation.
+</p>
+<p>
+  A closure solver scans the gap height and searches for the first region where
+  both one-generation pair multiplicity and the Goldreich-Julian refill proxy
+  reach unity. Failure to satisfy either condition is reported as an unresolved
+  gap rather than converted into a successful positron prediction.
+</p>
+<p>
+  This remains a diagnostic stationary model. It is not a GRPIC simulation,
+  fitted Sgr A* radiation field, or time-dependent pair cascade.
+</p>
+</section>

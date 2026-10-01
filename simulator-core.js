@@ -5,8 +5,8 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  const MODEL_VERSION = "8.6.0";
-  const STATE_SCHEMA_VERSION = 11;
+  const MODEL_VERSION = "8.7.0";
+  const STATE_SCHEMA_VERSION = 12;
 
   const CONSTANTS = Object.freeze({
     G: 6.6743015e-8,
@@ -2385,6 +2385,371 @@
     };
   }
 
+  function powerLawSoftPhotonSpectrum(input,options={}){
+    const p=normalizeParams(input);
+    const geometry=kerrGeometry(p.massSolar*CONSTANTS.MSUN,p.spin);
+    const radiusRg=assertFinitePositive(Number(options.softPhotonRadiusRg??2.1),"softPhotonRadiusRg");
+    const luminosity=assertFinitePositive(Number(options.softPhotonLuminosityErgS??1e36),"softPhotonLuminosityErgS");
+    const minEv=assertFinitePositive(Number(options.softPhotonMinEv??1e-3),"softPhotonMinEv");
+    const maxEv=assertFinitePositive(Number(options.softPhotonMaxEv??1e4),"softPhotonMaxEv");
+    if(!(maxEv>minEv))throw new RangeError("softPhotonMaxEv must exceed softPhotonMinEv");
+    const photonIndex=Number(options.softPhotonIndex??2);
+    if(!Number.isFinite(photonIndex))throw new RangeError("softPhotonIndex must be finite");
+    const bins=Math.max(12,Math.min(160,Math.trunc(Number(options.softPhotonBins??48))));
+    const radiusCm=radiusRg*geometry.rg;
+    const totalEnergyDensityErgCm3=luminosity/(4*Math.PI*radiusCm*radiusCm*CONSTANTS.C);
+    const logMin=Math.log(minEv),logMax=Math.log(maxEv),dlog=(logMax-logMin)/bins;
+    const raw=[];
+    let norm=0;
+    for(let i=0;i<bins;i+=1){
+      const energyEv=Math.exp(logMin+(i+0.5)*dlog);
+      const energyPerLogWeight=Math.pow(energyEv,2-photonIndex);
+      raw.push({energyEv,energyPerLogWeight});
+      norm+=energyPerLogWeight;
+    }
+    const spectrum=raw.map((item,index)=>{
+      const energyFraction=norm>0?item.energyPerLogWeight/norm:0;
+      const energyDensityErgCm3=totalEnergyDensityErgCm3*energyFraction;
+      const photonEnergyErg=item.energyEv*CONSTANTS.ERG_PER_EV;
+      const numberDensityCm3=photonEnergyErg>0?energyDensityErgCm3/photonEnergyErg:0;
+      return {
+        index,
+        energyEv:item.energyEv,
+        photonEnergyErg,
+        energyFraction,
+        energyDensityErgCm3,
+        numberDensityCm3,
+        dlogEnergy:dlog
+      };
+    });
+    return {
+      model:"isotropic power-law photon-number spectrum",
+      radiusRg,
+      radiusCm,
+      luminosityErgS:luminosity,
+      minEnergyEv:minEv,
+      maxEnergyEv:maxEv,
+      photonIndex,
+      bins:spectrum,
+      totalEnergyDensityErgCm3,
+      totalNumberDensityCm3:spectrum.reduce((sum,b)=>sum+b.numberDensityCm3,0),
+      convention:"dN/dε ∝ ε^(-p), discretized uniformly in ln ε and normalized to the requested bolometric soft-photon luminosity",
+      caveat:"Exploratory isotropic spectrum; it is not a fitted Sgr A* SED or GR radiative-transfer solution."
+    };
+  }
+
+  function spectralGammaGammaAudit(input,options={}){
+    const p=normalizeParams(input);
+    const gammaPhotonEnergyEv=Number(options.gammaPhotonEnergyEv??0);
+    if(!Number.isFinite(gammaPhotonEnergyEv)||gammaPhotonEnergyEv<0)throw new RangeError("gammaPhotonEnergyEv must be non-negative");
+    const spectrum=options.spectrum||powerLawSoftPhotonSpectrum(p,options);
+    const pathLengthCm=assertFinitePositive(Number(options.pathLengthCm??kerrGeometry(p.massSolar*CONSTANTS.MSUN,p.spin).rg),"pathLengthCm");
+    const collisionCosine=Number(options.collisionCosine??-1);
+    let opticalDepth=0,dominant=null;
+    const contributions=spectrum.bins.map((bin)=>{
+      const bw=breitWheelerCrossSection(gammaPhotonEnergyEv,bin.energyEv,collisionCosine);
+      const tau=bin.numberDensityCm3*bw.crossSectionCm2*pathLengthCm;
+      opticalDepth+=tau;
+      const row={energyEv:bin.energyEv,numberDensityCm3:bin.numberDensityCm3,crossSectionCm2:bw.crossSectionCm2,thresholdParameter:bw.thresholdParameter,opticalDepth:tau};
+      if(!dominant||tau>dominant.opticalDepth)dominant=row;
+      return row;
+    });
+    const conversionProbability=opticalDepth>700?1:-Math.expm1(-opticalDepth);
+    return {
+      gammaPhotonEnergyEv,
+      spectrum,
+      pathLengthCm,
+      collisionCosine,
+      opticalDepth,
+      conversionProbability,
+      dominantTarget:dominant,
+      contributions,
+      model:"head-on Breit-Wheeler opacity integrated over the discretized soft-photon spectrum"
+    };
+  }
+
+  function inverseComptonCoolingAudit(input,options={}){
+    const p=normalizeParams(input);
+    const gamma=assertFinitePositive(Number(options.gamma??1),"gamma");
+    const spectrum=options.spectrum||powerLawSoftPhotonSpectrum(p,options);
+    const mec2Ev=CONSTANTS.ELECTRON_REST_ENERGY_EV;
+    let powerErgS=0,thomsonPowerErgS=0,photonRatePerSecond=0,energyWeightedPhotonRate=0;
+    const components=spectrum.bins.map((bin)=>{
+      const b=4*gamma*bin.energyEv/mec2Ev;
+      const fKN=Math.pow(1+b,-1.5);
+      const thomson=(4/3)*CONSTANTS.THOMSON_CROSS_SECTION_CM2*CONSTANTS.C*gamma*gamma*bin.energyDensityErgCm3;
+      const power=thomson*fKN;
+      const scatteredEnergyEv=Math.min(
+        gamma*mec2Ev,
+        (4/3)*gamma*gamma*bin.energyEv/(1+b)
+      );
+      const scatteredEnergyErg=scatteredEnergyEv*CONSTANTS.ERG_PER_EV;
+      const rate=scatteredEnergyErg>0?power/scatteredEnergyErg:0;
+      thomsonPowerErgS+=thomson;
+      powerErgS+=power;
+      photonRatePerSecond+=rate;
+      energyWeightedPhotonRate+=rate*scatteredEnergyEv;
+      return {
+        seedEnergyEv:bin.energyEv,
+        seedEnergyDensityErgCm3:bin.energyDensityErgCm3,
+        b,
+        fKN,
+        thomsonPowerErgS:thomson,
+        powerErgS:power,
+        scatteredEnergyEv,
+        photonRatePerSecond:rate
+      };
+    });
+    return {
+      gamma,
+      spectrum,
+      thomsonPowerErgS,
+      powerErgS,
+      effectiveKleinNishinaSuppression:thomsonPowerErgS>0?powerErgS/thomsonPowerErgS:0,
+      photonRatePerSecond,
+      characteristicPhotonEnergyEv:photonRatePerSecond>0?energyWeightedPhotonRate/photonRatePerSecond:0,
+      components,
+      approximation:"Moderski-style F_KN ≈ (1+b)^(-3/2), b=4γ ε/(m_e c^2), applied bin-by-bin",
+      caveat:"This is an isotropic continuous-loss approximation, not the exact Klein-Nishina redistribution kernel or Monte-Carlo scattering."
+    };
+  }
+
+  function curvatureEmissionAtGamma(input,options={}){
+    const p=normalizeParams(input);
+    const gamma=assertFinitePositive(Number(options.gamma??1),"gamma");
+    const geometry=kerrGeometry(p.massSolar*CONSTANTS.MSUN,p.spin);
+    const curvatureRadiusRg=assertFinitePositive(Number(options.curvatureRadiusRg??1),"curvatureRadiusRg");
+    const curvatureRadiusCm=curvatureRadiusRg*geometry.rg;
+    const pathLengthCm=assertFinitePositive(Number(options.pathLengthCm??geometry.rg),"pathLengthCm");
+    const powerErgS=(2*CONSTANTS.ELECTRON_CHARGE_ESU**2*CONSTANTS.C*gamma**4)/(3*curvatureRadiusCm**2);
+    const characteristicPhotonEnergyErg=(3/2)*CONSTANTS.HBAR*CONSTANTS.C*gamma**3/curvatureRadiusCm;
+    const characteristicPhotonEnergyEv=characteristicPhotonEnergyErg/CONSTANTS.ERG_PER_EV;
+    const crossingTimeSeconds=pathLengthCm/CONSTANTS.C;
+    const photonsPerPrimary=characteristicPhotonEnergyErg>0?powerErgS*crossingTimeSeconds/characteristicPhotonEnergyErg:0;
+    return {
+      gamma,
+      curvatureRadiusRg,
+      curvatureRadiusCm,
+      powerErgS,
+      characteristicPhotonEnergyErg,
+      characteristicPhotonEnergyEv,
+      crossingTimeSeconds,
+      photonsPerPrimary
+    };
+  }
+
+  function gapRadiationBalanceAudit(input,options={}){
+    const p=normalizeParams(input);
+    const potential=options.potential||gapPotentialDrop(p,options);
+    const spectrum=options.spectrum||powerLawSoftPhotonSpectrum(p,options);
+    const potentialLimitedGamma=Math.max(1,1+Math.max(0,potential.voltageV)/CONSTANTS.ELECTRON_REST_ENERGY_EV);
+    const eStat=Math.max(0,potential.averageParallelElectricFieldVcm/299.792458);
+    const accelerationPowerErgS=CONSTANTS.ELECTRON_CHARGE_ESU*eStat*CONSTANTS.C;
+    function losses(gamma){
+      const curvature=curvatureEmissionAtGamma(p,{gamma,curvatureRadiusRg:options.curvatureRadiusRg??1,pathLengthCm:potential.gapHeightCm});
+      const inverseCompton=inverseComptonCoolingAudit(p,{gamma,spectrum});
+      return {curvature,inverseCompton,total:curvature.powerErgS+inverseCompton.powerErgS};
+    }
+    const atPotential=losses(potentialLimitedGamma);
+    let gamma=potentialLimitedGamma,limitingRegime="potential";
+    if(accelerationPowerErgS>0&&atPotential.total>accelerationPowerErgS){
+      let lo=1,hi=potentialLimitedGamma;
+      for(let i=0;i<80;i+=1){
+        const mid=Math.sqrt(lo*hi);
+        if(losses(mid).total>accelerationPowerErgS)hi=mid;else lo=mid;
+      }
+      gamma=Math.sqrt(lo*hi);
+      limitingRegime="radiation-reaction";
+    }
+    const finalLosses=losses(gamma);
+    const dominantLoss=finalLosses.inverseCompton.powerErgS>finalLosses.curvature.powerErgS?"inverse-compton":"curvature";
+    return {
+      potential,
+      spectrum,
+      potentialLimitedGamma,
+      gamma,
+      limitingRegime,
+      dominantLoss,
+      accelerationPowerErgS,
+      curvature:finalLosses.curvature,
+      inverseCompton:finalLosses.inverseCompton,
+      totalRadiativePowerErgS:finalLosses.total,
+      balanceRatio:accelerationPowerErgS>0?finalLosses.total/accelerationPowerErgS:0
+    };
+  }
+
+  function radiativeGapCascadeAudit(input,options={}){
+    const p=normalizeParams(input);
+    const geometry=kerrGeometry(p.massSolar*CONSTANTS.MSUN,p.spin);
+    const radiusRg=Number(options.radiusRg??Math.max(2.1,1.05*geometry.rPlus/geometry.rg));
+    const starvation=gapChargeStarvationAudit(p,{
+      radiusRg,
+      plasmaInjectionFraction:options.plasmaInjectionFraction??1,
+      fieldG:options.fieldG??null,
+      fieldLineOmegaFraction:options.fieldLineOmegaFraction??0.5
+    });
+    const potential=gapPotentialDrop(p,{
+      gapHeightRg:options.gapHeightRg??0.1,
+      potentialModel:options.potentialModel??"vacuum-h2",
+      fieldG:options.fieldG??null,
+      fieldLineOmegaFraction:options.fieldLineOmegaFraction??0.5,
+      chargeDeficitFraction:starvation.chargeDeficitFraction
+    });
+    const spectrum=powerLawSoftPhotonSpectrum(p,{
+      softPhotonRadiusRg:options.softPhotonRadiusRg??radiusRg,
+      softPhotonLuminosityErgS:options.softPhotonLuminosityErgS??1e36,
+      softPhotonMinEv:options.softPhotonMinEv??1e-3,
+      softPhotonMaxEv:options.softPhotonMaxEv??1e4,
+      softPhotonIndex:options.softPhotonIndex??2,
+      softPhotonBins:options.softPhotonBins??48
+    });
+    const balance=gapRadiationBalanceAudit(p,{
+      potential,
+      spectrum,
+      curvatureRadiusRg:options.curvatureRadiusRg??1
+    });
+    const curvatureOpacity=spectralGammaGammaAudit(p,{
+      gammaPhotonEnergyEv:balance.curvature.characteristicPhotonEnergyEv,
+      spectrum,
+      pathLengthCm:potential.gapHeightCm,
+      collisionCosine:options.collisionCosine??-1
+    });
+    const curvaturePairMultiplicity=balance.curvature.photonsPerPrimary*curvatureOpacity.conversionProbability;
+    let icPairMultiplicity=0,icEmittedPhotonsPerPrimary=0,icPairWeightedEnergyEv=0;
+    const icPairComponents=balance.inverseCompton.components.map((component)=>{
+      const opacity=spectralGammaGammaAudit(p,{
+        gammaPhotonEnergyEv:component.scatteredEnergyEv,
+        spectrum,
+        pathLengthCm:potential.gapHeightCm,
+        collisionCosine:options.collisionCosine??-1
+      });
+      const emitted=component.photonRatePerSecond*balance.curvature.crossingTimeSeconds;
+      const pairs=emitted*opacity.conversionProbability;
+      icEmittedPhotonsPerPrimary+=emitted;
+      icPairMultiplicity+=pairs;
+      icPairWeightedEnergyEv+=pairs*component.scatteredEnergyEv;
+      return {
+        seedEnergyEv:component.seedEnergyEv,
+        scatteredEnergyEv:component.scatteredEnergyEv,
+        emittedPhotonsPerPrimary:emitted,
+        gammaGammaOpticalDepth:opacity.opticalDepth,
+        conversionProbability:opacity.conversionProbability,
+        pairMultiplicity:pairs
+      };
+    });
+    const multiplicityOneGeneration=curvaturePairMultiplicity+icPairMultiplicity;
+    const coveringFraction=Number(options.coveringFraction??1);
+    if(!(coveringFraction>0&&coveringFraction<=1))throw new RangeError("coveringFraction must satisfy 0 < f <= 1");
+    const areaCm2=4*Math.PI*(radiusRg*geometry.rg)**2*coveringFraction;
+    const primaryDensityCm3=Math.min(starvation.availableChargeDensityCm3,starvation.goldreichJulian.numberDensityCm3);
+    const primaryFluxPerSecond=primaryDensityCm3*CONSTANTS.C*areaCm2;
+    const rawPairRatePerSecond=primaryFluxPerSecond*multiplicityOneGeneration;
+    const electricalPowerErgS=primaryFluxPerSecond*potential.voltageV*CONSTANTS.ERG_PER_EV;
+    const energyLimitedPairRatePerSecond=electricalPowerErgS/CONSTANTS.PAIR_REST_ENERGY_ERG;
+    const cappedPairRatePerSecond=Math.min(rawPairRatePerSecond,energyLimitedPairRatePerSecond);
+    const gjChargeFluxPerSecond=starvation.goldreichJulian.numberDensityCm3*CONSTANTS.C*areaCm2;
+    const closureChargeFluxPerSecond=2*cappedPairRatePerSecond;
+    const closureSupplyRatio=gjChargeFluxPerSecond>0?closureChargeFluxPerSecond/gjChargeFluxPerSecond:0;
+    return {
+      status:starvation.starved?"radiative-gap-candidate":"screened-by-charge-supply-proxy",
+      radiusRg,
+      coveringFraction,
+      starvation,
+      potential,
+      spectrum,
+      radiationBalance:balance,
+      curvatureOpacity,
+      curvaturePairMultiplicity,
+      icEmittedPhotonsPerPrimary,
+      icPairMultiplicity,
+      icPairCharacteristicEnergyEv:icPairMultiplicity>0?icPairWeightedEnergyEv/icPairMultiplicity:0,
+      icPairComponents,
+      multiplicityOneGeneration,
+      cascadeSelfSustaining:multiplicityOneGeneration>=1,
+      areaCm2,
+      primaryDensityCm3,
+      primaryFluxPerSecond,
+      rawPairRatePerSecond,
+      electricalPowerErgS,
+      energyLimitedPairRatePerSecond,
+      cappedPairRatePerSecond,
+      pairRateToBulgeTarget:cappedPairRatePerSecond/CONSTANTS.POSITRON_RATE_OBS_511,
+      gjChargeFluxPerSecond,
+      closureChargeFluxPerSecond,
+      closureSupplyRatio,
+      canRefillGoldreichJulian:closureSupplyRatio>=1,
+      dominantPairChannel:icPairMultiplicity>curvaturePairMultiplicity?"inverse-compton":"curvature",
+      caveats:[
+        "The photon spectrum is a normalized isotropic power-law proxy, not a fitted Sgr A* spectral energy distribution.",
+        "IC cooling uses a Moderski-style Klein-Nishina suppression approximation rather than the exact redistribution kernel.",
+        "Gamma-gamma opacity uses head-on collisions against the same isotropic spectral proxy.",
+        "The cascade is still one-generation; secondary-particle spectra and time-dependent screening are not evolved.",
+        "The result is a local gap-closure diagnostic and not a prediction of Galactic 511-keV morphology."
+      ]
+    };
+  }
+
+  function solveGapClosure(input,options={}){
+    const p=normalizeParams(input);
+    const minHeight=assertFinitePositive(Number(options.minGapHeightRg??1e-3),"minGapHeightRg");
+    const maxHeight=assertFinitePositive(Number(options.maxGapHeightRg??1),"maxGapHeightRg");
+    if(!(maxHeight>minHeight))throw new RangeError("maxGapHeightRg must exceed minGapHeightRg");
+    const steps=Math.max(24,Math.min(180,Math.trunc(Number(options.closureScanSteps??72))));
+    const heights=logSpace(minHeight,maxHeight,steps);
+    const points=heights.map((height)=>radiativeGapCascadeAudit(p,{...options,gapHeightRg:height}));
+    function metric(point,key){
+      return key==="gj-refill"?point.closureSupplyRatio:point.multiplicityOneGeneration;
+    }
+    function firstCrossing(key){
+      let previous=null;
+      for(let i=0;i<points.length;i+=1){
+        const value=metric(points[i],key);
+        if(value>=1){
+          if(!previous)return {heightRg:heights[i],audit:points[i],bracket:null};
+          let lo=Math.log(previous.height),hi=Math.log(heights[i]);
+          for(let j=0;j<48;j+=1){
+            const mid=(lo+hi)/2,h=Math.exp(mid);
+            const audit=radiativeGapCascadeAudit(p,{...options,gapHeightRg:h});
+            if(metric(audit,key)>=1)hi=mid;else lo=mid;
+          }
+          const h=Math.exp(hi);
+          return {heightRg:h,audit:radiativeGapCascadeAudit(p,{...options,gapHeightRg:h}),bracket:[previous.height,heights[i]]};
+        }
+        previous={height:heights[i],value};
+      }
+      return null;
+    }
+    const multiplicityClosure=firstCrossing("multiplicity");
+    const gjRefillClosure=firstCrossing("gj-refill");
+    const closureHeightRg=multiplicityClosure&&gjRefillClosure
+      ? Math.max(multiplicityClosure.heightRg,gjRefillClosure.heightRg)
+      : null;
+    const closureAudit=closureHeightRg
+      ? radiativeGapCascadeAudit(p,{...options,gapHeightRg:closureHeightRg})
+      : null;
+    return {
+      status:closureAudit?"closure-found":"closure-not-found",
+      minGapHeightRg:minHeight,
+      maxGapHeightRg:maxHeight,
+      scanSteps:steps,
+      multiplicityClosure,
+      gjRefillClosure,
+      closureHeightRg,
+      closureAudit,
+      points:points.map((audit,index)=>({
+        gapHeightRg:heights[index],
+        multiplicityOneGeneration:audit.multiplicityOneGeneration,
+        closureSupplyRatio:audit.closureSupplyRatio,
+        gamma:audit.radiationBalance.gamma,
+        icFraction:audit.radiationBalance.totalRadiativePowerErgS>0
+          ? audit.radiationBalance.inverseCompton.powerErgS/audit.radiationBalance.totalRadiativePowerErgS
+          : 0
+      })),
+      interpretation:"The reported closure height is the first scanned/refined h for which both one-generation pair multiplicity and the GJ-refill proxy reach unity.",
+      caveat:"This is a stationary algebraic closure criterion. GRPIC studies show real black-hole gaps can be intermittent and time-dependent."
+    };
+  }
+
   function gapCascadeAudit(input,options={}){
     const p=normalizeParams(input);
     const defaultGeometry=kerrGeometry(p.massSolar*CONSTANTS.MSUN,p.spin);
@@ -3914,7 +4279,10 @@
     "chirality_dynamics",
     "gap_charge_supply",
     "gap_potential",
+    "soft_photon_spectrum",
+    "inverse_compton",
     "pair_cascade",
+    "gap_closure",
     "superradiance_rate",
     "cloud_saturation",
     "positron_conversion",
@@ -4019,12 +4387,36 @@
           "Uses the Rieger/Katsoulakos vacuum-gap h^2 or near-GJ h^3/6 voltage scaling. The linear charge-deficit factor is a closure heuristic, not a GR Poisson solution."
       },
       {
+        id: "soft_photon_spectrum",
+        category: "diagnostic-proxy",
+        title: "Soft-photon spectrum",
+        state: mode === "cme" ? "power-law proxy available" : "not selected",
+        detail:
+          "v8.7 can replace the monoenergetic bath with an isotropic power-law photon-number spectrum normalized to a bolometric luminosity. It is not a fitted Sgr A* SED."
+      },
+      {
+        id: "inverse_compton",
+        category: "literature-model",
+        title: "Inverse-Compton losses",
+        state: mode === "cme" ? "KN-suppressed approximation" : "not selected",
+        detail:
+          "IC cooling is integrated over the spectral proxy with a Moderski-style F_KN ≈ (1+b)^(-3/2) suppression. This is not the exact Klein-Nishina redistribution kernel."
+      },
+      {
         id: "pair_cascade",
         category: "diagnostic-proxy",
-        title: "Curvature → gamma-gamma pair cascade",
-        state: mode === "cme" ? "one-generation diagnostic" : "not selected",
+        title: "Curvature + IC → gamma-gamma pair cascade",
+        state: mode === "cme" ? "one-generation spectral diagnostic" : "not selected",
         detail:
-          "Curvature radiation, head-on Breit-Wheeler conversion and pair multiplicity are evaluated in a monoenergetic isotropic soft-photon bath. Inverse Compton, spectra, feedback and time-dependent GR PIC evolution are omitted."
+          "Curvature and IC photons are tested against spectral Breit-Wheeler opacity. Secondary particle spectra, angular transport and time-dependent feedback are not evolved."
+      },
+      {
+        id: "gap_closure",
+        category: "diagnostic-proxy",
+        title: "Self-consistent gap-height closure",
+        state: mode === "cme" ? "algebraic scan/refinement" : "not selected",
+        detail:
+          "The solver searches h/r_g for both one-generation multiplicity >= 1 and a Goldreich-Julian refill proxy >= 1. Real GRPIC gaps can remain intermittent even when these algebraic criteria are met."
       },
       {
         id: "superradiance_rate",
@@ -4125,9 +4517,16 @@
     gapChargeStarvationAudit,
     gapPotentialDrop,
     curvatureRadiationAudit,
+    curvatureEmissionAtGamma,
     breitWheelerCrossSection,
     softPhotonFieldAudit,
     gammaGammaPairAudit,
+    powerLawSoftPhotonSpectrum,
+    spectralGammaGammaAudit,
+    inverseComptonCoolingAudit,
+    gapRadiationBalanceAudit,
+    radiativeGapCascadeAudit,
+    solveGapClosure,
     gapCascadeAudit,
     gapElectrodynamicsAudit,
     PRESETS,
