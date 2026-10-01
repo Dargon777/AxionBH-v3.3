@@ -5,7 +5,7 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  const MODEL_VERSION = "8.4.1";
+  const MODEL_VERSION = "8.4.2";
   const STATE_SCHEMA_VERSION = 9;
 
   const CONSTANTS = Object.freeze({
@@ -20,7 +20,10 @@
     ERG_PER_EV: 1.602176634e-12,
     MEV_TO_ERG: 1.602176634e-6,
     YEAR: 365.25 * 86400,
-    POSITRON_RATE_OBS_511: 1.07e43,
+    // Bulge positron production-rate reference from Siegert et al. (2016);
+    // model-dependent order-of-magnitude calibration, not a universal constant.
+    POSITRON_RATE_OBS_511: 2e43,
+    POSITRON_RATE_GALAXY_511: 5e43,
     LINE_PHOTON_RATE_OBS_511: 5.0e42,
     SCHWINGER_ECRIT_V_CM: 1.323285474e16,
     ELECTRON_COMPTON_REDUCED_CM: 3.8615926796e-11,
@@ -29,7 +32,7 @@
     POSITRON_ENERGY_COST_ERG: 1.6e-6,
     POSITRON_ENERGY: 1.6e-6,
     LEGACY_L_OBS_511_NUMBER: 1.07e43,
-    L_OBS_511: 1.07e43 * 1.6e-6,
+    L_OBS_511: 3.2748423107541366e37,
     LINE_POWER_OBS_511:
       5.0e42 * 0.51099895 * 1.602176634e-6,
     SPIN_THRESHOLD: 0.35,
@@ -1982,6 +1985,11 @@
         valuePerSecond:
           CONSTANTS.POSITRON_RATE_OBS_511,
         unit: "e+/s",
+        scope: "Galactic bulge",
+        reference:
+          "Siegert et al. 2016, A&A 586 A84: ~2e43 e+/s for the bulge; estimate is model-dependent.",
+        sourceUrl:
+          "https://arxiv.org/abs/1512.00325",
         historicalBug:
           "Legacy code compared model power in erg/s directly with a ~1e43 e+/s observational rate."
       },

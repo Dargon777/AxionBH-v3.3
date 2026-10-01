@@ -677,7 +677,7 @@ console.log("AxionBH simulator-core tests passed");
 
 
 {
-  assert.equal(A.MODEL_VERSION, "8.4.1");
+  assert.equal(A.MODEL_VERSION, "8.4.2");
   assert.equal(A.STATE_SCHEMA_VERSION, 9);
 }
 
@@ -745,7 +745,7 @@ console.log("AxionBH simulator-core tests passed");
     },
     "cme"
   );
-  assert.equal(report.modelVersion, "8.4.1");
+  assert.equal(report.modelVersion, "8.4.2");
   assert.equal(report.stateSchemaVersion, 9);
   assert.equal(report.layers.length, A.MODEL_LAYERS.length);
   assert.ok(report.accretion);
@@ -867,12 +867,12 @@ console.log("AxionBH simulator-core tests passed");
 }
 
 {
-  assert.equal(A.CONSTANTS.POSITRON_RATE_OBS_511,1.07e43);
+  assert.equal(A.CONSTANTS.POSITRON_RATE_OBS_511,2e43);
   const obs=A.positronObservableFromPower(
     A.CONSTANTS.POSITRON_ENERGY * 1e43
   );
   assert.ok(Math.abs(obs.positronRatePerSecond-1e43)/1e43<1e-12);
-  assert.ok(Math.abs(obs.ratio511-(1e43/1.07e43))<1e-12);
+  assert.ok(Math.abs(obs.ratio511-0.5)<1e-12);
 }
 {
   const audit=A.microphysicsAudit(A.DEFAULTS);
@@ -940,4 +940,13 @@ console.log("AxionBH simulator-core tests passed");
       ) - 1
     ) < 1e-12
   );
+}
+
+{
+  assert.equal(A.MODEL_VERSION,"8.4.2");
+  assert.equal(A.CONSTANTS.POSITRON_RATE_OBS_511,2e43);
+  assert.equal(A.CONSTANTS.POSITRON_RATE_GALAXY_511,5e43);
+  const audit=A.microphysicsAudit(A.DEFAULTS);
+  assert.equal(audit.observed511.scope,"Galactic bulge");
+  assert.ok(audit.observed511.reference.includes("Siegert"));
 }

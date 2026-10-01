@@ -359,7 +359,7 @@
       ordered[key] = Number(p[key]);
     });
     const source = JSON.stringify({
-      model: "AxionBH-v8.4.1",
+      model: "AxionBH-v8.4.2",
       mode,
       parameters: ordered
     });
@@ -1021,7 +1021,7 @@
     if ($("mode").value !== "cme") {
       setAnalysisMeta(
         "Parameter Inference",
-        "v8.4.1 inverse solver сейчас определён для CVE closure"
+        "v8.4.2 inverse solver сейчас определён для CVE closure"
       );
       setAnalysisTable(
         '<div class="inference-empty">Переключи режим на CME, чтобы оценить дефицит и требуемые однопараметрические сдвиги.</div>'
@@ -1889,7 +1889,7 @@
         '</span><span>E_cost=' +
         A.formatScientific(audit.mu5ToPositrons.energyCostErg,3) +
         ' erg/e⁺; no microscopic pair-production rate is derived.</span></div>',
-      '<div class="missing-note"><strong>Observable correction:</strong> the Galactic ~10⁴³ quantity is an annihilation/injection rate in e⁺/s, not an energy luminosity in erg/s. v8.4.1 therefore audits the corrected rate ratio separately; the legacy numerical e⁺ budget ratio fields remain untouched for backward reproducibility.</div>'
+      '<div class="missing-note"><strong>Observable correction:</strong> the Galactic ~10⁴³ quantity is an annihilation/injection rate in e⁺/s, not an energy luminosity in erg/s. v8.4.2 therefore audits the corrected rate ratio separately; the legacy numerical e⁺ budget ratio fields remain untouched for backward reproducibility.</div>'
     ].join("");
     setAnalysisTable(html);
     if (!window.Plotly) return;
@@ -2384,7 +2384,7 @@
     const diagnostics = currentDiagnostics();
     const payload = {
       generatedAt: new Date().toISOString(),
-      model: "AxionBH research workbench v8.4.1",
+      model: "AxionBH research workbench v8.4.2",
       modelVersion: A.MODEL_VERSION,
       stateSchemaVersion: A.STATE_SCHEMA_VERSION,
       stateId: runStateId(state.lastMode, state.lastParams),
@@ -2458,7 +2458,7 @@
     const lines = [
       "# AxionBH reproducibility report",
       "",
-      "- Model: AxionBH Research Workbench v8.4.1",
+      "- Model: AxionBH Research Workbench v8.4.2",
       "- Generated: " + new Date().toISOString(),
       "- State ID: " + stateId,
       "- Mode: " + modeNames[state.lastMode],
