@@ -4279,7 +4279,10 @@
     "chirality_dynamics",
     "gap_charge_supply",
     "gap_potential",
+    "soft_photon_spectrum",
+    "inverse_compton",
     "pair_cascade",
+    "gap_closure",
     "superradiance_rate",
     "cloud_saturation",
     "positron_conversion",
@@ -4384,12 +4387,36 @@
           "Uses the Rieger/Katsoulakos vacuum-gap h^2 or near-GJ h^3/6 voltage scaling. The linear charge-deficit factor is a closure heuristic, not a GR Poisson solution."
       },
       {
+        id: "soft_photon_spectrum",
+        category: "diagnostic-proxy",
+        title: "Soft-photon spectrum",
+        state: mode === "cme" ? "power-law proxy available" : "not selected",
+        detail:
+          "v8.7 can replace the monoenergetic bath with an isotropic power-law photon-number spectrum normalized to a bolometric luminosity. It is not a fitted Sgr A* SED."
+      },
+      {
+        id: "inverse_compton",
+        category: "literature-model",
+        title: "Inverse-Compton losses",
+        state: mode === "cme" ? "KN-suppressed approximation" : "not selected",
+        detail:
+          "IC cooling is integrated over the spectral proxy with a Moderski-style F_KN ≈ (1+b)^(-3/2) suppression. This is not the exact Klein-Nishina redistribution kernel."
+      },
+      {
         id: "pair_cascade",
         category: "diagnostic-proxy",
-        title: "Curvature → gamma-gamma pair cascade",
-        state: mode === "cme" ? "one-generation diagnostic" : "not selected",
+        title: "Curvature + IC → gamma-gamma pair cascade",
+        state: mode === "cme" ? "one-generation spectral diagnostic" : "not selected",
         detail:
-          "Curvature radiation, head-on Breit-Wheeler conversion and pair multiplicity are evaluated in a monoenergetic isotropic soft-photon bath. Inverse Compton, spectra, feedback and time-dependent GR PIC evolution are omitted."
+          "Curvature and IC photons are tested against spectral Breit-Wheeler opacity. Secondary particle spectra, angular transport and time-dependent feedback are not evolved."
+      },
+      {
+        id: "gap_closure",
+        category: "diagnostic-proxy",
+        title: "Self-consistent gap-height closure",
+        state: mode === "cme" ? "algebraic scan/refinement" : "not selected",
+        detail:
+          "The solver searches h/r_g for both one-generation multiplicity >= 1 and a Goldreich-Julian refill proxy >= 1. Real GRPIC gaps can remain intermittent even when these algebraic criteria are met."
       },
       {
         id: "superradiance_rate",
