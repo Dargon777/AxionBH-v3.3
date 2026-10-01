@@ -263,7 +263,7 @@ console.log("AxionBH simulator-core tests passed");
   const baseline = A.cme(A.DEFAULTS);
   const deficit = A.deficitOrders(baseline.ratio511, 1);
   assert.ok(Number.isFinite(deficit));
-  assert.ok(deficit > 300 && deficit < 310);
+  assert.ok(deficit > 298 && deficit < 300);
 }
 
 {
@@ -308,8 +308,8 @@ console.log("AxionBH simulator-core tests passed");
     steps: 180
   });
   assert.equal(inference.rows.length, 2);
-  assert.ok(inference.deficitOrders > 300);
-  assert.ok(inference.requiredGain > 1e300);
+  assert.ok(inference.deficitOrders > 298);
+  assert.ok(inference.requiredGain > 1e298);
 }
 
 
@@ -369,7 +369,7 @@ console.log("AxionBH simulator-core tests passed");
   assert.equal(source.status, "ceiling-limited");
   assert.equal(chiral.status, "ceiling-limited");
   assert.equal(conversion.status, "solved");
-  assert.ok(conversion.requiredGain > 1e300);
+  assert.ok(conversion.requiredGain > 1e298);
   assert.ok(Math.abs(Math.log10(conversion.achievedMetric)) < 1e-8);
 }
 
@@ -677,8 +677,8 @@ console.log("AxionBH simulator-core tests passed");
 
 
 {
-  assert.equal(A.MODEL_VERSION, "8.4.0");
-  assert.equal(A.STATE_SCHEMA_VERSION, 8);
+  assert.equal(A.MODEL_VERSION, "8.4.1");
+  assert.equal(A.STATE_SCHEMA_VERSION, 9);
 }
 
 {
@@ -745,7 +745,7 @@ console.log("AxionBH simulator-core tests passed");
     },
     "cme"
   );
-  assert.equal(report.modelVersion, "8.4.0");
+  assert.equal(report.modelVersion, "8.4.1");
   assert.equal(report.stateSchemaVersion, 8);
   assert.equal(report.layers.length, A.MODEL_LAYERS.length);
   assert.ok(report.accretion);
@@ -868,7 +868,9 @@ console.log("AxionBH simulator-core tests passed");
 
 {
   assert.equal(A.CONSTANTS.POSITRON_RATE_OBS_511,1.07e43);
-  const obs=A.positronObservableFromPower(1.6e37);
+  const obs=A.positronObservableFromPower(
+    A.CONSTANTS.POSITRON_ENERGY * 1e43
+  );
   assert.ok(Math.abs(obs.positronRatePerSecond-1e43)/1e43<1e-12);
   assert.ok(Math.abs(obs.ratio511-(1e43/1.07e43))<1e-12);
 }
@@ -884,3 +886,58 @@ console.log("AxionBH simulator-core tests passed");
 {const ec=A.CONSTANTS.SCHWINGER_ECRIT_V_CM;assert.equal(A.schwingerPairRateDensity(0),0);assert.ok(A.schwingerPairRateDensity(ec)>A.schwingerPairRateDensity(.1*ec));}
 {const inf=A.inferSchwingerFieldForObservedRate(A.DEFAULTS);assert.ok(inf.electricFieldOverCritical>0&&inf.electricFieldOverCritical<10);const got=A.schwingerPairProduction(A.DEFAULTS,{electricFieldVcm:inf.electricFieldVcm});assert.ok(Math.abs(Math.log10(got.rawRatio511))<1e-6);}
 {const a=A.pairProductionAudit(A.DEFAULTS);assert.equal(a.status,"explicit-idealized");assert.ok(a.minimumObservedPairPowerErgS>0);}
+
+
+{
+  const result=A.cme(A.DEFAULTS);
+  const obs=A.positronObservableFromPower(
+    result.luminosity
+  );
+  assert.equal(result.ratio511,obs.ratio511);
+  assert.equal(
+    result.positronBudgetRatio,
+    result.ratio511
+  );
+  assert.ok(result.ratio511>result.legacyRatio511);
+  const factor=result.ratio511/result.legacyRatio511;
+  assert.ok(factor>6.2e5&&factor<6.3e5);
+}
+
+{
+  const audit=A.microphysicsAudit(A.DEFAULTS);
+  assert.ok(audit.axionToMu5.derivativeCe1PeakGeV>0);
+  assert.ok(audit.axionToMu5.legacyToDerivativeRatio>1e12);
+  assert.ok(
+    Number.isFinite(
+      audit.axionToMu5.requiredCeForLegacyScale
+    )
+  );
+}
+
+{
+  const scale=A.derivativeAxialBackgroundPeak(
+    {
+      ...A.DEFAULTS,
+      axionMassEv:2e-5,
+      faGev:1e10
+    },
+    1e-6,
+    1
+  );
+  const expected=
+    (2e-5*1e-9)*1e-6/(2*1e10);
+  assert.ok(Math.abs(scale/expected-1)<1e-14);
+}
+
+{
+  const pair=A.pairProductionAudit(A.DEFAULTS);
+  assert.ok(
+    Math.abs(
+      pair.minimumObservedPairPowerErgS /
+      (
+        A.CONSTANTS.POSITRON_RATE_OBS_511 *
+        A.CONSTANTS.PAIR_REST_ENERGY_ERG
+      ) - 1
+    ) < 1e-12
+  );
+}

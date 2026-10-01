@@ -261,8 +261,9 @@
       return [
         ["ā", A.formatScientific(result.aBar) + " GeV", "устойчивая natural-unit ветвь"],
         ["κ", A.formatScientific(result.kappa), "эффективность конверсии"],
-        ["Lₑ₊", A.formatScientific(result.luminosity) + " erg/s", "позитронная светимость"],
-        ["L / L₅₁₁", formatRatio(result.ratio511), "относительно 1.07×10⁴³ erg/s"]
+        ["P_proxy", A.formatScientific(result.luminosity) + " erg/s", "phenomenological energy-budget power"],
+        ["Ṅₑ₊,eq", A.formatScientific(result.equivalentPositronRate) + " s⁻¹", "energy-budget equivalent"],
+        ["e⁺ budget / target", formatRatio(result.ratio511), "target 1.07×10⁴³ e⁺/s"]
       ];
     }
     if (result.mode === "bosenova") {
@@ -358,7 +359,7 @@
       ordered[key] = Number(p[key]);
     });
     const source = JSON.stringify({
-      model: "AxionBH-v8.4",
+      model: "AxionBH-v8.4.1",
       mode,
       parameters: ordered
     });
@@ -659,7 +660,7 @@
         gridcolor: colors.grid
       },
       zaxis: {
-        title: "log₁₀ L/L₅₁₁",
+        title: "log₁₀ e⁺ budget ratio",
         color: colors.text,
         gridcolor: colors.grid
       },
@@ -720,7 +721,7 @@
         showscale: false,
         hovertemplate:
           "A<br>a/M=%{x:.3f}<br>B₀=%{y:.3e} G" +
-          "<br>L/L₅₁₁=%{customdata:.3e}<extra></extra>"
+          "<br>e⁺ budget ratio=%{customdata:.3e}<extra></extra>"
       },
       {
         type: "surface",
@@ -733,10 +734,10 @@
         cmax,
         colorscale: "Viridis",
         showscale: true,
-        colorbar: { title: "log₁₀ L/L₅₁₁", len: 0.72 },
+        colorbar: { title: "log₁₀ e⁺ budget ratio", len: 0.72 },
         hovertemplate:
           "B<br>a/M=%{x:.3f}<br>B₀=%{y:.3e} G" +
-          "<br>L/L₅₁₁=%{customdata:.3e}<extra></extra>"
+          "<br>e⁺ budget ratio=%{customdata:.3e}<extra></extra>"
       }
     ], layout, { responsive: true, displaylogo: false });
   }
@@ -764,7 +765,7 @@
         contours: { coloring: "heatmap", showlabels: false },
         hovertemplate:
           "A<br>a/M=%{x:.3f}<br>B₀=%{y:.3e} G" +
-          "<br>L/L₅₁₁=%{customdata:.3e}<extra></extra>"
+          "<br>e⁺ budget ratio=%{customdata:.3e}<extra></extra>"
       },
       {
         type: "contour",
@@ -778,11 +779,11 @@
         zmax: cmax,
         colorscale: "Viridis",
         showscale: true,
-        colorbar: { title: "log₁₀ L/L₅₁₁", len: 0.75 },
+        colorbar: { title: "log₁₀ e⁺ budget ratio", len: 0.75 },
         contours: { coloring: "heatmap", showlabels: false },
         hovertemplate:
           "B<br>a/M=%{x:.3f}<br>B₀=%{y:.3e} G" +
-          "<br>L/L₅₁₁=%{customdata:.3e}<extra></extra>"
+          "<br>e⁺ budget ratio=%{customdata:.3e}<extra></extra>"
       }
     ], {
       paper_bgcolor: "transparent",
@@ -916,7 +917,7 @@
       colorbar: { title: "orders short" },
       hovertemplate:
         "a/M=%{x:.3f}<br>B₀=%{y:.3e} G" +
-        "<br>L/L₅₁₁=%{customdata:.3e}" +
+        "<br>e⁺ budget ratio=%{customdata:.3e}" +
         "<br>gap=%{z:.2f} dex<extra></extra>"
     }], {
       ...layout,
@@ -929,7 +930,7 @@
     setAnalysisMeta(
       view === "deficit" ? "CME deficit map" : "3D Parameter Explorer",
       view === "deficit"
-        ? "Сколько порядков величины отделяет L/L₅₁₁ от единицы; нулевые точки не имеют конечного log-gap"
+        ? "Сколько порядков величины отделяет e⁺ budget ratio от единицы; нулевые точки не имеют конечного log-gap"
         : "CVE closure · spin × B₀ · fₐ задаёт логарифмический срез; A и B используют один fₐ"
     );
 
@@ -966,7 +967,7 @@
 
     setAnalysisMeta(
       "Чувствительность ±10%",
-      modeNames[mode] + " · отклик L/L₅₁₁ на изменение одного параметра"
+      modeNames[mode] + " · отклик e⁺ budget ratio на изменение одного параметра"
     );
 
     const rows = analysis.rows;
@@ -985,7 +986,7 @@
     setAnalysisTable(html);
 
     if (!window.Plotly) return;
-    const layout = plotLayout("параметр", "макс. |Δ(L/L₅₁₁)|, %");
+    const layout = plotLayout("параметр", "макс. |Δ(e⁺ budget ratio)|, %");
     Plotly.react("plot", [{
       type: "bar",
       x: rows.map((row) => parameterLabels[row.key] || row.key),
@@ -1020,7 +1021,7 @@
     if ($("mode").value !== "cme") {
       setAnalysisMeta(
         "Parameter Inference",
-        "v8.4 inverse solver сейчас определён для CVE closure"
+        "v8.4.1 inverse solver сейчас определён для CVE closure"
       );
       setAnalysisTable(
         '<div class="inference-empty">Переключи режим на CME, чтобы оценить дефицит и требуемые однопараметрические сдвиги.</div>'
@@ -1037,7 +1038,7 @@
 
     setAnalysisMeta(
       "Parameter Inference",
-      "Однопараметрический inverse scan до L/L₅₁₁ = 1 · диапазоны диагностические, не физические priors"
+      "Однопараметрический inverse scan до e⁺ budget ratio = 1 · диапазоны диагностические, не физические priors"
     );
 
     const deficit = analysis.deficitOrders;
@@ -1046,7 +1047,7 @@
 
     const summary = [
       '<div class="inference-summary">',
-      '<div><span>Current L/L₅₁₁</span><strong>' +
+      '<div><span>Current e⁺ budget ratio</span><strong>' +
         A.formatScientific(analysis.currentMetric, 3) + '</strong></div>',
       '<div><span>Deficit</span><strong>' +
         (Number.isFinite(deficit) ? deficit.toFixed(2) + ' dex' : '∞') +
@@ -1537,7 +1538,7 @@
     ].join("");
 
     const table = [
-      '<div class="analysis-row analysis-row-head calibration"><span>Case</span><span>Ṁ, M☉/yr</span><span>nₑ,net cm⁻³</span><span>μ_V MeV</span><span>CVE suppression</span><span>L/L₅₁₁</span><span>Deficit</span><span>Context</span></div>',
+      '<div class="analysis-row analysis-row-head calibration"><span>Case</span><span>Ṁ, M☉/yr</span><span>nₑ,net cm⁻³</span><span>μ_V MeV</span><span>CVE suppression</span><span>e⁺ budget ratio</span><span>Deficit</span><span>Context</span></div>',
       calibrationRow(
         analysis.current,
         "current input · forced accretion closure"
@@ -1639,7 +1640,7 @@
           "<br>deficit=%{y:.2f} dex" +
           "<br>nₑ=%{customdata[0]:.3e} cm⁻³" +
           "<br>μ_V=%{customdata[1]:.4f} MeV" +
-          "<br>L/L₅₁₁=%{customdata[2]:.3e}" +
+          "<br>e⁺ budget ratio=%{customdata[2]:.3e}" +
           "<extra></extra>"
       },
       {
@@ -1757,7 +1758,7 @@
     ].join("");
 
     const table = [
-      '<div class="analysis-row analysis-row-head flow-geometry"><span>Case</span><span>r/r_g</span><span>H/r</span><span>α</span><span>|v_r|/c</span><span>Y_e</span><span>nₑ,net</span><span>L/L₅₁₁</span><span>Deficit</span></div>',
+      '<div class="analysis-row analysis-row-head flow-geometry"><span>Case</span><span>r/r_g</span><span>H/r</span><span>α</span><span>|v_r|/c</span><span>Y_e</span><span>nₑ,net</span><span>e⁺ budget ratio</span><span>Deficit</span></div>',
       flowGeometryRow(
         analysis.current,
         context
@@ -1872,12 +1873,23 @@
       '<div class="analysis-row micro"><strong>axion → μ₅</strong><span>phenomenological</span><span>' +
         audit.axionToMu5.modelRelation +
         '</span><span>' + audit.axionToMu5.warning + '</span></div>',
+      '<div class="analysis-row micro"><strong>Derivative Cₑ=1</strong><span>literature-form benchmark</span><span>' +
+        audit.axionToMu5.derivativeRelation +
+        '</span><span>b₀=' +
+        A.formatScientific(
+          audit.axionToMu5.derivativeCe1PeakGeV,
+          3
+        ) + ' GeV; legacy/derivative=' +
+        A.formatScientific(
+          audit.axionToMu5.legacyToDerivativeRatio,
+          3
+        ) + '×</span></div>',
       '<div class="analysis-row micro"><strong>μ₅ → e⁺</strong><span>phenomenological energy proxy</span><span>' +
         audit.mu5ToPositrons.modelRelation +
         '</span><span>E_cost=' +
         A.formatScientific(audit.mu5ToPositrons.energyCostErg,3) +
         ' erg/e⁺; no microscopic pair-production rate is derived.</span></div>',
-      '<div class="missing-note"><strong>Observable correction:</strong> the Galactic ~10⁴³ quantity is an annihilation/injection rate in e⁺/s, not an energy luminosity in erg/s. v8.4 therefore audits the corrected rate ratio separately; the legacy numerical L/L₅₁₁ fields remain untouched for backward reproducibility.</div>'
+      '<div class="missing-note"><strong>Observable correction:</strong> the Galactic ~10⁴³ quantity is an annihilation/injection rate in e⁺/s, not an energy luminosity in erg/s. v8.4.1 therefore audits the corrected rate ratio separately; the legacy numerical e⁺ budget ratio fields remain untouched for backward reproducibility.</div>'
     ].join("");
     setAnalysisTable(html);
     if (!window.Plotly) return;
@@ -2147,7 +2159,7 @@
         A.formatScientific(ceiling.mu5Max, 3) + ' GeV</strong></div>',
       '<div><span>Selected g_extra</span><strong>' +
         A.formatScientific(gain, 3) + '×</strong></div>',
-      '<div><span>Selected L/L₅₁₁</span><strong>' +
+      '<div><span>Selected e⁺ budget ratio</span><strong>' +
         selectedState + '</strong></div>',
       '</div>'
     ].join("");
@@ -2215,7 +2227,7 @@
         ? Math.log10(selected.ratio511)
         : null;
     const colors = themeColors();
-    const layout = plotLayout("log₁₀ g_extra", "log₁₀ L/L₅₁₁");
+    const layout = plotLayout("log₁₀ g_extra", "log₁₀ e⁺ budget ratio");
     layout.shapes = [{
       type: "line",
       x0: 0,
@@ -2232,7 +2244,7 @@
       y,
       line: { color: colors.accent, width: 2 },
       hovertemplate:
-        "log₁₀ g=%{x:.2f}<br>log₁₀ L/L₅₁₁=%{y:.2f}<extra></extra>"
+        "log₁₀ g=%{x:.2f}<br>log₁₀ e⁺ budget ratio=%{y:.2f}<extra></extra>"
     }];
 
     if (selectedY !== null) {
@@ -2243,7 +2255,7 @@
         y: [selectedY],
         marker: { size: 10, color: colors.accent2 },
         hovertemplate:
-          "selected<br>log₁₀ g=%{x:.2f}<br>log₁₀ L/L₅₁₁=%{y:.2f}<extra></extra>"
+          "selected<br>log₁₀ g=%{x:.2f}<br>log₁₀ e⁺ budget ratio=%{y:.2f}<extra></extra>"
       });
     }
 
@@ -2273,11 +2285,11 @@
 
     setAnalysisMeta(
       "Сравнение сценариев",
-      modeNames[mode] + " · одна и та же метрика L/L₅₁₁"
+      modeNames[mode] + " · одна и та же метрика e⁺ budget ratio"
     );
 
     const html = [
-      '<div class="analysis-row analysis-row-head compare"><span>Сценарий</span><span>a/M</span><span>B₀</span><span>L/L₅₁₁</span></div>',
+      '<div class="analysis-row analysis-row-head compare"><span>Сценарий</span><span>a/M</span><span>B₀</span><span>e⁺ budget ratio</span></div>',
       ...scenarios.map((item) =>
         '<div class="analysis-row compare"><strong>' +
         names[item.name] +
@@ -2290,14 +2302,14 @@
     setAnalysisTable(html);
 
     if (!window.Plotly) return;
-    const layout = plotLayout("сценарий", "L/L₅₁₁");
+    const layout = plotLayout("сценарий", "e⁺ budget ratio");
     layout.yaxis.type = "log";
     Plotly.react("plot", [{
       type: "bar",
       x: scenarios.map((item) => names[item.name]),
       y: scenarios.map((item) => item.metric > 0 ? item.metric : null),
       marker: { color: themeColors().accent2 },
-      hovertemplate: "%{x}<br>L/L₅₁₁=%{y:.3e}<extra></extra>"
+      hovertemplate: "%{x}<br>e⁺ budget ratio=%{y:.3e}<extra></extra>"
     }], layout, { responsive: true, displaylogo: false });
   }
 
@@ -2372,7 +2384,7 @@
     const diagnostics = currentDiagnostics();
     const payload = {
       generatedAt: new Date().toISOString(),
-      model: "AxionBH research workbench v8.4",
+      model: "AxionBH research workbench v8.4.1",
       modelVersion: A.MODEL_VERSION,
       stateSchemaVersion: A.STATE_SCHEMA_VERSION,
       stateId: runStateId(state.lastMode, state.lastParams),
@@ -2446,7 +2458,7 @@
     const lines = [
       "# AxionBH reproducibility report",
       "",
-      "- Model: AxionBH Research Workbench v8.4",
+      "- Model: AxionBH Research Workbench v8.4.1",
       "- Generated: " + new Date().toISOString(),
       "- State ID: " + stateId,
       "- Mode: " + modeNames[state.lastMode],
