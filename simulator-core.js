@@ -5,8 +5,8 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  const MODEL_VERSION = "8.4.0";
-  const STATE_SCHEMA_VERSION = 8;
+  const MODEL_VERSION = "8.4.1";
+  const STATE_SCHEMA_VERSION = 9;
 
   const CONSTANTS = Object.freeze({
     G: 6.6743015e-8,
@@ -16,14 +16,22 @@
     HBAR: 1.054571817e-27,
     MU_B: 9.2740100783e-21,
     MP: 1.67262192369e-24,
-    ERG_PER_GEV: 1.602e-3,
+    ERG_PER_GEV: 1.602176634e-3,
     ERG_PER_EV: 1.602176634e-12,
+    MEV_TO_ERG: 1.602176634e-6,
     YEAR: 365.25 * 86400,
     POSITRON_RATE_OBS_511: 1.07e43,
+    LINE_PHOTON_RATE_OBS_511: 5.0e42,
     SCHWINGER_ECRIT_V_CM: 1.323285474e16,
     ELECTRON_COMPTON_REDUCED_CM: 3.8615926796e-11,
-    L_OBS_511: 1.07e43, // deprecated numeric alias; historical v7/v8.2 code treated this as erg/s
+    PAIR_REST_ENERGY_ERG:
+      2 * 0.51099895 * 1.602176634e-6,
+    POSITRON_ENERGY_COST_ERG: 1.6e-6,
     POSITRON_ENERGY: 1.6e-6,
+    LEGACY_L_OBS_511_NUMBER: 1.07e43,
+    L_OBS_511: 1.07e43 * 1.6e-6,
+    LINE_POWER_OBS_511:
+      5.0e42 * 0.51099895 * 1.602176634e-6,
     SPIN_THRESHOLD: 0.35,
     B_EQ: 3e4,
     T_NORM: 1e7,
@@ -1498,6 +1506,9 @@
         eta5: 0,
         kappa: 0,
         luminosity: 0,
+        equivalentPositronRate: 0,
+        positronBudgetRatio: 0,
+        legacyRatio511: 0,
         ratio511: 0,
         avgB: closure.fieldG,
         geometry,
@@ -1520,6 +1531,8 @@
     const luminosity = kappa * p.mdot * CONSTANTS.C * CONSTANTS.C;
     const safeLuminosity =
       Number.isFinite(luminosity) && luminosity > 0 ? luminosity : 0;
+    const observable =
+      positronObservableFromPower(safeLuminosity);
 
     return {
       mode: "cme",
@@ -1528,7 +1541,14 @@
       eta5,
       kappa: Number.isFinite(kappa) && kappa > 0 ? kappa : 0,
       luminosity: safeLuminosity,
-      ratio511: safeLuminosity / CONSTANTS.L_OBS_511,
+      equivalentPositronRate:
+        observable.positronRatePerSecond,
+      positronBudgetRatio:
+        observable.ratio511,
+      legacyRatio511:
+        safeLuminosity /
+        CONSTANTS.LEGACY_L_OBS_511_NUMBER,
+      ratio511: observable.ratio511,
       avgB,
       geometry,
       closure,
@@ -1552,7 +1572,16 @@
       averageRate,
       averageLuminosity,
       burstLuminosity,
-      ratio511: averageLuminosity / CONSTANTS.L_OBS_511,
+      equivalentPositronRate: averageRate,
+      positronBudgetRatio:
+        averageRate /
+        CONSTANTS.POSITRON_RATE_OBS_511,
+      legacyRatio511:
+        averageLuminosity /
+        CONSTANTS.LEGACY_L_OBS_511_NUMBER,
+      ratio511:
+        averageRate /
+        CONSTANTS.POSITRON_RATE_OBS_511,
       intervalSeconds
     };
   }
@@ -1593,7 +1622,16 @@
       saturationPower,
       positronPower,
       positronRate,
-      ratio511: positronPower / c.L_OBS_511,
+      equivalentPositronRate: positronRate,
+      positronBudgetRatio:
+        positronRate /
+        c.POSITRON_RATE_OBS_511,
+      legacyRatio511:
+        positronPower /
+        c.LEGACY_L_OBS_511_NUMBER,
+      ratio511:
+        positronRate /
+        c.POSITRON_RATE_OBS_511,
       active: gamma > 0
     };
   }
@@ -1630,7 +1668,23 @@
       convertedEnergy,
       averageLuminosity,
       burstLuminosity,
-      ratio511: averageLuminosity / c.L_OBS_511
+      equivalentPositronRate:
+        positronRateFromPower(
+          averageLuminosity
+        ),
+      positronBudgetRatio:
+        positronRateFromPower(
+          averageLuminosity
+        ) /
+        c.POSITRON_RATE_OBS_511,
+      legacyRatio511:
+        averageLuminosity /
+        c.LEGACY_L_OBS_511_NUMBER,
+      ratio511:
+        positronRateFromPower(
+          averageLuminosity
+        ) /
+        c.POSITRON_RATE_OBS_511
     };
   }
 
@@ -1841,6 +1895,29 @@
     })
   });
 
+
+  function derivativeAxialBackgroundPeak(
+    input,
+    aAmplitudeGeV,
+    electronCoupling = 1
+  ) {
+    const p = normalizeParams(input);
+    const amplitude = Math.abs(Number(aAmplitudeGeV));
+    const coupling = Math.abs(Number(electronCoupling));
+    if (
+      !Number.isFinite(amplitude) ||
+      !Number.isFinite(coupling)
+    ) return Number.NaN;
+
+    const axionMassGeV = p.axionMassEv * 1e-9;
+    return (
+      coupling *
+      axionMassGeV *
+      amplitude /
+      (2 * p.faGev)
+    );
+  }
+
   function positronRateFromPower(powerErgS, energyCostErg = CONSTANTS.POSITRON_ENERGY) {
     const power = Number(powerErgS);
     const cost = Number(energyCostErg);
@@ -1861,6 +1938,8 @@
         CONSTANTS.POSITRON_RATE_OBS_511,
       ratio511:
         rate / CONSTANTS.POSITRON_RATE_OBS_511,
+      targetProxyPowerErgS:
+        CONSTANTS.L_OBS_511,
       note:
         "Observed ~1e43 quantity is a Galactic positron annihilation/injection rate in e+/s. Conversion from model power to e+/s remains an explicit phenomenological energy-cost proxy."
     };
@@ -1872,13 +1951,30 @@
     const observable =
       positronObservableFromPower(result.luminosity);
     const historicalRatio =
-      result.luminosity / CONSTANTS.L_OBS_511;
+      result.luminosity /
+      CONSTANTS.LEGACY_L_OBS_511_NUMBER;
     const correctedDeficit =
       deficitOrders(observable.ratio511, 1);
     const historicalDeficit =
       deficitOrders(historicalRatio, 1);
     const transport =
       anomalousTransportDiagnostics(p, result);
+    const derivativeCe1 =
+      derivativeAxialBackgroundPeak(
+        p,
+        result.aBar,
+        1
+      );
+    const closureCeiling =
+      cmeClosureCeiling(p);
+    const requiredCeForLegacy =
+      derivativeCe1 > 0
+        ? result.mu5 / derivativeCe1
+        : Number.POSITIVE_INFINITY;
+    const requiredCeForCeiling =
+      derivativeCe1 > 0
+        ? closureCeiling.mu5Max / derivativeCe1
+        : Number.POSITIVE_INFINITY;
     return {
       modelVersion: MODEL_VERSION,
       observed511: {
@@ -1894,8 +1990,26 @@
         modelRelation:
           "mu5 = alpha_F * (a/fa) * mu_B * B * C_turb",
         warning:
-          "Derivative axion-fermion couplings can bias charge production in appropriate non-equilibrium settings, but they do not by themselves derive this stationary local mu5 ansatz.",
-        mu5GeV: result.mu5
+          "Standard axion-fermion interactions are derivative in a. The C_e=1 benchmark is an axial-background energy scale, not automatically an equilibrium mu5 for massive fermions.",
+        mu5GeV: result.mu5,
+        derivativeCe1PeakGeV:
+          derivativeCe1,
+        derivativeRelation:
+          "b0_peak = C_e * m_a * a0 / (2 f_a)",
+        legacyToDerivativeRatio:
+          derivativeCe1 > 0
+            ? result.mu5 / derivativeCe1
+            : Number.POSITIVE_INFINITY,
+        legacyToDerivativeDex:
+          derivativeCe1 > 0 && result.mu5 > 0
+            ? Math.log10(
+                result.mu5 / derivativeCe1
+              )
+            : Number.POSITIVE_INFINITY,
+        requiredCeForLegacyScale:
+          requiredCeForLegacy,
+        requiredCeForClosureCeiling:
+          requiredCeForCeiling
       },
       mu5ToPositrons: {
         status: "phenomenological-energy-proxy",
@@ -1935,7 +2049,7 @@
   function schwingerPairProduction(input,options={}){
     const p=normalizeParams(input),E=Number(options.electricFieldVcm||0),volume=pairProductionVolume(p,options.radiusRg||1,options.thicknessRg||1,options.fillingFactor||1),density=schwingerPairRateDensity(E),raw=density*volume.volumeCm3;
     const power=options.availablePowerErgS==null?p.mdot*CONSTANTS.C**2:Number(options.availablePowerErgS);if(!Number.isFinite(power)||power<0)throw new RangeError("availablePowerErgS must be non-negative");
-    const pairRestEnergy=2*0.511*CONSTANTS.POSITRON_ENERGY,energyRate=power/pairRestEnergy,capped=Math.min(raw,energyRate);
+    const pairRestEnergy=CONSTANTS.PAIR_REST_ENERGY_ERG,energyRate=power/pairRestEnergy,capped=Math.min(raw,energyRate);
     return {electricFieldVcm:E,electricFieldOverCritical:E/CONSTANTS.SCHWINGER_ECRIT_V_CM,rateDensityCm3S:density,volume,rawPairRatePerSecond:raw,availablePowerErgS:power,minimumPairEnergyErg:pairRestEnergy,energyLimitedRatePerSecond:energyRate,cappedPairRatePerSecond:capped,observedPositronRatePerSecond:CONSTANTS.POSITRON_RATE_OBS_511,rawRatio511:raw/CONSTANTS.POSITRON_RATE_OBS_511,cappedRatio511:capped/CONSTANTS.POSITRON_RATE_OBS_511,energyLimited:raw>energyRate};
   }
   function inferSchwingerFieldForObservedRate(input,options={}){
@@ -1944,7 +2058,7 @@
     const x=Math.sqrt(lo*hi),E=x*CONSTANTS.SCHWINGER_ECRIT_V_CM;return {targetRatePerSecond:target,volume,electricFieldOverCritical:x,electricFieldVcm:E,rateDensityCm3S:schwingerPairRateDensity(E)};
   }
   function pairProductionAudit(input){
-    const p=normalizeParams(input),required=inferSchwingerFieldForObservedRate(p),accretionPower=p.mdot*CONSTANTS.C**2,pairRestEnergy=2*0.511*CONSTANTS.POSITRON_ENERGY,minimumObservedPairPower=CONSTANTS.POSITRON_RATE_OBS_511*pairRestEnergy;
+    const p=normalizeParams(input),required=inferSchwingerFieldForObservedRate(p),accretionPower=p.mdot*CONSTANTS.C**2,pairRestEnergy=CONSTANTS.PAIR_REST_ENERGY_ERG,minimumObservedPairPower=CONSTANTS.POSITRON_RATE_OBS_511*pairRestEnergy;
     return {mechanism:"Schwinger constant-field e+e- production",status:"explicit-idealized",assumptions:["locally constant homogeneous electric field","vacuum Schwinger rate; plasma screening/backreaction omitted","fiducial active volume 4π r² Δr with r=Δr=r_g and filling factor 1","energy ceiling uses mdot c², not a derived electromagnetic extraction efficiency"],criticalFieldVcm:CONSTANTS.SCHWINGER_ECRIT_V_CM,required,accretionPowerErgS:accretionPower,minimumObservedPairPowerErgS:minimumObservedPairPower,energyBudgetRatio:accretionPower/minimumObservedPairPower,energyBudgetCanSupplyMinimumRestMass:accretionPower>=minimumObservedPairPower};
   }
 
@@ -3149,6 +3263,12 @@
         "unit_system",
         "CVE closure решается после явного перевода B, T, Ω, m_eff и L_eff в natural units (ℏ=c=k_B=1)."
       );
+      add(
+        "info",
+        "positron_target_units",
+        "v8.4.1 canonical ratio511 is the phenomenological energy-budget-equivalent e+ rate divided by the ~1.07e43 e+/s reference. The old power/1.07e43 quantity is legacyRatio511 only.",
+        r.ratio511
+      );
 
       const thermalToElectronMass =
         temperatureGeV(p.temperature) / CONSTANTS.ELECTRON_MASS_GEV;
@@ -3399,7 +3519,7 @@
         title: "μ5 → positron luminosity",
         state: "model ansatz",
         detail:
-          "kappa = mu5/m_p and L = kappa mdot c^2 are not a derived pair-production calculation."
+          "kappa = mu5/m_p and P_proxy = kappa mdot c^2 remain phenomenological. ratio511 now compares the corresponding energy-budget-equivalent e+ rate to the observed rate; Schwinger production is a separate explicit idealized channel."
       }
     ];
 
@@ -3443,6 +3563,7 @@
     FLOW_GEOMETRY_CONTEXT,
     CONSTANTS,
     DEFAULTS,
+    derivativeAxialBackgroundPeak,
     positronRateFromPower,
     positronObservableFromPower,
     microphysicsAudit,
