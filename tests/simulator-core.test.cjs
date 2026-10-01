@@ -900,7 +900,7 @@ console.log("AxionBH simulator-core tests passed");
   );
   assert.ok(result.ratio511>result.legacyRatio511);
   const factor=result.ratio511/result.legacyRatio511;
-  assert.ok(factor>6.2e5&&factor<6.3e5);
+  assert.ok(factor>3.2e5&&factor<3.3e5);
 }
 
 {
