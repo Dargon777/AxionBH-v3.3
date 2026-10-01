@@ -732,8 +732,8 @@ console.log("AxionBH simulator-core tests passed");
 
 
 {
-  assert.equal(A.MODEL_VERSION, "8.5.2");
-  assert.equal(A.STATE_SCHEMA_VERSION, 10);
+  assert.equal(A.MODEL_VERSION, "8.6.0");
+  assert.equal(A.STATE_SCHEMA_VERSION, 11);
 }
 
 {
@@ -800,8 +800,8 @@ console.log("AxionBH simulator-core tests passed");
     },
     "cme"
   );
-  assert.equal(report.modelVersion, "8.5.2");
-  assert.equal(report.stateSchemaVersion, 10);
+  assert.equal(report.modelVersion, "8.6.0");
+  assert.equal(report.stateSchemaVersion, 11);
   assert.equal(report.layers.length, A.MODEL_LAYERS.length);
   assert.ok(report.accretion);
   assert.ok(report.layers.some(
@@ -998,11 +998,11 @@ console.log("AxionBH simulator-core tests passed");
 }
 
 {const f=A.blackHoleRotationalField(A.DEFAULTS);assert.ok(f.electricFieldVcm>0);}
-{const a=A.gapElectrodynamicsAudit(A.DEFAULTS);assert.equal(a.status,"upper-bound-scale");assert.ok(a.fieldToRequiredRatio>0);assert.ok(a.fieldDeficitDex>0);}
+{const a=A.gapElectrodynamicsAudit(A.DEFAULTS);assert.equal(a.status,"gap-cascade-audit");assert.ok(a.fieldToRequiredRatio>0);assert.ok(a.fieldDeficitDex>0);}
 {const a=A.gapParallelElectricField(A.DEFAULTS,{screeningFraction:.1}),b=A.gapParallelElectricField(A.DEFAULTS,{screeningFraction:1});assert.ok(a.parallelElectricFieldVcm<b.parallelElectricFieldVcm);}
 
 {
-  assert.equal(A.MODEL_VERSION,"8.5.2");
+  assert.equal(A.MODEL_VERSION,"8.6.0");
   assert.equal(A.CONSTANTS.POSITRON_RATE_OBS_511,2e43);
   assert.equal(A.CONSTANTS.POSITRON_RATE_GALAXY_511,5e43);
   const base=A.cme(A.DEFAULTS);
@@ -1012,4 +1012,117 @@ console.log("AxionBH simulator-core tests passed");
   assert.ok(Math.abs(ceiling.ratioMax-ceiling.positronRateMax/A.CONSTANTS.POSITRON_RATE_OBS_511)<1e-12);
   const audit=A.microphysicsAudit(A.DEFAULTS);
   assert.equal(audit.observed511.scope,"Galactic bulge");
+}
+
+
+{
+  const gj=A.goldreichJulianDensityScale(A.DEFAULTS);
+  assert.ok(gj.numberDensityCm3>0);
+  assert.ok(gj.omegaFPerSecond>0);
+}
+
+{
+  const full=A.gapChargeStarvationAudit(A.DEFAULTS,{
+    plasmaInjectionFraction:1
+  });
+  const weak=A.gapChargeStarvationAudit(A.DEFAULTS,{
+    plasmaInjectionFraction:1e-18
+  });
+  assert.equal(full.starved,false);
+  assert.equal(weak.starved,true);
+  assert.ok(full.supplyRatio>1);
+  assert.ok(weak.supplyRatio<1);
+  assert.ok(
+    weak.requiredInjectionFractionForScreening>1e-18 &&
+    weak.requiredInjectionFractionForScreening<1
+  );
+}
+
+{
+  const h1=A.gapPotentialDrop(A.DEFAULTS,{
+    gapHeightRg:0.1,
+    potentialModel:"vacuum-h2"
+  });
+  const h2=A.gapPotentialDrop(A.DEFAULTS,{
+    gapHeightRg:0.2,
+    potentialModel:"vacuum-h2"
+  });
+  assert.ok(Math.abs(h2.voltageV/h1.voltageV-4)<1e-12);
+
+  const g1=A.gapPotentialDrop(A.DEFAULTS,{
+    gapHeightRg:0.1,
+    potentialModel:"near-gj-h3"
+  });
+  const g2=A.gapPotentialDrop(A.DEFAULTS,{
+    gapHeightRg:0.2,
+    potentialModel:"near-gj-h3"
+  });
+  assert.ok(Math.abs(g2.voltageV/g1.voltageV-8)<1e-12);
+}
+
+{
+  const below=A.breitWheelerCrossSection(1e9,1);
+  const above=A.breitWheelerCrossSection(1e12,1);
+  assert.equal(below.aboveThreshold,false);
+  assert.equal(below.crossSectionCm2,0);
+  assert.equal(above.aboveThreshold,true);
+  assert.ok(above.crossSectionCm2>0);
+  assert.ok(above.crossSectionCm2<A.CONSTANTS.THOMSON_CROSS_SECTION_CM2);
+}
+
+{
+  const potential=A.gapPotentialDrop(A.DEFAULTS,{
+    gapHeightRg:1,
+    chargeDeficitFraction:1
+  });
+  const curvature=A.curvatureRadiationAudit(A.DEFAULTS,{
+    potential,
+    curvatureRadiusRg:1
+  });
+  assert.ok(curvature.gamma>1);
+  assert.ok(curvature.characteristicPhotonEnergyEv>0);
+  assert.ok(curvature.photonsPerPrimary>0);
+}
+
+{
+  const optical=A.gapCascadeAudit(A.DEFAULTS,{
+    gapHeightRg:1,
+    plasmaInjectionFraction:1e-18,
+    curvatureRadiusRg:1,
+    softPhotonEnergyEv:1,
+    softPhotonLuminosityErgS:1e36
+  });
+  const xray=A.gapCascadeAudit(A.DEFAULTS,{
+    gapHeightRg:1,
+    plasmaInjectionFraction:1e-18,
+    curvatureRadiusRg:1,
+    softPhotonEnergyEv:1e3,
+    softPhotonLuminosityErgS:1e36
+  });
+  assert.equal(optical.starvation.starved,true);
+  assert.equal(optical.gammaGamma.breitWheeler.aboveThreshold,false);
+  assert.equal(optical.multiplicityOneGeneration,0);
+  assert.equal(xray.gammaGamma.breitWheeler.aboveThreshold,true);
+  assert.ok(xray.gammaGamma.opticalDepth>0);
+  assert.ok(xray.multiplicityOneGeneration>1);
+  assert.equal(xray.cascadeSelfSustaining,true);
+  assert.ok(
+    xray.cappedPairRatePerSecond<=
+    xray.energyLimitedPairRatePerSecond
+  );
+  assert.ok(
+    xray.schwinger.cappedPairRatePerSecond<=
+    xray.schwinger.energyLimitedRatePerSecond
+  );
+}
+
+{
+  const report=A.modelValidityReport(A.DEFAULTS,"cme");
+  for(const id of [
+    "gap_charge_supply",
+    "gap_potential",
+    "pair_cascade"
+  ]){
+    assert.ok(report.layers.some((layer)=>layer.id===id));
+  }
 }
