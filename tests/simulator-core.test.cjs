@@ -677,7 +677,7 @@ console.log("AxionBH simulator-core tests passed");
 
 
 {
-  assert.equal(A.MODEL_VERSION, "8.0.0");
+  assert.equal(A.MODEL_VERSION, "8.1.0");
   assert.equal(A.STATE_SCHEMA_VERSION, 8);
 }
 
@@ -745,7 +745,7 @@ console.log("AxionBH simulator-core tests passed");
     },
     "cme"
   );
-  assert.equal(report.modelVersion, "8.0.0");
+  assert.equal(report.modelVersion, "8.1.0");
   assert.equal(report.stateSchemaVersion, 8);
   assert.equal(report.layers.length, A.MODEL_LAYERS.length);
   assert.ok(report.accretion);
@@ -754,4 +754,52 @@ console.log("AxionBH simulator-core tests passed");
       layer.id === "positron_luminosity" &&
       layer.category === "phenomenological"
   ));
+}
+
+
+{
+  const rate = 7.3e-9;
+  const gs = A.mdotGsFromMsunPerYear(rate);
+  const roundtrip = A.mdotMsunPerYearFromGs(gs);
+  assert.ok(Math.abs(roundtrip / rate - 1) < 1e-14);
+}
+
+{
+  const eht = A.ACCRETION_CALIBRATIONS.eht2023;
+  const faraday = A.ACCRETION_CALIBRATIONS.faraday2006;
+  assert.equal(eht.minMsunPerYear, 5.2e-9);
+  assert.equal(eht.maxMsunPerYear, 9.5e-9);
+  assert.equal(faraday.minMsunPerYear, 2e-9);
+  assert.equal(faraday.maxMsunPerYear, 2e-7);
+  assert.equal(
+    A.classifyAccretionRate(7e-9, eht).relation,
+    "within"
+  );
+  assert.equal(
+    A.classifyAccretionRate(1e-3, eht).relation,
+    "above"
+  );
+}
+
+{
+  const analysis =
+    A.accretionCalibrationAnalysis(A.DEFAULTS);
+  assert.ok(analysis.legacyToEhtHigh > 1e5);
+  assert.ok(analysis.legacyToEhtLow > analysis.legacyToEhtHigh);
+  assert.equal(
+    analysis.ranges.eht2023.low.parameters.electronDensityMode,
+    2
+  );
+  assert.ok(
+    analysis.ranges.eht2023.high.flow.netElectronDensityCm3 >
+    analysis.ranges.eht2023.low.flow.netElectronDensityCm3
+  );
+  assert.ok(
+    analysis.ranges.eht2023.high.ratio511 >
+    analysis.ranges.eht2023.low.ratio511
+  );
+  assert.ok(
+    analysis.legacy.ratio511 >
+    analysis.ranges.eht2023.high.ratio511
+  );
 }

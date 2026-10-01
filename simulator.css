@@ -497,3 +497,50 @@ input[type="range"]{width:100%;accent-color:var(--accent)}
   .validity-summary{grid-template-columns:1fr 1fr}
   .analysis-row.validity{grid-template-columns:1fr}
 }
+
+
+.calibration-summary{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  border:1px solid var(--border);
+  border-radius:12px 12px 0 0;
+  overflow:hidden;
+}
+.calibration-summary>div{
+  padding:10px 11px;
+  background:var(--panel-2);
+  border-right:1px solid var(--border);
+}
+.calibration-summary>div:last-child{border-right:none}
+.calibration-summary span{
+  display:block;
+  color:var(--muted);
+  font-size:9px;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+}
+.calibration-summary strong{
+  display:block;
+  margin-top:4px;
+  font-size:11px;
+  overflow-wrap:anywhere;
+}
+.analysis-row.calibration{
+  grid-template-columns:1.35fr .9fr 1fr .8fr .9fr .9fr .8fr 1.25fr;
+}
+@media(max-width:1000px){
+  .calibration-summary{
+    grid-template-columns:repeat(3,1fr)
+  }
+  .analysis-row.calibration{
+    grid-template-columns:1fr 1fr 1fr 1fr
+  }
+}
+@media(max-width:650px){
+  .calibration-summary{
+    grid-template-columns:1fr 1fr
+  }
+  .analysis-row.calibration{
+    grid-template-columns:1fr
+  }
+}

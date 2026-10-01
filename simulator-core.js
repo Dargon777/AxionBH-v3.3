@@ -5,7 +5,7 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  const MODEL_VERSION = "8.0.0";
+  const MODEL_VERSION = "8.1.0";
   const STATE_SCHEMA_VERSION = 8;
 
   const CONSTANTS = Object.freeze({
@@ -62,6 +62,51 @@
     burstIntervalYears: 1e6,
     burstDuration: 1e6,
     burstEfficiency: 1e-17
+  });
+
+  function mdotGsFromMsunPerYear(value) {
+    const rate = assertFinitePositive(
+      Number(value),
+      "mdotMsunPerYear"
+    );
+    return rate * CONSTANTS.MSUN / CONSTANTS.YEAR;
+  }
+
+  function mdotMsunPerYearFromGs(value) {
+    const rate = assertFinitePositive(
+      Number(value),
+      "mdotGs"
+    );
+    return rate * CONSTANTS.YEAR / CONSTANTS.MSUN;
+  }
+
+  const ACCRETION_CALIBRATIONS = Object.freeze({
+    eht2023: Object.freeze({
+      id: "eht2023",
+      label: "EHT 2023 promising GRMHD cluster",
+      kind: "model-cluster",
+      minMsunPerYear: 5.2e-9,
+      maxMsunPerYear: 9.5e-9,
+      source:
+        "Event Horizon Telescope Collaboration, Sgr A* Paper V, arXiv:2311.09478",
+      sourceUrl:
+        "https://arxiv.org/abs/2311.09478",
+      caveat:
+        "Promising MAD, low-inclination model cluster; all tested EHT model families fail at least one observational constraint."
+    }),
+    faraday2006: Object.freeze({
+      id: "faraday2006",
+      label: "Faraday-rotation conditional range",
+      kind: "conditional-observational",
+      minMsunPerYear: 2e-9,
+      maxMsunPerYear: 2e-7,
+      source:
+        "Marrone et al. 2007, arXiv:astro-ph/0611791",
+      sourceUrl:
+        "https://arxiv.org/abs/astro-ph/0611791",
+      caveat:
+        "Conditional on magnetic-field strength, ordering and geometry; not a model-independent interval."
+    })
   });
 
   const PRESETS = Object.freeze({
@@ -2471,6 +2516,177 @@
   }
 
 
+
+  function classifyAccretionRate(
+    mdotMsunPerYear,
+    calibration
+  ) {
+    const value = assertFinitePositive(
+      Number(mdotMsunPerYear),
+      "mdotMsunPerYear"
+    );
+    const min = calibration.minMsunPerYear;
+    const max = calibration.maxMsunPerYear;
+    if (value < min) {
+      return {
+        relation: "below",
+        factorToNearestBound: min / value
+      };
+    }
+    if (value > max) {
+      return {
+        relation: "above",
+        factorToNearestBound: value / max
+      };
+    }
+    return {
+      relation: "within",
+      factorToNearestBound: 1
+    };
+  }
+
+  function accretionCalibrationPoint(
+    input,
+    mdotMsunPerYear,
+    {
+      id = "point",
+      label = "calibration point",
+      sourceId = null,
+      role = "point"
+    } = {}
+  ) {
+    const p = normalizeParams(input);
+    const mdotGs =
+      mdotGsFromMsunPerYear(mdotMsunPerYear);
+    const parameters = normalizeParams({
+      ...p,
+      mdot: mdotGs,
+      electronDensityMode: 2
+    });
+    const flow = accretionElectronDensity(parameters);
+    const plasma =
+      finiteMassPlasmaDiagnostics(parameters);
+    const result = cme(parameters);
+
+    return {
+      id,
+      label,
+      sourceId,
+      role,
+      mdotMsunPerYear,
+      mdotGs,
+      parameters,
+      flow,
+      plasma,
+      result,
+      ratio511: result.ratio511,
+      deficitDex: deficitOrders(result.ratio511, 1)
+    };
+  }
+
+  function accretionCalibrationAnalysis(input) {
+    const p = normalizeParams(input);
+    const currentMsunPerYear =
+      mdotMsunPerYearFromGs(p.mdot);
+    const legacyMsunPerYear =
+      mdotMsunPerYearFromGs(DEFAULTS.mdot);
+
+    const ranges = Object.fromEntries(
+      Object.entries(ACCRETION_CALIBRATIONS).map(
+        ([key, calibration]) => {
+          const geometricMid = Math.sqrt(
+            calibration.minMsunPerYear *
+            calibration.maxMsunPerYear
+          );
+          return [
+            key,
+            {
+              ...calibration,
+              geometricMidMsunPerYear: geometricMid,
+              currentRelation: classifyAccretionRate(
+                currentMsunPerYear,
+                calibration
+              ),
+              low: accretionCalibrationPoint(
+                p,
+                calibration.minMsunPerYear,
+                {
+                  id: key + "-low",
+                  label: calibration.label + " · low",
+                  sourceId: key,
+                  role: "low"
+                }
+              ),
+              mid: accretionCalibrationPoint(
+                p,
+                geometricMid,
+                {
+                  id: key + "-mid",
+                  label: calibration.label + " · geometric mid",
+                  sourceId: key,
+                  role: "mid"
+                }
+              ),
+              high: accretionCalibrationPoint(
+                p,
+                calibration.maxMsunPerYear,
+                {
+                  id: key + "-high",
+                  label: calibration.label + " · high",
+                  sourceId: key,
+                  role: "high"
+                }
+              )
+            }
+          ];
+        }
+      )
+    );
+
+    const current = accretionCalibrationPoint(
+      p,
+      currentMsunPerYear,
+      {
+        id: "current",
+        label: "Current Ṁ",
+        role: "current"
+      }
+    );
+    const legacy = accretionCalibrationPoint(
+      p,
+      legacyMsunPerYear,
+      {
+        id: "legacy",
+        label: "AxionBH legacy Ṁ",
+        role: "legacy"
+      }
+    );
+
+    return {
+      currentMsunPerYear,
+      legacyMsunPerYear,
+      current,
+      legacy,
+      ranges,
+      legacyToEhtLow:
+        legacyMsunPerYear /
+        ACCRETION_CALIBRATIONS.eht2023.minMsunPerYear,
+      legacyToEhtHigh:
+        legacyMsunPerYear /
+        ACCRETION_CALIBRATIONS.eht2023.maxMsunPerYear,
+      points: [
+        current,
+        legacy,
+        ranges.eht2023.low,
+        ranges.eht2023.mid,
+        ranges.eht2023.high,
+        ranges.faraday2006.low,
+        ranges.faraday2006.mid,
+        ranges.faraday2006.high
+      ]
+    };
+  }
+
   function diagnoseRun(mode, input, result = null) {
     const p = normalizeParams(input);
     const r = result || simulate(mode, p);
@@ -2519,6 +2735,23 @@
           "accretion_density_closure",
           "Accretion density uses the steady thick-disk continuity proxy mdot = 4π r H rho |v_r|; H/r, v_r/c and Y_e are explicit model inputs.",
           plasma.accretion.netElectronDensityCm3
+        );
+        const mdotContext =
+          mdotMsunPerYearFromGs(p.mdot);
+        const ehtContext = classifyAccretionRate(
+          mdotContext,
+          ACCRETION_CALIBRATIONS.eht2023
+        );
+        add(
+          "info",
+          "accretion_literature_context",
+          ehtContext.relation === "within"
+            ? "Current Ṁ lies inside the EHT 2023 promising GRMHD cluster range; that cluster is model-dependent and not a universal observational bound."
+            : "Current Ṁ lies " + ehtContext.relation +
+              " the EHT 2023 promising GRMHD cluster by a factor of " +
+              ehtContext.factorToNearestBound.toExponential(2) +
+              " relative to the nearest range edge; this is context, not a hard exclusion.",
+          mdotContext
         );
       }
       add(
@@ -2766,9 +2999,15 @@
     MODEL_VERSION,
     STATE_SCHEMA_VERSION,
     MODEL_LAYERS,
+    ACCRETION_CALIBRATIONS,
     CONSTANTS,
     DEFAULTS,
     PRESETS,
+    mdotGsFromMsunPerYear,
+    mdotMsunPerYearFromGs,
+    classifyAccretionRate,
+    accretionCalibrationPoint,
+    accretionCalibrationAnalysis,
     normalizeParams,
     kerrGeometry,
     turbulentFactor,

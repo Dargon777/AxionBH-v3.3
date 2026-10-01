@@ -358,7 +358,7 @@
       ordered[key] = Number(p[key]);
     });
     const source = JSON.stringify({
-      model: "AxionBH-v8.0",
+      model: "AxionBH-v8.1",
       mode,
       parameters: ordered
     });
@@ -1020,7 +1020,7 @@
     if ($("mode").value !== "cme") {
       setAnalysisMeta(
         "Parameter Inference",
-        "v8.0 inverse solver сейчас определён для CVE closure"
+        "v8.1 inverse solver сейчас определён для CVE closure"
       );
       setAnalysisTable(
         '<div class="inference-empty">Переключи режим на CME, чтобы оценить дефицит и требуемые однопараметрические сдвиги.</div>'
@@ -1444,6 +1444,224 @@
   }
 
 
+
+  function calibrationRow(point, sourceLabel) {
+    return '<div class="analysis-row calibration">' +
+      '<strong>' + point.label + '</strong>' +
+      '<span>' + A.formatScientific(
+        point.mdotMsunPerYear,
+        3
+      ) + '</span>' +
+      '<span>' + A.formatScientific(
+        point.flow.netElectronDensityCm3,
+        3
+      ) + '</span>' +
+      '<span>' + A.formatScientific(
+        point.plasma.vectorMuMeV,
+        3
+      ) + '</span>' +
+      '<span>' + A.formatScientific(
+        point.plasma.suppression,
+        3
+      ) + '</span>' +
+      '<span>' + A.formatScientific(
+        point.ratio511,
+        3
+      ) + '</span>' +
+      '<span>' + (
+        Number.isFinite(point.deficitDex)
+          ? point.deficitDex.toFixed(2) + " dex"
+          : "∞"
+      ) + '</span>' +
+      '<span>' + (sourceLabel || "current") + '</span>' +
+      '</div>';
+  }
+
+  function renderAccretionCalibration() {
+    if ($("mode").value !== "cme") {
+      setAnalysisMeta(
+        "Sgr A* Accretion Calibration",
+        "Calibration is evaluated through the stationary CVE + accretion-plasma chain"
+      );
+      setAnalysisTable(
+        '<div class="inference-empty">Переключи режим на CVE closure.</div>'
+      );
+      if (window.Plotly) Plotly.purge("plot");
+      return;
+    }
+
+    const analysis =
+      A.accretionCalibrationAnalysis(params());
+    const eht = analysis.ranges.eht2023;
+    const rm = analysis.ranges.faraday2006;
+    const currentRelation = eht.currentRelation;
+
+    setAnalysisMeta(
+      "Sgr A* Accretion Calibration",
+      "Literature ranges are contextual model/conditional constraints, not a single adopted truth"
+    );
+
+    const summary = [
+      '<div class="calibration-summary">',
+      '<div><span>Current Ṁ</span><strong>' +
+        A.formatScientific(
+          analysis.currentMsunPerYear,
+          3
+        ) + ' M☉/yr</strong></div>',
+      '<div><span>Legacy Ṁ</span><strong>' +
+        A.formatScientific(
+          analysis.legacyMsunPerYear,
+          3
+        ) + ' M☉/yr</strong></div>',
+      '<div><span>EHT cluster</span><strong>' +
+        A.formatScientific(
+          eht.minMsunPerYear,
+          2
+        ) + '–' +
+        A.formatScientific(
+          eht.maxMsunPerYear,
+          2
+        ) + '</strong></div>',
+      '<div><span>Current vs EHT</span><strong>' +
+        currentRelation.relation + ' · ' +
+        A.formatScientific(
+          currentRelation.factorToNearestBound,
+          2
+        ) + '×</strong></div>',
+      '<div><span>Legacy / EHT high</span><strong>' +
+        A.formatScientific(
+          analysis.legacyToEhtHigh,
+          2
+        ) + '×</strong></div>',
+      '</div>'
+    ].join("");
+
+    const table = [
+      '<div class="analysis-row analysis-row-head calibration"><span>Case</span><span>Ṁ, M☉/yr</span><span>nₑ,net cm⁻³</span><span>μ_V MeV</span><span>CVE suppression</span><span>L/L₅₁₁</span><span>Deficit</span><span>Context</span></div>',
+      calibrationRow(
+        analysis.current,
+        "current input · forced accretion closure"
+      ),
+      calibrationRow(
+        analysis.legacy,
+        "AxionBH legacy"
+      ),
+      calibrationRow(eht.low, "EHT 2023 low"),
+      calibrationRow(eht.mid, "EHT 2023 geometric mid"),
+      calibrationRow(eht.high, "EHT 2023 high"),
+      calibrationRow(rm.low, "Faraday low"),
+      calibrationRow(rm.high, "Faraday high")
+    ].join("");
+
+    const note =
+      '<div class="missing-note"><strong>EHT 2023:</strong> ' +
+      eht.caveat +
+      '<br><strong>Faraday rotation:</strong> ' +
+      rm.caveat +
+      '<br>The same v8.0 accretion geometry (r/r_g, H/r, |v_r|/c, Y_e) is held fixed across rows so the table isolates Ṁ.</div>';
+
+    setAnalysisTable(summary + table + note);
+
+    if (!window.Plotly) return;
+
+    const plotPoints = [
+      analysis.legacy,
+      eht.low,
+      eht.mid,
+      eht.high,
+      rm.low,
+      rm.high
+    ].filter((point) =>
+      Number.isFinite(point.deficitDex)
+    );
+    const colors = themeColors();
+    const layout = plotLayout(
+      "Ṁ, M☉/yr",
+      "remaining deficit, dex"
+    );
+    layout.xaxis.type = "log";
+
+    const yValues = plotPoints.map(
+      (point) => point.deficitDex
+    );
+    const yMin = Math.max(
+      0,
+      Math.min(...yValues) - 3
+    );
+    const yMax = Math.max(...yValues) + 3;
+    layout.shapes = [
+      {
+        type: "rect",
+        x0: eht.minMsunPerYear,
+        x1: eht.maxMsunPerYear,
+        y0: yMin,
+        y1: yMax,
+        fillcolor: "rgba(120,120,120,0.10)",
+        line: { width: 0 }
+      },
+      {
+        type: "rect",
+        x0: rm.minMsunPerYear,
+        x1: rm.maxMsunPerYear,
+        y0: yMin,
+        y1: yMax,
+        fillcolor: "rgba(120,120,120,0.05)",
+        line: { width: 1, dash: "dot" }
+      }
+    ];
+    layout.yaxis.range = [yMin, yMax];
+
+    Plotly.react("plot", [
+      {
+        type: "scatter",
+        mode: "markers+text",
+        x: plotPoints.map(
+          (point) => point.mdotMsunPerYear
+        ),
+        y: plotPoints.map(
+          (point) => point.deficitDex
+        ),
+        text: plotPoints.map(
+          (point) => point.id
+        ),
+        textposition: "top center",
+        marker: {
+          size: 10,
+          color: colors.accent2
+        },
+        customdata: plotPoints.map((point) => [
+          point.flow.netElectronDensityCm3,
+          point.plasma.vectorMuMeV,
+          point.ratio511
+        ]),
+        hovertemplate:
+          "%{text}<br>Ṁ=%{x:.3e} M☉/yr" +
+          "<br>deficit=%{y:.2f} dex" +
+          "<br>nₑ=%{customdata[0]:.3e} cm⁻³" +
+          "<br>μ_V=%{customdata[1]:.4f} MeV" +
+          "<br>L/L₅₁₁=%{customdata[2]:.3e}" +
+          "<extra></extra>"
+      },
+      {
+        type: "scatter",
+        mode: "markers",
+        x: [analysis.current.mdotMsunPerYear],
+        y: [analysis.current.deficitDex],
+        marker: {
+          size: 12,
+          color: colors.accent
+        },
+        name: "current",
+        hovertemplate:
+          "current<br>Ṁ=%{x:.3e} M☉/yr" +
+          "<br>deficit=%{y:.2f} dex<extra></extra>"
+      }
+    ], layout, {
+      responsive: true,
+      displaylogo: false
+    });
+  }
+
   function renderValidity() {
     const p = params();
     const mode = $("mode").value;
@@ -1862,6 +2080,7 @@
         else if (kind === "inference") renderInference();
         else if (kind === "transport") renderTransport();
         else if (kind === "plasma") renderPlasma();
+        else if (kind === "calibration") renderAccretionCalibration();
         else if (kind === "validity") renderValidity();
         else if (kind === "chirality") renderChirality();
         else if (kind === "missing") renderMissingPhysics();
@@ -1910,7 +2129,7 @@
     const diagnostics = currentDiagnostics();
     const payload = {
       generatedAt: new Date().toISOString(),
-      model: "AxionBH research workbench v8.0",
+      model: "AxionBH research workbench v8.1",
       modelVersion: A.MODEL_VERSION,
       stateSchemaVersion: A.STATE_SCHEMA_VERSION,
       stateId: runStateId(state.lastMode, state.lastParams),
@@ -1941,6 +2160,12 @@
         state.lastMode,
         state.lastResult
       ),
+      accretionCalibration:
+        state.lastMode === "cme"
+          ? A.accretionCalibrationAnalysis(
+              state.lastParams
+            )
+          : null,
       missingPhysics: {
         placement: $("missingPlacement").value,
         gainExp: Number($("missingGainExp").value),
@@ -1964,7 +2189,7 @@
     const lines = [
       "# AxionBH reproducibility report",
       "",
-      "- Model: AxionBH Research Workbench v8.0",
+      "- Model: AxionBH Research Workbench v8.1",
       "- Generated: " + new Date().toISOString(),
       "- State ID: " + stateId,
       "- Mode: " + modeNames[state.lastMode],
@@ -2160,7 +2385,7 @@
       applyParameters(restored);
       if (modeNames[payload.mode]) $("mode").value = payload.mode;
 
-      if (["spin", "explorer", "sensitivity", "inference", "transport", "plasma", "validity", "chirality", "missing", "compare"].includes(payload.analysis)) {
+      if (["spin", "explorer", "sensitivity", "inference", "transport", "plasma", "calibration", "validity", "chirality", "missing", "compare"].includes(payload.analysis)) {
         state.analysis = payload.analysis;
       }
 
