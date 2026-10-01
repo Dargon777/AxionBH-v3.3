@@ -677,7 +677,7 @@ console.log("AxionBH simulator-core tests passed");
 
 
 {
-  assert.equal(A.MODEL_VERSION, "8.2.0");
+  assert.equal(A.MODEL_VERSION, "8.3.0");
   assert.equal(A.STATE_SCHEMA_VERSION, 8);
 }
 
@@ -745,7 +745,7 @@ console.log("AxionBH simulator-core tests passed");
     },
     "cme"
   );
-  assert.equal(report.modelVersion, "8.2.0");
+  assert.equal(report.modelVersion, "8.3.0");
   assert.equal(report.stateSchemaVersion, 8);
   assert.equal(report.layers.length, A.MODEL_LAYERS.length);
   assert.ok(report.accretion);
@@ -864,4 +864,19 @@ console.log("AxionBH simulator-core tests passed");
   assert.ok(point.flow.netElectronDensityCm3 > 0);
   assert.ok(point.plasma.vectorMuMeV > 0);
   assert.ok(point.ratio511 > 0);
+}
+
+{
+  assert.equal(A.CONSTANTS.POSITRON_RATE_OBS_511,1.07e43);
+  const obs=A.positronObservableFromPower(1.6e37);
+  assert.ok(Math.abs(obs.positronRatePerSecond-1e43)/1e43<1e-12);
+  assert.ok(Math.abs(obs.ratio511-(1e43/1.07e43))<1e-12);
+}
+{
+  const audit=A.microphysicsAudit(A.DEFAULTS);
+  assert.equal(audit.observed511.unit,"e+/s");
+  assert.ok(audit.dimensionalCorrectionDex>5);
+  assert.ok(audit.dimensionalCorrectionDex<6.5);
+  assert.ok(audit.correctedDeficitDex<audit.historicalDeficitDex);
+  assert.equal(audit.axionToMu5.status,"phenomenological");
 }

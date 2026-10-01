@@ -123,8 +123,8 @@ for (const feature of [
   );
 }
 
-assert.ok(html.includes("v8.2"));
-assert.ok(app.includes("AxionBH research workbench v8.2"));
+assert.ok(html.includes("v8.3"));
+assert.ok(app.includes("AxionBH research workbench v8.3"));
 
 
 for (const feature of [
@@ -313,7 +313,7 @@ for (const feature of [
 ]) {
   assert.ok(
     core.includes(feature) || app.includes(feature),
-    "missing v8.2 calibration feature: " + feature
+    "missing v8.3 calibration feature: " + feature
   );
 }
 
@@ -329,8 +329,13 @@ for (const feature of [
 ]) {
   assert.ok(
     core.includes(feature) || app.includes(feature),
-    "missing v8.2 flow feature: " + feature
+    "missing v8.3 flow feature: " + feature
   );
 }
 
 assert.ok(html.includes('data-analysis="flow"'));
+
+for(const feature of ["POSITRON_RATE_OBS_511","positronObservableFromPower","microphysicsAudit","renderMicrophysicsAudit"]){
+  assert.ok(core.includes(feature)||app.includes(feature),"missing v8.3 feature: "+feature);
+}
+assert.ok(html.includes('data-analysis="micro"'));

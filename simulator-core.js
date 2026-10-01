@@ -5,7 +5,7 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  const MODEL_VERSION = "8.2.0";
+  const MODEL_VERSION = "8.3.0";
   const STATE_SCHEMA_VERSION = 8;
 
   const CONSTANTS = Object.freeze({
@@ -19,7 +19,8 @@
     ERG_PER_GEV: 1.602e-3,
     ERG_PER_EV: 1.602176634e-12,
     YEAR: 365.25 * 86400,
-    L_OBS_511: 1.07e43,
+    POSITRON_RATE_OBS_511: 1.07e43,
+    L_OBS_511: 1.07e43, // deprecated numeric alias; historical v7/v8.2 code treated this as erg/s
     POSITRON_ENERGY: 1.6e-6,
     SPIN_THRESHOLD: 0.35,
     B_EQ: 3e4,
@@ -1838,6 +1839,83 @@
     })
   });
 
+  function positronRateFromPower(powerErgS, energyCostErg = CONSTANTS.POSITRON_ENERGY) {
+    const power = Number(powerErgS);
+    const cost = Number(energyCostErg);
+    if (!Number.isFinite(power) || power < 0) {
+      throw new RangeError("powerErgS must be non-negative");
+    }
+    assertFinitePositive(cost, "energyCostErg");
+    return power / cost;
+  }
+
+  function positronObservableFromPower(powerErgS, energyCostErg = CONSTANTS.POSITRON_ENERGY) {
+    const rate = positronRateFromPower(powerErgS, energyCostErg);
+    return {
+      powerErgS,
+      energyCostErg,
+      positronRatePerSecond: rate,
+      observedPositronRatePerSecond:
+        CONSTANTS.POSITRON_RATE_OBS_511,
+      ratio511:
+        rate / CONSTANTS.POSITRON_RATE_OBS_511,
+      note:
+        "Observed ~1e43 quantity is a Galactic positron annihilation/injection rate in e+/s. Conversion from model power to e+/s remains an explicit phenomenological energy-cost proxy."
+    };
+  }
+
+  function microphysicsAudit(input) {
+    const p = normalizeParams(input);
+    const result = cme(p);
+    const observable =
+      positronObservableFromPower(result.luminosity);
+    const historicalRatio =
+      result.luminosity / CONSTANTS.L_OBS_511;
+    const correctedDeficit =
+      deficitOrders(observable.ratio511, 1);
+    const historicalDeficit =
+      deficitOrders(historicalRatio, 1);
+    const transport =
+      anomalousTransportDiagnostics(p, result);
+    return {
+      modelVersion: MODEL_VERSION,
+      observed511: {
+        quantity: "Galactic positron annihilation/injection rate",
+        valuePerSecond:
+          CONSTANTS.POSITRON_RATE_OBS_511,
+        unit: "e+/s",
+        historicalBug:
+          "Legacy code compared model power in erg/s directly with a ~1e43 e+/s observational rate."
+      },
+      axionToMu5: {
+        status: "phenomenological",
+        modelRelation:
+          "mu5 = alpha_F * (a/fa) * mu_B * B * C_turb",
+        warning:
+          "Derivative axion-fermion couplings can bias charge production in appropriate non-equilibrium settings, but they do not by themselves derive this stationary local mu5 ansatz.",
+        mu5GeV: result.mu5
+      },
+      mu5ToPositrons: {
+        status: "phenomenological-energy-proxy",
+        modelRelation:
+          "Ndot_e+ = L_model / E_cost",
+        energyCostErg:
+          CONSTANTS.POSITRON_ENERGY,
+        powerErgS: result.luminosity,
+        positronRatePerSecond:
+          observable.positronRatePerSecond
+      },
+      observable,
+      historicalRatio511: historicalRatio,
+      historicalDeficitDex: historicalDeficit,
+      correctedRatio511: observable.ratio511,
+      correctedDeficitDex: correctedDeficit,
+      dimensionalCorrectionDex:
+        historicalDeficit - correctedDeficit,
+      transport
+    };
+  }
+
   function deficitOrders(value, target = 1) {
     const metric = Number(value);
     const goal = Number(target);
@@ -3333,6 +3411,9 @@
     FLOW_GEOMETRY_CONTEXT,
     CONSTANTS,
     DEFAULTS,
+    positronRateFromPower,
+    positronObservableFromPower,
+    microphysicsAudit,
     PRESETS,
     mdotGsFromMsunPerYear,
     mdotMsunPerYearFromGs,
