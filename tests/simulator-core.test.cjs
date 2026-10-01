@@ -66,6 +66,61 @@ function finiteOrInfinity(value) {
   assert.ok(Number.isFinite(sr.alpha));
   assert.ok(Number.isFinite(sr.gamma));
   assert.ok(finiteOrInfinity(sr.saturationTime));
+  assert.equal(sr.level, "211");
+  assert.equal(sr.superradiantCondition, false);
+  assert.equal(sr.active, false);
+  assert.equal(sr.gamma, 0);
+  assert.ok(sr.criticalSpin > A.DEFAULTS.spin);
+}
+
+{
+  const active = A.superradiant({
+    ...A.DEFAULTS,
+    axionMassEv: 8.5e-18,
+    superradianceSeedOccupation: 1
+  });
+  assert.equal(active.superradiantCondition, true);
+  assert.equal(active.active, true);
+  assert.ok(active.gamma > 0);
+  assert.ok(active.growthBracket > 0);
+  assert.ok(active.criticalSpin < A.DEFAULTS.spin);
+  assert.ok(active.saturationFraction > 0);
+  assert.ok(active.saturationFraction < 0.1);
+  assert.ok(active.saturationOccupation > 1e70);
+  assert.ok(active.eFoldCount > 100);
+  assert.ok(Number.isFinite(active.saturationTime));
+  assert.ok(active.averageExtractionPower > 0);
+  assert.equal(active.conversionStatus, "phenomenological-energy-proxy");
+}
+
+{
+  const active = A.scalar211Superradiance({
+    ...A.DEFAULTS,
+    axionMassEv: 8.5e-18
+  });
+  assert.equal(active.level, "211");
+  assert.ok(active.omegaRDimensionless < active.horizonOmegaDimensionless);
+  assert.ok(active.growthApproximation.includes("Baryakhtar"));
+}
+
+{
+  const diagnostics = A.diagnoseRun(
+    "superradiant",
+    A.DEFAULTS,
+    A.superradiant(A.DEFAULTS)
+  );
+  const gate = diagnostics.checks.find(
+    (item) => item.code === "superradiance_condition"
+  );
+  assert.ok(gate);
+  assert.equal(gate.level, "warning");
+}
+
+{
+  const p = A.normalizeParams({
+    superradianceSeedOccupation: 10
+  });
+  assert.equal(p.superradianceSeedOccupation, 10);
 }
 
 {
@@ -677,8 +732,8 @@ console.log("AxionBH simulator-core tests passed");
 
 
 {
-  assert.equal(A.MODEL_VERSION, "8.5.1");
-  assert.equal(A.STATE_SCHEMA_VERSION, 9);
+  assert.equal(A.MODEL_VERSION, "8.5.2");
+  assert.equal(A.STATE_SCHEMA_VERSION, 10);
 }
 
 {
@@ -745,8 +800,8 @@ console.log("AxionBH simulator-core tests passed");
     },
     "cme"
   );
-  assert.equal(report.modelVersion, "8.5.1");
-  assert.equal(report.stateSchemaVersion, 9);
+  assert.equal(report.modelVersion, "8.5.2");
+  assert.equal(report.stateSchemaVersion, 10);
   assert.equal(report.layers.length, A.MODEL_LAYERS.length);
   assert.ok(report.accretion);
   assert.ok(report.layers.some(
