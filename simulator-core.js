@@ -1721,10 +1721,24 @@
     const coefficients = selfConsistencyCoefficients(p);
     const current = cme(p);
     const thermal = coefficients.temperatureGeV;
-    const discriminantFactor = 4 * coefficients.c0 * coefficients.c2;
+    const logDiscriminantFactor =
+      coefficients.c0 > 0 && coefficients.c2 > 0
+        ? Math.log(4) +
+          Math.log(coefficients.c0) +
+          Math.log(coefficients.c2)
+        : Number.NEGATIVE_INFINITY;
+    const discriminantFactor =
+      logDiscriminantFactor > Math.log(Number.MIN_VALUE)
+        ? Math.exp(logDiscriminantFactor)
+        : 0;
+    const criticalLog =
+      Number.isFinite(logDiscriminantFactor)
+        ? -0.5 * logDiscriminantFactor
+        : Number.POSITIVE_INFINITY;
     const criticalUpstreamProduct =
-      discriminantFactor > 0 && Number.isFinite(discriminantFactor)
-        ? 1 / Math.sqrt(discriminantFactor)
+      Number.isFinite(criticalLog) &&
+      criticalLog < Math.log(Number.MAX_VALUE)
+        ? Math.exp(criticalLog)
         : Number.POSITIVE_INFINITY;
 
     const mu5Max = Math.sqrt(
@@ -1761,6 +1775,11 @@
       ceilingDeficitOrders: deficitOrders(ratioMax, goal),
       upstreamHeadroom:
         current.ratio511 > 0 ? ratioMax / current.ratio511 : Number.POSITIVE_INFINITY,
+      discriminantFactor,
+      log10DiscriminantFactor:
+        Number.isFinite(logDiscriminantFactor)
+          ? logDiscriminantFactor / Math.LN10
+          : Number.NEGATIVE_INFINITY,
       criticalUpstreamProduct,
       requiredPostGainAtCurrent:
         current.ratio511 > 0 ? goal / current.ratio511 : Number.POSITIVE_INFINITY,

@@ -570,3 +570,11 @@ console.log("AxionBH simulator-core tests passed");
   assert.ok(Math.abs(ceiling.mu5Max / expected - 1) < 1e-10);
   assert.ok(ceiling.mu5Max < ceiling.masslessMu5Max);
 }
+
+
+{
+  const ceiling = A.cmeClosureCeiling(A.DEFAULTS);
+  assert.ok(Number.isFinite(ceiling.criticalUpstreamProduct));
+  assert.ok(ceiling.criticalUpstreamProduct > 1e150);
+  assert.ok(ceiling.log10DiscriminantFactor < -300);
+}

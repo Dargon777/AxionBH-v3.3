@@ -1585,10 +1585,35 @@
 
     if (!window.Plotly) return;
 
+    const criticalExp =
+      Number.isFinite(ceiling.criticalUpstreamProduct) &&
+      ceiling.criticalUpstreamProduct > 0
+        ? Math.log10(ceiling.criticalUpstreamProduct)
+        : 60;
+    const sweepMax = placement === "conversion"
+      ? Math.min(
+          220,
+          Math.max(
+            60,
+            Number.isFinite(
+              ceiling.requiredPostGainAtCurrent
+            ) &&
+            ceiling.requiredPostGainAtCurrent > 0
+              ? Math.log10(
+                  ceiling.requiredPostGainAtCurrent
+                ) * 1.02
+              : 60
+          )
+        )
+      : Math.min(
+          220,
+          Math.max(60, criticalExp * 1.02)
+        );
+
     const sweep = A.missingPhysicsSweep(p, placement, {
       minExp: 0,
-      maxExp: 60,
-      steps: 181
+      maxExp: sweepMax,
+      steps: 220
     });
     const valid = sweep.points.filter((point) =>
       Number.isFinite(point.ratio511) && point.ratio511 > 0
@@ -1605,7 +1630,7 @@
     layout.shapes = [{
       type: "line",
       x0: 0,
-      x1: 60,
+      x1: sweepMax,
       y0: 0,
       y1: 0,
       line: { color: colors.muted, dash: "dash", width: 1 }
@@ -2023,7 +2048,7 @@
           $("missingPlacement").value = payload.missingPhysics.placement;
         }
         const gainExp = Number(payload.missingPhysics.gainExp);
-        if (Number.isFinite(gainExp) && gainExp >= 0 && gainExp <= 60) {
+        if (Number.isFinite(gainExp) && gainExp >= 0 && gainExp <= 220) {
           $("missingGainExp").value = gainExp;
         }
       }
