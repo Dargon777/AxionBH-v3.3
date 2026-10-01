@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="AxionBH interactive browser simulator and parameter-analysis workbench.">
-  <title>AxionBH — Research Workbench v7.6</title>
+  <title>AxionBH — Research Workbench v7.7</title>
   <link rel="stylesheet" href="simulator.css">
   <script defer src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <script defer src="simulator-core.js"></script>
@@ -15,7 +15,7 @@
     <div class="topbar-inner">
       <a class="brand" href="index.html">
         <span class="brand-mark">A</span>
-        <span>AxionBH<small>research workbench · v7.6</small></span>
+        <span>AxionBH<small>research workbench · v7.7</small></span>
       </a>
       <nav class="nav">
         <a href="index.html">Теория</a>
@@ -39,14 +39,14 @@
     </section>
 
     <div class="notice">
-      <strong>Исследовательский калькулятор.</strong> AxionBH реализует текущие допущения модели и не является подтверждённым инструментом наблюдательной астрофизики. В v7.6 CME-ветка считается в единой системе natural units; порог a/M = 0.35 остаётся феноменологическим gate, а не выведенным результатом.
+      <strong>Исследовательский калькулятор.</strong> AxionBH реализует текущие допущения модели и не является подтверждённым инструментом наблюдательной астрофизики. В v7.7 CVE closure считается в единой системе natural units; порог a/M = 0.35 остаётся феноменологическим gate, а не выведенным результатом.
     </div>
 
     <section class="workspace">
       <aside class="panel controls">
         <div class="panel-title">
           <h2>Параметры</h2>
-          <span class="muted">v7.6</span>
+          <span class="muted">v7.7</span>
         </div>
 
         <div class="field">
@@ -66,7 +66,7 @@
         <div class="field">
           <label for="mode">Режим</label>
           <select id="mode" class="select">
-            <option value="cme">CME / стационарное облако</option>
+            <option value="cme">CVE closure / стационарное облако</option>
             <option value="bosenova">Bosenova / ручные вспышки</option>
             <option value="superradiant">Суперрадиантный рост</option>
             <option value="hybrid">Superradiant + Bosenova</option>
@@ -149,13 +149,14 @@
           <div class="result-head analysis-head">
             <div>
               <h2 id="analysisTitle">κ как функция спина</h2>
-              <div id="analysisSubtitle" class="muted">CME-ветка · логарифмическая шкала</div>
+              <div id="analysisSubtitle" class="muted">CVE closure · логарифмическая шкала</div>
             </div>
             <div class="analysis-tabs" role="tablist" aria-label="Анализ">
               <button class="analysis-tab active" data-analysis="spin" type="button">κ(spin)</button>
               <button class="analysis-tab" data-analysis="explorer" type="button">3D Explorer</button>
               <button class="analysis-tab" data-analysis="sensitivity" type="button">Sensitivity</button>
               <button class="analysis-tab" data-analysis="inference" type="button">Inference</button>
+              <button class="analysis-tab" data-analysis="transport" type="button">Transport</button>
               <button class="analysis-tab" data-analysis="missing" type="button">New Physics</button>
               <button class="analysis-tab" data-analysis="compare" type="button">Сценарии</button>
             </div>

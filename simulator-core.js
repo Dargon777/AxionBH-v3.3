@@ -177,6 +177,123 @@
     return Number.isFinite(result) ? result : Number.POSITIVE_INFINITY;
   }
 
+
+  function chiralMagneticConductivity(mu5) {
+    const chemical = Number(mu5);
+    if (!Number.isFinite(chemical)) return Number.NaN;
+    return (2 * CONSTANTS.ALPHA_FINE / Math.PI) * chemical;
+  }
+
+  function chiralMagneticCurrent(mu5, B) {
+    const sigmaB = chiralMagneticConductivity(mu5);
+    const field = magneticFieldGeV2(B);
+    const current = sigmaB * field;
+    return Number.isFinite(current) ? current : Number.NaN;
+  }
+
+  function axialVorticalCurrent(mu5, temperature, omegaPerSecond) {
+    const sigmaV = chiralConductivity(mu5, temperature);
+    const omega = angularFrequencyGeV(omegaPerSecond);
+    const current = sigmaV * omega;
+    return Number.isFinite(current) ? current : Number.NaN;
+  }
+
+  function anomalousTransportDiagnostics(input, result = null) {
+    const p = normalizeParams(input);
+    const closureResult = result || cme(p);
+    const geometry = closureResult.geometry ||
+      kerrGeometry(p.massSolar * CONSTANTS.MSUN, p.spin);
+    const mu5 = Number(closureResult.mu5) || 0;
+    const fieldG = Number(closureResult.avgB) ||
+      averageMagneticField(p.B0, geometry, p.nProfile);
+    const fieldGeV2 = magneticFieldGeV2(fieldG);
+    const omegaGeV = angularFrequencyGeV(geometry.omegaH);
+    const thermal = temperatureGeV(p.temperature);
+
+    const sigmaCME = chiralMagneticConductivity(mu5);
+    const sigmaCVE = chiralConductivity(mu5, p.temperature);
+    const jCME = sigmaCME * fieldGeV2;
+    const jCVE = sigmaCVE * omegaGeV;
+    const jCVEThermal = (thermal * thermal / 6) * omegaGeV;
+    const jCVEChemical =
+      (mu5 * mu5 / (2 * Math.PI * Math.PI)) * omegaGeV;
+    const magnitudeRatio =
+      Number.isFinite(jCME) && Number.isFinite(jCVE) && jCVE !== 0
+        ? Math.abs(jCME / jCVE)
+        : null;
+    const chemicalFraction =
+      Number.isFinite(jCVE) && jCVE !== 0
+        ? jCVEChemical / jCVE
+        : null;
+
+    return {
+      legacyModeKey: "cme",
+      closureName: "axial CVE closure",
+      cmeName: "magnetic CME diagnostic",
+      mu5,
+      fieldG,
+      fieldGeV2,
+      omegaPerSecond: geometry.omegaH,
+      omegaGeV,
+      temperatureGeV: thermal,
+      sigmaCME,
+      sigmaCVE,
+      jCME,
+      jCVE,
+      jCVEThermal,
+      jCVEChemical,
+      magnitudeRatio,
+      chemicalFraction,
+      cmeCurrentType: "vector/electric",
+      cmeDirection: "parallel to B",
+      cveCurrentType: "axial",
+      cveDirection: "parallel to omega",
+      luminosityMappingDefined: false
+    };
+  }
+
+  function anomalousTransportSweep(
+    input,
+    {
+      xKey = "B0",
+      values = logSpace(1, 2e5, 100)
+    } = {}
+  ) {
+    const p = normalizeParams(input);
+    if (!Array.isArray(values) || values.length < 2) {
+      throw new RangeError("values must contain at least two points");
+    }
+    if (!["B0", "spin"].includes(xKey)) {
+      throw new RangeError("transport sweep supports B0 or spin");
+    }
+
+    return {
+      xKey,
+      points: values.map((value) => {
+        try {
+          const next = { ...p, [xKey]: value };
+          const result = cme(next);
+          const transport = anomalousTransportDiagnostics(next, result);
+          return {
+            value,
+            jCME: transport.jCME,
+            jCVE: transport.jCVE,
+            ratio: transport.magnitudeRatio,
+            mu5: transport.mu5
+          };
+        } catch {
+          return {
+            value,
+            jCME: null,
+            jCVE: null,
+            ratio: null,
+            mu5: null
+          };
+        }
+      })
+    };
+  }
+
   function averageMagneticField(B0, geometry, nProfile) {
     const n = assertFinitePositive(nProfile, "nProfile");
     const x = geometry.rErgEquator / geometry.rPlus;
@@ -1487,6 +1604,11 @@
     mu5FromA,
     chiralDegeneracy,
     chiralConductivity,
+    chiralMagneticConductivity,
+    chiralMagneticCurrent,
+    axialVorticalCurrent,
+    anomalousTransportDiagnostics,
+    anomalousTransportSweep,
     averageMagneticField,
     selfConsistencyCoefficients,
     selfConsistencyRhs,

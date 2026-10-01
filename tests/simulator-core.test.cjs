@@ -371,3 +371,59 @@ console.log("AxionBH simulator-core tests passed");
   assert.ok(conversion.requiredGain > 1e50);
   assert.ok(Math.abs(Math.log10(conversion.achievedMetric)) < 1e-8);
 }
+
+
+{
+  const mu5 = 1e-6;
+  const sigma = A.chiralMagneticConductivity(mu5);
+  const expected = 2 * A.CONSTANTS.ALPHA_FINE * mu5 / Math.PI;
+  assert.ok(Math.abs(sigma / expected - 1) < 1e-12);
+}
+
+{
+  const mu5 = 2e-7;
+  const B = 100;
+  const current = A.chiralMagneticCurrent(mu5, B);
+  const expected =
+    (2 * A.CONSTANTS.ALPHA_FINE * mu5 / Math.PI) *
+    A.magneticFieldGeV2(B);
+  assert.ok(Math.abs(current / expected - 1) < 1e-12);
+}
+
+{
+  const result = A.cme(A.DEFAULTS);
+  const transport = A.anomalousTransportDiagnostics(
+    A.DEFAULTS,
+    result
+  );
+  assert.equal(transport.closureName, "axial CVE closure");
+  assert.equal(transport.cmeDirection, "parallel to B");
+  assert.equal(transport.cveDirection, "parallel to omega");
+  assert.equal(transport.luminosityMappingDefined, false);
+  assert.ok(Number.isFinite(transport.jCME));
+  assert.ok(Number.isFinite(transport.jCVE));
+  assert.ok(transport.jCME > 0);
+  assert.ok(transport.jCVE > 0);
+  assert.ok(Number.isFinite(transport.magnitudeRatio));
+  assert.ok(
+    transport.jCVEThermal + transport.jCVEChemical > 0
+  );
+  assert.ok(
+    Math.abs(
+      (transport.jCVEThermal + transport.jCVEChemical) /
+      transport.jCVE - 1
+    ) < 1e-12
+  );
+}
+
+{
+  const sweep = A.anomalousTransportSweep(A.DEFAULTS, {
+    xKey: "B0",
+    values: [10, 100, 1000]
+  });
+  assert.equal(sweep.points.length, 3);
+  assert.ok(sweep.points.every((point) =>
+    Number.isFinite(point.jCME) &&
+    Number.isFinite(point.jCVE)
+  ));
+}
