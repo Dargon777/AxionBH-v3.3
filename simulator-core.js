@@ -294,6 +294,290 @@
     };
   }
 
+
+  function axialChargeDensity(mu5, temperature) {
+    const chemical = Number(mu5);
+    if (!Number.isFinite(chemical)) return Number.NaN;
+    const thermal = temperatureGeV(temperature);
+    return (
+      chemical * thermal * thermal / 3 +
+      chemical * chemical * chemical / (3 * Math.PI * Math.PI)
+    );
+  }
+
+  function axialSusceptibility(mu5, temperature) {
+    const chemical = Number(mu5);
+    if (!Number.isFinite(chemical)) return Number.NaN;
+    const thermal = temperatureGeV(temperature);
+    return (
+      thermal * thermal / 3 +
+      chemical * chemical / (Math.PI * Math.PI)
+    );
+  }
+
+  function mu5FromAxialCharge(n5, temperature) {
+    const density = Number(n5);
+    if (!Number.isFinite(density)) return Number.NaN;
+    if (density === 0) return 0;
+
+    const sign = Math.sign(density);
+    const target = Math.abs(density);
+    const thermal = temperatureGeV(temperature);
+
+    function densityPositive(mu) {
+      return (
+        mu * thermal * thermal / 3 +
+        mu * mu * mu / (3 * Math.PI * Math.PI)
+      );
+    }
+
+    const linearGuess =
+      target * 3 / Math.max(thermal * thermal, 1e-300);
+    const cubicGuess =
+      Math.cbrt(target * 3 * Math.PI * Math.PI);
+    let high = Math.max(linearGuess, cubicGuess, 1e-300);
+
+    while (densityPositive(high) < target && high < 1e100) {
+      high *= 2;
+    }
+
+    let low = 0;
+    for (let i = 0; i < 100; i += 1) {
+      const mid = (low + high) / 2;
+      if (densityPositive(mid) < target) low = mid;
+      else high = mid;
+    }
+
+    return sign * (low + high) / 2;
+  }
+
+  function anomalyCoefficient() {
+    return 2 * CONSTANTS.ALPHA_FINE / Math.PI;
+  }
+
+  function chiralityFlipRateGeV(ratePerSecond) {
+    const rate = Number(ratePerSecond);
+    if (!Number.isFinite(rate) || rate < 0) {
+      throw new RangeError("flipRatePerSecond must be non-negative");
+    }
+    return rate * CONSTANTS.S_INV_TO_GEV;
+  }
+
+  function chiralitySourceProxy(input, result = null) {
+    const p = normalizeParams(input);
+    const cveResult = result || cme(p);
+    const transport = anomalousTransportDiagnostics(p, cveResult);
+    const coefficients = selfConsistencyCoefficients(p);
+    const divergence =
+      Math.abs(transport.jCVE) /
+      Math.max(coefficients.effectiveLengthGeVInv, 1e-300);
+
+    return {
+      sourceGeV4: divergence,
+      transport,
+      effectiveLengthGeVInv: coefficients.effectiveLengthGeVInv,
+      note:
+        "Diagnostic proxy |J5,CVE|/L_eff; not a derived microscopic axion chirality source."
+    };
+  }
+
+  function evolveAxialDensity(n0, sourceGeV4, gammaGeV, timeGeVInv) {
+    if (!Number.isFinite(n0) || !Number.isFinite(sourceGeV4)) {
+      return Number.NaN;
+    }
+    if (!Number.isFinite(gammaGeV) || gammaGeV < 0) {
+      return Number.NaN;
+    }
+    if (!Number.isFinite(timeGeVInv) || timeGeVInv < 0) {
+      return Number.NaN;
+    }
+
+    if (gammaGeV === 0) {
+      return n0 + sourceGeV4 * timeGeVInv;
+    }
+
+    const equilibrium = sourceGeV4 / gammaGeV;
+    const decay = Math.exp(-gammaGeV * timeGeVInv);
+    return equilibrium + (n0 - equilibrium) * decay;
+  }
+
+  function chiralityDynamics(
+    input,
+    {
+      flipRatePerSecond = 1e-6,
+      horizonSeconds = 1e6,
+      electricAlignment = 0,
+      sourceGain = 1,
+      initialMu5 = null
+    } = {}
+  ) {
+    const p = normalizeParams(input);
+    const flipRate = Number(flipRatePerSecond);
+    const horizon = Number(horizonSeconds);
+    const alignment = Number(electricAlignment);
+    const gain = Number(sourceGain);
+
+    if (!Number.isFinite(flipRate) || flipRate < 0) {
+      throw new RangeError("flipRatePerSecond must be non-negative");
+    }
+    assertFinitePositive(horizon, "horizonSeconds");
+    if (!Number.isFinite(alignment)) {
+      throw new RangeError("electricAlignment must be finite");
+    }
+    assertFinitePositive(gain, "sourceGain");
+
+    const result = cme(p);
+    const proxy = chiralitySourceProxy(p, result);
+    const transport = proxy.transport;
+    const thermal = transport.temperatureGeV;
+    const masslessRatio = thermal / CONSTANTS.ELECTRON_MASS_GEV;
+    const initialChemical =
+      initialMu5 === null || initialMu5 === undefined
+        ? result.mu5
+        : Number(initialMu5);
+
+    if (!Number.isFinite(initialChemical)) {
+      throw new RangeError("initialMu5 must be finite");
+    }
+
+    const sourceProxyGeV4 = gain * proxy.sourceGeV4;
+    const eDotBGeV4 =
+      alignment *
+      transport.fieldGeV2 *
+      transport.fieldGeV2;
+    const anomalySourceGeV4 =
+      anomalyCoefficient() * eDotBGeV4;
+    const netSourceGeV4 =
+      sourceProxyGeV4 + anomalySourceGeV4;
+
+    const gammaGeV = chiralityFlipRateGeV(flipRate);
+    const horizonGeVInv =
+      horizon / CONSTANTS.S_INV_TO_GEV;
+    const n0 = axialChargeDensity(initialChemical, p.temperature);
+    const nFinal = evolveAxialDensity(
+      n0,
+      netSourceGeV4,
+      gammaGeV,
+      horizonGeVInv
+    );
+    const muFinal = mu5FromAxialCharge(nFinal, p.temperature);
+    const nEquilibrium =
+      gammaGeV > 0 ? netSourceGeV4 / gammaGeV : null;
+    const muEquilibrium =
+      nEquilibrium === null
+        ? null
+        : mu5FromAxialCharge(nEquilibrium, p.temperature);
+
+    const closureCeiling = cmeClosureCeiling(p);
+    const nAtClosureCeiling =
+      axialChargeDensity(closureCeiling.mu5Max, p.temperature);
+    const flipRateAtClosureCeiling =
+      proxy.sourceGeV4 > 0 && nAtClosureCeiling > 0
+        ? (proxy.sourceGeV4 / nAtClosureCeiling) /
+          CONSTANTS.S_INV_TO_GEV
+        : null;
+
+    const denominator =
+      anomalyCoefficient() *
+      transport.fieldGeV2 *
+      transport.fieldGeV2;
+    const electricAlignmentCrossover =
+      denominator > 0
+        ? proxy.sourceGeV4 / denominator
+        : null;
+
+    const electricAlignmentForClosureCeiling =
+      denominator > 0
+        ? (
+            gammaGeV * nAtClosureCeiling -
+            sourceProxyGeV4
+          ) / denominator
+        : null;
+
+    return {
+      model: "massless-free-Dirac diagnostic",
+      initialMu5: initialChemical,
+      initialN5: n0,
+      finalMu5: muFinal,
+      finalN5: nFinal,
+      equilibriumMu5: muEquilibrium,
+      equilibriumN5: nEquilibrium,
+      eta5Final: muFinal / thermal,
+      flipRatePerSecond: flipRate,
+      flipRateGeV: gammaGeV,
+      flipTimeSeconds:
+        flipRate > 0 ? 1 / flipRate : Number.POSITIVE_INFINITY,
+      horizonSeconds: horizon,
+      horizonGeVInv,
+      sourceGain: gain,
+      sourceProxyGeV4,
+      anomalySourceGeV4,
+      netSourceGeV4,
+      electricAlignment: alignment,
+      electricAlignmentCrossover,
+      electricAlignmentForClosureCeiling,
+      closureMu5Ceiling: closureCeiling.mu5Max,
+      n5AtClosureCeiling: nAtClosureCeiling,
+      flipRateAtClosureCeiling,
+      temperatureGeV: thermal,
+      electronMassGeV: CONSTANTS.ELECTRON_MASS_GEV,
+      temperatureToElectronMass: masslessRatio,
+      masslessRegime:
+        masslessRatio >= 3
+          ? "relativistic"
+          : masslessRatio >= 1
+            ? "borderline"
+            : "nonrelativistic",
+      transport,
+      sourceProxyNote: proxy.note
+    };
+  }
+
+  function chiralityDynamicsSeries(
+    input,
+    options = {},
+    points = 120
+  ) {
+    const count = Math.max(16, Math.min(300, Math.trunc(points)));
+    const analysis = chiralityDynamics(input, options);
+    const p = normalizeParams(input);
+    const gamma = analysis.flipRateGeV;
+    const n0 = analysis.initialN5;
+    const source = analysis.netSourceGeV4;
+    const horizon = analysis.horizonSeconds;
+
+    const minTime = Math.max(horizon * 1e-9, 1e-12);
+    const times =
+      horizon > minTime
+        ? [0, ...logSpace(minTime, horizon, count - 1)]
+        : [0, horizon];
+
+    return {
+      ...analysis,
+      points: times.map((timeSeconds) => {
+        const timeGeVInv =
+          timeSeconds / CONSTANTS.S_INV_TO_GEV;
+        const n5 = evolveAxialDensity(
+          n0,
+          source,
+          gamma,
+          timeGeVInv
+        );
+        const mu5 = mu5FromAxialCharge(n5, p.temperature);
+        return {
+          timeSeconds,
+          n5,
+          mu5,
+          eta5: mu5 / analysis.temperatureGeV,
+          jCME: chiralMagneticCurrent(
+            mu5,
+            analysis.transport.fieldG
+          )
+        };
+      })
+    };
+  }
+
   function averageMagneticField(B0, geometry, nProfile) {
     const n = assertFinitePositive(nProfile, "nProfile");
     const x = geometry.rErgEquator / geometry.rPlus;
@@ -1471,7 +1755,18 @@
       add(
         "info",
         "unit_system",
-        "CME closure решается после явного перевода B, T, Ω, m_eff и L_eff в natural units (ℏ=c=k_B=1)."
+        "CVE closure решается после явного перевода B, T, Ω, m_eff и L_eff в natural units (ℏ=c=k_B=1)."
+      );
+
+      const thermalToElectronMass =
+        temperatureGeV(p.temperature) / CONSTANTS.ELECTRON_MASS_GEV;
+      add(
+        thermalToElectronMass >= 1 ? "info" : "warning",
+        "massless_fermion_regime",
+        thermalToElectronMass >= 1
+          ? "Температура не ниже m_e; massless-fermion transport approximation хотя бы не находится в явно нерелятивистском режиме."
+          : "T << m_e: massless-fermion CVE/CME coefficients и susceptibility являются структурной диагностикой, а не физически надёжным electron-plasma расчётом.",
+        thermalToElectronMass
       );
 
       if (p.spin < CONSTANTS.SPIN_THRESHOLD) {
@@ -1496,8 +1791,8 @@
           relativeResidual <= 1e-10 ? "ok" : "warning",
           "root_residual",
           relativeResidual <= 1e-10
-            ? "Устойчивая CME-ветвь удовлетворяет самосогласованному уравнению."
-            : "Относительный residual устойчивой CME-ветви выше 1e-10.",
+            ? "Устойчивая CVE-ветвь удовлетворяет самосогласованному уравнению."
+            : "Относительный residual устойчивой CVE-ветви выше 1e-10.",
           relativeResidual
         );
         add(
@@ -1609,6 +1904,15 @@
     axialVorticalCurrent,
     anomalousTransportDiagnostics,
     anomalousTransportSweep,
+    axialChargeDensity,
+    axialSusceptibility,
+    mu5FromAxialCharge,
+    anomalyCoefficient,
+    chiralityFlipRateGeV,
+    chiralitySourceProxy,
+    evolveAxialDensity,
+    chiralityDynamics,
+    chiralityDynamicsSeries,
     averageMagneticField,
     selfConsistencyCoefficients,
     selfConsistencyRhs,

@@ -123,8 +123,8 @@ for (const feature of [
   );
 }
 
-assert.ok(html.includes("v7.7"));
-assert.ok(app.includes("AxionBH research workbench v7.7"));
+assert.ok(html.includes("v7.8"));
+assert.ok(app.includes("AxionBH research workbench v7.8"));
 
 
 for (const feature of [
@@ -188,3 +188,37 @@ for (const feature of [
 
 assert.ok(html.includes('data-analysis="transport"'));
 assert.ok(app.includes("CVE closure / стационарное облако"));
+
+
+for (const id of [
+  "chiralityControls",
+  "chiralityFlipExp",
+  "chiralityFlipOut",
+  "chiralityTimeExp",
+  "chiralityTimeOut",
+  "chiralityAnomalyMode",
+  "chiralityEExp",
+  "chiralityEOut"
+]) {
+  assert.ok(
+    html.includes('id="' + id + '"'),
+    "missing v7.8 chirality UI id: " + id
+  );
+}
+
+for (const feature of [
+  "axialChargeDensity",
+  "axialSusceptibility",
+  "mu5FromAxialCharge",
+  "chiralitySourceProxy",
+  "chiralityDynamics",
+  "chiralityDynamicsSeries",
+  "renderChirality"
+]) {
+  assert.ok(
+    core.includes(feature) || app.includes(feature),
+    "missing v7.8 chirality feature: " + feature
+  );
+}
+
+assert.ok(html.includes('data-analysis="chirality"'));

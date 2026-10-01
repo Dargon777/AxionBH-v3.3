@@ -322,7 +322,7 @@
       ordered[key] = Number(p[key]);
     });
     const source = JSON.stringify({
-      model: "AxionBH-v7.7",
+      model: "AxionBH-v7.8",
       mode,
       parameters: ordered
     });
@@ -984,7 +984,7 @@
     if ($("mode").value !== "cme") {
       setAnalysisMeta(
         "Parameter Inference",
-        "v7.7 inverse solver сейчас определён для CVE closure"
+        "v7.8 inverse solver сейчас определён для CVE closure"
       );
       setAnalysisTable(
         '<div class="inference-empty">Переключи режим на CME, чтобы оценить дефицит и требуемые однопараметрические сдвиги.</div>'
@@ -1206,6 +1206,186 @@
     ], layout, { responsive: true, displaylogo: false });
   }
 
+
+  function chiralityFlipRateValue() {
+    return Math.pow(10, Number($("chiralityFlipExp").value));
+  }
+
+  function chiralityHorizonValue() {
+    return Math.pow(10, Number($("chiralityTimeExp").value));
+  }
+
+  function chiralityElectricAlignment() {
+    const mode = $("chiralityAnomalyMode").value;
+    if (mode === "off") return 0;
+    const magnitude =
+      Math.pow(10, Number($("chiralityEExp").value));
+    return mode === "sink" ? -magnitude : magnitude;
+  }
+
+  function updateChiralityLabels() {
+    $("chiralityFlipOut").textContent =
+      A.formatScientific(chiralityFlipRateValue(), 2);
+    $("chiralityTimeOut").textContent =
+      A.formatScientific(chiralityHorizonValue(), 2);
+    $("chiralityEOut").textContent =
+      A.formatScientific(
+        Math.pow(10, Number($("chiralityEExp").value)),
+        2
+      );
+  }
+
+  function currentChiralityOptions() {
+    return {
+      flipRatePerSecond: chiralityFlipRateValue(),
+      horizonSeconds: chiralityHorizonValue(),
+      electricAlignment: chiralityElectricAlignment()
+    };
+  }
+
+  function renderChirality() {
+    if ($("mode").value !== "cme") {
+      setAnalysisMeta(
+        "Chirality Dynamics",
+        "n₅(t) diagnostic определён для стационарной CVE closure"
+      );
+      setAnalysisTable(
+        '<div class="inference-empty">Переключи режим на CVE closure. Динамика хиральности не подключена к другим luminosity-веткам.</div>'
+      );
+      if (window.Plotly) Plotly.purge("plot");
+      return;
+    }
+
+    const analysis = A.chiralityDynamicsSeries(
+      params(),
+      currentChiralityOptions(),
+      140
+    );
+
+    setAnalysisMeta(
+      "Chirality Dynamics",
+      "dn₅/dt = S_proxy + C_A E·B − Γ_flip n₅ · exact constant-coefficient evolution"
+    );
+
+    const eqMu = analysis.equilibriumMu5 === null
+      ? "no finite eq"
+      : A.formatScientific(analysis.equilibriumMu5, 3) + " GeV";
+    const flipTime = Number.isFinite(analysis.flipTimeSeconds)
+      ? A.formatScientific(analysis.flipTimeSeconds, 3) + " s"
+      : "∞";
+    const crossover = Number.isFinite(
+      analysis.electricAlignmentCrossover
+    )
+      ? A.formatScientific(
+          analysis.electricAlignmentCrossover,
+          3
+        )
+      : "—";
+
+    const summary = [
+      '<div class="chirality-summary">',
+      '<div><span>T/mₑ</span><strong>' +
+        A.formatScientific(
+          analysis.temperatureToElectronMass,
+          3
+        ) + '</strong></div>',
+      '<div><span>Regime</span><strong>' +
+        analysis.masslessRegime + '</strong></div>',
+      '<div><span>μ₅(0)</span><strong>' +
+        A.formatScientific(analysis.initialMu5, 3) +
+        ' GeV</strong></div>',
+      '<div><span>μ₅(t_end)</span><strong>' +
+        A.formatScientific(analysis.finalMu5, 3) +
+        ' GeV</strong></div>',
+      '<div><span>μ₅(eq)</span><strong>' +
+        eqMu + '</strong></div>',
+      '<div><span>τ_flip</span><strong>' +
+        flipTime + '</strong></div>',
+      '</div>'
+    ].join("");
+
+    const table = [
+      '<div class="analysis-row analysis-row-head chirality"><span>Quantity</span><span>Value</span><span>Meaning</span></div>',
+      '<div class="analysis-row chirality"><strong>S_proxy</strong><span>' +
+        A.formatScientific(analysis.sourceProxyGeV4, 3) +
+        ' GeV⁴</span><span>|J₅,CVE| / L_eff proxy</span></div>',
+      '<div class="analysis-row chirality"><strong>S_anomaly</strong><span>' +
+        A.formatScientific(analysis.anomalySourceGeV4, 3) +
+        ' GeV⁴</span><span>C_A E·B, signed</span></div>',
+      '<div class="analysis-row chirality"><strong>|E∥/B| crossover</strong><span>' +
+        crossover + '</span><span>|anomaly| = S_proxy</span></div>',
+      '<div class="analysis-row chirality"><strong>Γ_flip @ μ₅,max</strong><span>' +
+        A.formatScientific(
+          analysis.flipRateAtClosureCeiling,
+          3
+        ) + ' s⁻¹</span><span>proxy-only equilibrium at closure ceiling</span></div>',
+      '<div class="analysis-row chirality"><strong>E∥/B @ μ₅,max</strong><span>' +
+        A.formatScientific(
+          analysis.electricAlignmentForClosureCeiling,
+          3
+        ) + '</span><span>required at selected Γ_flip</span></div>'
+    ].join("");
+
+    const validity =
+      analysis.masslessRegime === "nonrelativistic"
+        ? '<div class="diagnostic-line warning"><strong>REGIME WARNING</strong><span>At the current T, T/mₑ ≪ 1. The massless Dirac susceptibility and anomaly-transport coefficients are used only as a structural diagnostic; a finite-mass kinetic treatment is required for a physical electron plasma.</span></div>'
+        : '<div class="diagnostic-line info"><strong>REGIME</strong><span>Massless susceptibility remains an approximation; inspect T/mₑ before physical interpretation.</span></div>';
+
+    const note =
+      '<div class="missing-note">' +
+      validity +
+      '<strong>Source caveat:</strong> S_proxy is |J₅,CVE|/L_eff from the current closure. It is not a microscopic derivation of axion → axial-charge production. The E·B term uses the anomaly convention consistent with the Transport tab.</div>';
+
+    setAnalysisTable(summary + table + note);
+
+    if (!window.Plotly) return;
+
+    const valid = analysis.points.filter((point) =>
+      point.timeSeconds > 0 &&
+      Number.isFinite(point.mu5) &&
+      point.mu5 !== 0
+    );
+    const colors = themeColors();
+    const layout = plotLayout(
+      "time, s",
+      "log₁₀ |μ₅|, GeV"
+    );
+    layout.xaxis.type = "log";
+    layout.shapes = [{
+      type: "line",
+      x0: valid.length ? valid[0].timeSeconds : 1e-12,
+      x1: analysis.horizonSeconds,
+      y0: Math.log10(Math.abs(analysis.closureMu5Ceiling)),
+      y1: Math.log10(Math.abs(analysis.closureMu5Ceiling)),
+      line: { color: colors.muted, dash: "dash", width: 1 }
+    }];
+
+    Plotly.react("plot", [{
+      type: "scatter",
+      mode: "lines",
+      x: valid.map((point) => point.timeSeconds),
+      y: valid.map((point) =>
+        Math.log10(Math.abs(point.mu5))
+      ),
+      customdata: valid.map((point) => [
+        point.mu5,
+        point.eta5,
+        point.jCME
+      ]),
+      line: { color: colors.accent2, width: 2 },
+      hovertemplate:
+        "t=%{x:.3e} s" +
+        "<br>log₁₀|μ₅|=%{y:.2f}" +
+        "<br>μ₅=%{customdata[0]:.3e} GeV" +
+        "<br>η₅=%{customdata[1]:.3e}" +
+        "<br>jCME=%{customdata[2]:.3e} GeV³" +
+        "<extra></extra>"
+    }], layout, {
+      responsive: true,
+      displaylogo: false
+    });
+  }
+
   function renderMissingPhysics() {
     if ($("mode").value !== "cme") {
       setAnalysisMeta(
@@ -1383,6 +1563,7 @@
     });
 
     $("explorerControls").classList.toggle("hidden", kind !== "explorer");
+    $("chiralityControls").classList.toggle("hidden", kind !== "chirality");
     $("missingPhysicsControls").classList.toggle("hidden", kind !== "missing");
     $("plot").classList.toggle("plot-tall", kind === "explorer");
 
@@ -1393,6 +1574,7 @@
         else if (kind === "sensitivity") renderSensitivity();
         else if (kind === "inference") renderInference();
         else if (kind === "transport") renderTransport();
+        else if (kind === "chirality") renderChirality();
         else if (kind === "missing") renderMissingPhysics();
         else if (kind === "compare") renderComparison();
         else renderSpinAnalysis();
@@ -1439,7 +1621,7 @@
     const diagnostics = currentDiagnostics();
     const payload = {
       generatedAt: new Date().toISOString(),
-      model: "AxionBH research workbench v7.7",
+      model: "AxionBH research workbench v7.8",
       stateId: runStateId(state.lastMode, state.lastParams),
       mode: state.lastMode,
       parameters: state.lastParams,
@@ -1455,6 +1637,12 @@
         ? A.anomalousTransportDiagnostics(
             state.lastParams,
             state.lastResult
+          )
+        : null,
+      chirality: state.lastMode === "cme"
+        ? A.chiralityDynamics(
+            state.lastParams,
+            currentChiralityOptions()
           )
         : null,
       missingPhysics: {
@@ -1480,7 +1668,7 @@
     const lines = [
       "# AxionBH reproducibility report",
       "",
-      "- Model: AxionBH Research Workbench v7.7",
+      "- Model: AxionBH Research Workbench v7.8",
       "- Generated: " + new Date().toISOString(),
       "- State ID: " + stateId,
       "- Mode: " + modeNames[state.lastMode],
@@ -1631,6 +1819,12 @@
         faExp: Number($("explorerFaExp").value),
         resolution: $("explorerResolution").value
       },
+      chirality: {
+        flipExp: Number($("chiralityFlipExp").value),
+        timeExp: Number($("chiralityTimeExp").value),
+        anomalyMode: $("chiralityAnomalyMode").value,
+        eExp: Number($("chiralityEExp").value)
+      },
       missingPhysics: {
         placement: $("missingPlacement").value,
         gainExp: Number($("missingGainExp").value)
@@ -1654,7 +1848,7 @@
       applyParameters(restored);
       if (modeNames[payload.mode]) $("mode").value = payload.mode;
 
-      if (["spin", "explorer", "sensitivity", "inference", "transport", "missing", "compare"].includes(payload.analysis)) {
+      if (["spin", "explorer", "sensitivity", "inference", "transport", "chirality", "missing", "compare"].includes(payload.analysis)) {
         state.analysis = payload.analysis;
       }
 
@@ -1674,6 +1868,24 @@
         }
       }
 
+      if (payload.chirality && typeof payload.chirality === "object") {
+        const flipExp = Number(payload.chirality.flipExp);
+        const timeExp = Number(payload.chirality.timeExp);
+        const eExp = Number(payload.chirality.eExp);
+        if (Number.isFinite(flipExp) && flipExp >= -30 && flipExp <= 6) {
+          $("chiralityFlipExp").value = flipExp;
+        }
+        if (Number.isFinite(timeExp) && timeExp >= -3 && timeExp <= 15) {
+          $("chiralityTimeExp").value = timeExp;
+        }
+        if (Number.isFinite(eExp) && eExp >= -40 && eExp <= 0) {
+          $("chiralityEExp").value = eExp;
+        }
+        if (["off", "source", "sink"].includes(payload.chirality.anomalyMode)) {
+          $("chiralityAnomalyMode").value = payload.chirality.anomalyMode;
+        }
+      }
+
       if (payload.missingPhysics && typeof payload.missingPhysics === "object") {
         if (missingPlacementNames[payload.missingPhysics.placement]) {
           $("missingPlacement").value = payload.missingPhysics.placement;
@@ -1685,6 +1897,7 @@
       }
 
       updateExplorerFaLabel();
+      updateChiralityLabels();
       updateMissingGainLabel();
       $("preset").value = "custom";
       updateConditionalFields();
@@ -1778,6 +1991,20 @@
     $("explorerReference").addEventListener("change", () => scheduleExplorerRender(0));
     $("explorerResolution").addEventListener("change", () => scheduleExplorerRender(0));
 
+    ["chiralityFlipExp", "chiralityTimeExp", "chiralityEExp"].forEach((id) => {
+      $(id).addEventListener("input", () => {
+        updateChiralityLabels();
+        if (state.analysis === "chirality" && state.lastResult) {
+          renderAnalysis("chirality");
+        }
+      });
+    });
+    $("chiralityAnomalyMode").addEventListener("change", () => {
+      if (state.analysis === "chirality" && state.lastResult) {
+        renderAnalysis("chirality");
+      }
+    });
+
     $("missingGainExp").addEventListener("input", () => {
       updateMissingGainLabel();
       if (state.analysis === "missing" && state.lastResult) {
@@ -1792,6 +2019,7 @@
 
     updateConditionalFields();
     updateExplorerFaLabel();
+    updateChiralityLabels();
     updateMissingGainLabel();
     restoreSharedState();
     run();

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="AxionBH interactive browser simulator and parameter-analysis workbench.">
-  <title>AxionBH — Research Workbench v7.7</title>
+  <title>AxionBH — Research Workbench v7.8</title>
   <link rel="stylesheet" href="simulator.css">
   <script defer src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <script defer src="simulator-core.js"></script>
@@ -15,7 +15,7 @@
     <div class="topbar-inner">
       <a class="brand" href="index.html">
         <span class="brand-mark">A</span>
-        <span>AxionBH<small>research workbench · v7.7</small></span>
+        <span>AxionBH<small>research workbench · v7.8</small></span>
       </a>
       <nav class="nav">
         <a href="index.html">Теория</a>
@@ -39,14 +39,14 @@
     </section>
 
     <div class="notice">
-      <strong>Исследовательский калькулятор.</strong> AxionBH реализует текущие допущения модели и не является подтверждённым инструментом наблюдательной астрофизики. В v7.7 CVE closure считается в единой системе natural units; порог a/M = 0.35 остаётся феноменологическим gate, а не выведенным результатом.
+      <strong>Исследовательский калькулятор.</strong> AxionBH реализует текущие допущения модели и не является подтверждённым инструментом наблюдательной астрофизики. В v7.8 CVE closure считается в единой системе natural units; порог a/M = 0.35 остаётся феноменологическим gate, а не выведенным результатом.
     </div>
 
     <section class="workspace">
       <aside class="panel controls">
         <div class="panel-title">
           <h2>Параметры</h2>
-          <span class="muted">v7.7</span>
+          <span class="muted">v7.8</span>
         </div>
 
         <div class="field">
@@ -157,6 +157,7 @@
               <button class="analysis-tab" data-analysis="sensitivity" type="button">Sensitivity</button>
               <button class="analysis-tab" data-analysis="inference" type="button">Inference</button>
               <button class="analysis-tab" data-analysis="transport" type="button">Transport</button>
+              <button class="analysis-tab" data-analysis="chirality" type="button">Chirality</button>
               <button class="analysis-tab" data-analysis="missing" type="button">New Physics</button>
               <button class="analysis-tab" data-analysis="compare" type="button">Сценарии</button>
             </div>
@@ -198,6 +199,38 @@
             <div class="explorer-field explorer-export">
               <label>Данные</label>
               <button id="explorerCsvBtn" class="mini-btn" type="button">CSV grid</button>
+            </div>
+          </div>
+
+          <div id="chiralityControls" class="explorer-controls chirality-controls hidden">
+            <div class="explorer-field explorer-fa">
+              <label for="chiralityFlipExp">log₁₀ Γ_flip, s⁻¹</label>
+              <div class="range-row">
+                <input id="chiralityFlipExp" type="range" min="-30" max="6" step="0.25" value="-6">
+                <span id="chiralityFlipOut" class="range-value">1.00e-6</span>
+              </div>
+            </div>
+            <div class="explorer-field explorer-fa">
+              <label for="chiralityTimeExp">log₁₀ horizon, s</label>
+              <div class="range-row">
+                <input id="chiralityTimeExp" type="range" min="-3" max="15" step="0.25" value="6">
+                <span id="chiralityTimeOut" class="range-value">1.00e+6</span>
+              </div>
+            </div>
+            <div class="explorer-field">
+              <label for="chiralityAnomalyMode">E·B anomaly</label>
+              <select id="chiralityAnomalyMode" class="select compact-select">
+                <option value="off">Off</option>
+                <option value="source">+ E∥B</option>
+                <option value="sink">− E∥B</option>
+              </select>
+            </div>
+            <div class="explorer-field explorer-fa">
+              <label for="chiralityEExp">log₁₀ |E∥/B|</label>
+              <div class="range-row">
+                <input id="chiralityEExp" type="range" min="-40" max="0" step="0.25" value="-30">
+                <span id="chiralityEOut" class="range-value">1.00e-30</span>
+              </div>
             </div>
           </div>
 
