@@ -123,8 +123,8 @@ for (const feature of [
   );
 }
 
-assert.ok(html.includes("v8.8.0"));
-assert.ok(app.includes("AxionBH research workbench v8.8.0"));
+assert.ok(html.includes("v8.9.0"));
+assert.ok(app.includes("AxionBH research workbench v8.9.0"));
 
 
 for (const feature of [
@@ -455,3 +455,33 @@ for (const id of [
 }
 assert.ok(app.includes("511-keV Observable Pipeline"));
 assert.ok(app.includes("updatePositronLabels"));
+
+
+for (const feature of [
+  "resolveIsmPhase",
+  "positronBetaFromKineticEnergy",
+  "inFlightAnnihilationCrossSectionCm2",
+  "jeanCollisionalSlowingTimeSeconds",
+  "positronDiffusionCoefficientCm2S",
+  "ismPositronTransportAudit"
+]) {
+  assert.ok(
+    core.includes(feature) || app.includes(feature),
+    "missing v8.9 ISM transport feature: " + feature
+  );
+}
+for (const id of [
+  'id="positronTransportModel"',
+  'id="positronIsmPhase"',
+  'id="positronPropagationMode"',
+  'id="positronLogD10"',
+  'id="positronDiffusionDelta"',
+  'id="positronAdvectionKms"',
+  'id="positronFieldLineExp"',
+  'id="positronAnnCoeffExp"'
+]) {
+  assert.ok(html.includes(id), "missing v8.9 ISM UI control: " + id);
+}
+assert.ok(app.includes("ISM phase"));
+assert.ok(app.includes("slowing time"));
+assert.ok(app.includes("field-line path"));

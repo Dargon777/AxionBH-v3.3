@@ -382,7 +382,7 @@
       ordered[key] = Number(p[key]);
     });
     const source = JSON.stringify({
-      model: "AxionBH-v8.8.0",
+      model: "AxionBH-v8.9.0",
       mode,
       parameters: ordered
     });
@@ -1052,7 +1052,7 @@
     if ($("mode").value !== "cme") {
       setAnalysisMeta(
         "Parameter Inference",
-        "v8.8 inverse solver сейчас определён для CVE closure"
+        "v8.9 inverse solver сейчас определён для CVE closure"
       );
       setAnalysisTable(
         '<div class="inference-empty">Переключи режим на CME, чтобы оценить дефицит и требуемые однопараметрические сдвиги.</div>'
@@ -1386,13 +1386,23 @@
       mode: $("mode").value,
       sourceKind: $("positronSourceKind").value,
       gapOptions: currentGapOptions(),
+      transportModel: $("positronTransportModel").value,
+      ismPhase: $("positronIsmPhase").value,
+      propagationMode: $("positronPropagationMode").value,
       sourceEscapeFraction: Number($("positronEscape").value),
       smearingScalePc: Number($("positronSmearingPc").value),
       bulgeAcceptanceRadiusPc: Number($("positronBulgeRadiusPc").value),
       thermalizationSurvivalFraction: Number($("positronThermalization").value),
       annihilationFraction: Number($("positronAnnihilation").value),
       positroniumFraction: Number($("positroniumFraction").value),
-      injectionEnergyMeV: positronInjectionEnergyValue()
+      injectionEnergyMeV: positronInjectionEnergyValue(),
+      D10GeVCm2S: Math.pow(10, Number($("positronLogD10").value)),
+      diffusionDelta: Number($("positronDiffusionDelta").value),
+      advectionKms: Number($("positronAdvectionKms").value),
+      fieldLineDisplacementFraction:
+        Math.pow(10, Number($("positronFieldLineExp").value)),
+      effectiveThermalAnnihilationCoefficientCm3S:
+        Math.pow(10, Number($("positronAnnCoeffExp").value))
     };
   }
 
@@ -1411,6 +1421,16 @@
       Number($("positroniumFraction").value).toFixed(2);
     $("positronInjectionOut").textContent =
       A.formatScientific(positronInjectionEnergyValue(), 2) + " MeV";
+    $("positronLogD10Out").textContent =
+      A.formatScientific(Math.pow(10, Number($("positronLogD10").value)), 2);
+    $("positronDiffusionDeltaOut").textContent =
+      Number($("positronDiffusionDelta").value).toFixed(2);
+    $("positronAdvectionKmsOut").textContent =
+      Number($("positronAdvectionKms").value).toFixed(0);
+    $("positronFieldLineOut").textContent =
+      A.formatScientific(Math.pow(10, Number($("positronFieldLineExp").value)), 2);
+    $("positronAnnCoeffOut").textContent =
+      A.formatScientific(Math.pow(10, Number($("positronAnnCoeffExp").value)), 2);
   }
 
 
@@ -2017,7 +2037,7 @@
         '</span><span>E_cost=' +
         A.formatScientific(audit.mu5ToPositrons.energyCostErg,3) +
         ' erg/e⁺; no microscopic pair-production rate is derived.</span></div>',
-      '<div class="missing-note"><strong>Observable correction:</strong> the Galactic ~10⁴³ quantity is an annihilation/injection rate in e⁺/s, not an energy luminosity in erg/s. v8.8 therefore audits the corrected rate ratio separately; the legacy numerical e⁺ budget ratio fields remain untouched for backward reproducibility.</div>'
+      '<div class="missing-note"><strong>Observable correction:</strong> the Galactic ~10⁴³ quantity is an annihilation/injection rate in e⁺/s, not an energy luminosity in erg/s. v8.9 therefore audits the corrected rate ratio separately; the legacy numerical e⁺ budget ratio fields remain untouched for backward reproducibility.</div>'
     ].join("");
     setAnalysisTable(html);
     if (!window.Plotly) return;
@@ -2122,20 +2142,43 @@
     const analysis=A.positronTransportPipeline(params(),options);
     const source=analysis.source;
     const ref=analysis.reference;
+    const ism=analysis.ismTransport;
     const sourceStatus=source.status==="available"||source.status==="zero"
       ? source.status
       : "UNRESOLVED";
     setAnalysisMeta(
-      "511-keV Observable Pipeline",
-      "production → escape → transport → thermalisation → annihilation → positronium → line flux"
+      "511-keV Observable Pipeline v8.9",
+      analysis.transportModel==="ism-timescale"
+        ? "source → ISM slowing / propagation → annihilation → positronium → line flux"
+        : "legacy v8.8 manual transport factors"
     );
+
+    const ismRows=ism?[
+      '<div><span>ISM phase</span><strong>'+ism.phase.label+'</strong></div>',
+      '<div><span>propagation</span><strong>'+ism.propagationMode+'</strong></div>',
+      '<div><span>n_H</span><strong>'+A.formatScientific(ism.phase.hydrogenDensityCm3,3)+' cm⁻³</strong></div>',
+      '<div><span>x_e</span><strong>'+A.formatScientific(ism.phase.ionizationFraction,3)+'</strong></div>',
+      '<div><span>slowing time</span><strong>'+A.formatDuration(ism.slowingTimeSeconds)+'</strong></div>',
+      '<div><span>field-line path</span><strong>'+A.formatScientific(ism.pathLengthPc,3)+' pc</strong></div>',
+      '<div><span>D(E_inj)</span><strong>'+A.formatScientific(ism.diffusionCoefficientAtInjectionCm2S,3)+' cm²/s</strong></div>',
+      '<div><span>diffusive σ</span><strong>'+A.formatScientific(ism.diffusionSigmaPc,3)+' pc</strong></div>',
+      '<div><span>advection length</span><strong>'+A.formatScientific(ism.advectionDistancePc,3)+' pc</strong></div>',
+      '<div><span>derived smearing</span><strong>'+A.formatScientific(ism.effectiveSmearingPc,3)+' pc</strong></div>',
+      '<div><span>in-flight τ_ann</span><strong>'+A.formatScientific(ism.inFlightAnnihilationOpticalDepth,3)+'</strong></div>',
+      '<div><span>in-flight survival</span><strong>'+A.formatScientific(ism.inFlightSurvivalFraction,3)+'</strong></div>',
+      '<div><span>thermal t_ann</span><strong>'+A.formatDuration(ism.thermalAnnihilationTimeSeconds)+'</strong></div>',
+      '<div><span>bulge escape time</span><strong>'+A.formatDuration(ism.bulgeEscapeTimeSeconds)+'</strong></div>',
+      '<div><span>post-thermal annihilation</span><strong>'+A.formatScientific(ism.postThermalAnnihilationFraction,3)+'</strong></div>'
+    ].join(""):"";
 
     const html=[
       '<div class="pair-summary">',
       '<div><span>source</span><strong>'+source.sourceKind+'</strong></div>',
       '<div><span>source status</span><strong>'+sourceStatus+'</strong></div>',
+      '<div><span>transport model</span><strong>'+analysis.transportModel+'</strong></div>',
       '<div><span>production e⁺</span><strong>'+A.formatScientific(analysis.productionRatePerSecond,3)+' s⁻¹</strong></div>',
-      '<div><span>escape fraction</span><strong>'+A.formatScientific(analysis.sourceEscapeFraction,3)+'</strong></div>',
+      '<div><span>source escape</span><strong>'+A.formatScientific(analysis.sourceEscapeFraction,3)+'</strong></div>',
+      ismRows,
       '<div><span>bulge retention</span><strong>'+A.formatScientific(analysis.spatialRetentionFraction,3)+'</strong></div>',
       '<div><span>thermalisation survival</span><strong>'+A.formatScientific(analysis.thermalizationSurvivalFraction,3)+'</strong></div>',
       '<div><span>annihilation e⁺</span><strong>'+A.formatScientific(analysis.annihilationRatePerSecond,3)+' s⁻¹</strong></div>',
@@ -2144,43 +2187,52 @@
       '<div><span>511 line photons</span><strong>'+A.formatScientific(analysis.linePhotonRatePerSecond,3)+' s⁻¹</strong></div>',
       '<div><span>predicted Earth flux</span><strong>'+A.formatScientific(analysis.lineFluxAtEarthPhCm2S,3)+' ph cm⁻² s⁻¹</strong></div>',
       '<div><span>line / observed bulge</span><strong>'+A.formatScientific(analysis.lineFluxToBulgeReference,3)+'×</strong></div>',
-      '<div><span>smearing</span><strong>'+A.formatScientific(analysis.smearingScalePc,3)+' pc</strong></div>',
       '<div><span>smearing offset</span><strong>'+analysis.smearingOffsetSigma.toFixed(2)+'σ</strong></div>',
       '<div><span>injection energy</span><strong>'+A.formatScientific(analysis.injectionEnergyMeV,3)+' MeV</strong></div>',
       '<div><span>≤1.4 MeV diagnostic</span><strong>'+(analysis.injectionEnergyCompatibleWithSmearingScenario?'compatible':'tension')+'</strong></div>',
       '</div>',
-      '<div class="missing-note"><strong>Observable reference:</strong> bulge line flux '+
-        A.formatScientific(ref.lineFluxPhCm2S,3)+' ph cm⁻² s⁻¹ at an effective '+
-        ref.effectiveDistanceKpc.toFixed(1)+' kpc, corresponding to '+
-        A.formatScientific(ref.linePhotonRatePerSecond,3)+' photons/s. '+
-        'The escape, survival and annihilation factors remain explicit phenomenological transport terms; the 150±50 pc scale is used only as a morphology diagnostic.</div>'
+      '<div class="missing-note"><strong>Interpretation:</strong> in v8.9 the default ISM mode derives spatial smearing, free-electron in-flight survival and post-thermal annihilation from phase density, a collisional slowing scale, diffusion/advection or field-line transport, and bulge escape. The low-energy diffusion law and effective thermal annihilation coefficient remain reduced-model inputs, not a full Monte-Carlo ISM calculation.</div>'
     ].join("");
     setAnalysisTable(html);
 
     if(!window.Plotly)return;
     const sweep=A.positronTransportSweep(params(),{
       ...options,
+      injectionEnergyValuesMeV:A.logSpace(0.03,10,72),
       smearingValuesPc:A.linearSpace(25,600,72)
     });
     const colors=themeColors();
-    const layout=plotLayout("transport smearing, pc","fraction / observed ratio");
-    layout.shapes=[
-      {type:"line",x0:150,x1:150,y0:0,y1:1,line:{dash:"dash",color:colors.muted}}
-    ];
-    Plotly.react("plot",[
-      {
-        type:"scatter",mode:"lines",name:"bulge retention",
-        x:sweep.points.map(p=>p.smearingScalePc),
-        y:sweep.points.map(p=>p.spatialRetentionFraction)
-      },
-      {
-        type:"scatter",mode:"lines",name:"511 flux / observed",
-        x:sweep.points.map(p=>p.smearingScalePc),
-        y:sweep.points.map(p=>p.lineFluxToBulgeReference)
-      }
-    ],layout,{responsive:true,displaylogo:false});
+    if(sweep.xKey==="injectionEnergyMeV"){
+      const layout=plotLayout("injection energy, MeV","effective transport smearing, pc");
+      layout.xaxis.type="log";
+      layout.shapes=[
+        {type:"line",x0:0.03,x1:10,y0:100,y1:100,line:{dash:"dot",color:colors.muted}},
+        {type:"line",x0:0.03,x1:10,y0:200,y1:200,line:{dash:"dot",color:colors.muted}}
+      ];
+      Plotly.react("plot",[{
+        type:"scatter",mode:"lines",name:"derived smearing",
+        x:sweep.points.map(p=>p.injectionEnergyMeV),
+        y:sweep.points.map(p=>p.effectiveSmearingPc)
+      }],layout,{responsive:true,displaylogo:false});
+    }else{
+      const layout=plotLayout("transport smearing, pc","fraction / observed ratio");
+      layout.shapes=[
+        {type:"line",x0:150,x1:150,y0:0,y1:1,line:{dash:"dash",color:colors.muted}}
+      ];
+      Plotly.react("plot",[
+        {
+          type:"scatter",mode:"lines",name:"bulge retention",
+          x:sweep.points.map(p=>p.smearingScalePc),
+          y:sweep.points.map(p=>p.spatialRetentionFraction)
+        },
+        {
+          type:"scatter",mode:"lines",name:"511 flux / observed",
+          x:sweep.points.map(p=>p.smearingScalePc),
+          y:sweep.points.map(p=>p.lineFluxToBulgeReference)
+        }
+      ],layout,{responsive:true,displaylogo:false});
+    }
   }
-
 
   function renderValidity() {
     const p = params();
@@ -2656,7 +2708,7 @@
     const diagnostics = currentDiagnostics();
     const payload = {
       generatedAt: new Date().toISOString(),
-      model: "AxionBH research workbench v8.8.0",
+      model: "AxionBH research workbench v8.9.0",
       modelVersion: A.MODEL_VERSION,
       stateSchemaVersion: A.STATE_SCHEMA_VERSION,
       stateId: runStateId(state.lastMode, state.lastParams),
@@ -2742,7 +2794,7 @@
     const lines = [
       "# AxionBH reproducibility report",
       "",
-      "- Model: AxionBH Research Workbench v8.8.0",
+      "- Model: AxionBH Research Workbench v8.9.0",
       "- Generated: " + new Date().toISOString(),
       "- State ID: " + stateId,
       "- Mode: " + modeNames[state.lastMode],
@@ -2928,13 +2980,21 @@
       },
       annihilation: {
         sourceKind: $("positronSourceKind").value,
+        transportModel: $("positronTransportModel").value,
+        ismPhase: $("positronIsmPhase").value,
+        propagationMode: $("positronPropagationMode").value,
         escape: Number($("positronEscape").value),
         smearingPc: Number($("positronSmearingPc").value),
         bulgeRadiusPc: Number($("positronBulgeRadiusPc").value),
         thermalization: Number($("positronThermalization").value),
         annihilation: Number($("positronAnnihilation").value),
         positronium: Number($("positroniumFraction").value),
-        injectionExp: Number($("positronInjectionExp").value)
+        injectionExp: Number($("positronInjectionExp").value),
+        logD10: Number($("positronLogD10").value),
+        diffusionDelta: Number($("positronDiffusionDelta").value),
+        advectionKms: Number($("positronAdvectionKms").value),
+        fieldLineExp: Number($("positronFieldLineExp").value),
+        annCoeffExp: Number($("positronAnnCoeffExp").value)
       },
       missingPhysics: {
         placement: $("missingPlacement").value,
@@ -3023,6 +3083,15 @@
         if (["mode-proxy","gap-cascade","gap-schwinger"].includes(payload.annihilation.sourceKind)) {
           $("positronSourceKind").value=payload.annihilation.sourceKind;
         }
+        if (["ism-timescale","legacy-factors"].includes(payload.annihilation.transportModel)) {
+          $("positronTransportModel").value=payload.annihilation.transportModel;
+        }
+        if (A.ISM_PHASE_PRESETS[payload.annihilation.ismPhase]) {
+          $("positronIsmPhase").value=payload.annihilation.ismPhase;
+        }
+        if (["diffusion-advection","collisional-ballistic"].includes(payload.annihilation.propagationMode)) {
+          $("positronPropagationMode").value=payload.annihilation.propagationMode;
+        }
         const transportRanges=[
           ["positronEscape",payload.annihilation.escape,0,1],
           ["positronSmearingPc",payload.annihilation.smearingPc,25,600],
@@ -3030,7 +3099,12 @@
           ["positronThermalization",payload.annihilation.thermalization,0,1],
           ["positronAnnihilation",payload.annihilation.annihilation,0,1],
           ["positroniumFraction",payload.annihilation.positronium,0,1],
-          ["positronInjectionExp",payload.annihilation.injectionExp,-2,2]
+          ["positronInjectionExp",payload.annihilation.injectionExp,-2,2],
+          ["positronLogD10",payload.annihilation.logD10,24,30],
+          ["positronDiffusionDelta",payload.annihilation.diffusionDelta,0,1],
+          ["positronAdvectionKms",payload.annihilation.advectionKms,0,300],
+          ["positronFieldLineExp",payload.annihilation.fieldLineExp,-4,0],
+          ["positronAnnCoeffExp",payload.annihilation.annCoeffExp,-15,-10]
         ];
         transportRanges.forEach(([id,value,min,max])=>{
           const x=Number(value);
@@ -3180,7 +3254,7 @@
       });
     });
 
-    ["positronEscape","positronSmearingPc","positronBulgeRadiusPc","positronThermalization","positronAnnihilation","positroniumFraction","positronInjectionExp"].forEach((id)=>{
+    ["positronEscape","positronSmearingPc","positronBulgeRadiusPc","positronThermalization","positronAnnihilation","positroniumFraction","positronInjectionExp","positronLogD10","positronDiffusionDelta","positronAdvectionKms","positronFieldLineExp","positronAnnCoeffExp"].forEach((id)=>{
       $(id).addEventListener("input",()=>{
         updatePositronLabels();
         if(state.analysis==="annihilation"&&state.lastResult){
@@ -3188,10 +3262,12 @@
         }
       });
     });
-    $("positronSourceKind").addEventListener("change",()=>{
-      if(state.analysis==="annihilation"&&state.lastResult){
-        renderAnalysis("annihilation");
-      }
+    ["positronSourceKind","positronTransportModel","positronIsmPhase","positronPropagationMode"].forEach((id)=>{
+      $(id).addEventListener("change",()=>{
+        if(state.analysis==="annihilation"&&state.lastResult){
+          renderAnalysis("annihilation");
+        }
+      });
     });
 
     $("missingGainExp").addEventListener("input", () => {

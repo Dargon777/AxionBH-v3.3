@@ -5,8 +5,8 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  const MODEL_VERSION = "8.8.0";
-  const STATE_SCHEMA_VERSION = 13;
+  const MODEL_VERSION = "8.9.0";
+  const STATE_SCHEMA_VERSION = 14;
 
   const CONSTANTS = Object.freeze({
     G: 6.6743015e-8,
@@ -73,7 +73,63 @@
     ELECTRON_CHARGE_ESU: 4.803204712570263e-10,
     ELECTRON_MASS_G: 9.1093837139e-28,
     ELECTRON_REST_ENERGY_EV: 510998.95,
-    THOMSON_CROSS_SECTION_CM2: 6.6524587321e-25
+    THOMSON_CROSS_SECTION_CM2: 6.6524587321e-25,
+    CLASSICAL_ELECTRON_RADIUS_CM: 2.8179403262e-13,
+    MEV_TO_EV: 1e6,
+    KM_TO_CM: 1e5
+  });
+
+  const ISM_PHASE_PRESETS = Object.freeze({
+    "warm-neutral": Object.freeze({
+      id:"warm-neutral",
+      label:"Warm neutral medium",
+      hydrogenDensityCm3:0.3,
+      ionizationFraction:0.05,
+      temperatureK:8000,
+      advectionKms:20,
+      effectiveThermalAnnihilationCoefficientCm3S:1e-12,
+      note:"Representative exploratory WNM values; phase transport is not a fitted Galactic-bulge gas model."
+    }),
+    "warm-ionized": Object.freeze({
+      id:"warm-ionized",
+      label:"Warm ionized medium",
+      hydrogenDensityCm3:0.2,
+      ionizationFraction:0.9,
+      temperatureK:8000,
+      advectionKms:30,
+      effectiveThermalAnnihilationCoefficientCm3S:3e-13,
+      note:"Representative exploratory WIM values; the effective annihilation coefficient collapses several atomic channels."
+    }),
+    "hot-ionized": Object.freeze({
+      id:"hot-ionized",
+      label:"Hot ionized medium",
+      hydrogenDensityCm3:0.003,
+      ionizationFraction:1,
+      temperatureK:1e6,
+      advectionKms:100,
+      effectiveThermalAnnihilationCoefficientCm3S:3e-14,
+      note:"Representative exploratory HIM values. Low density makes escape competitive with annihilation."
+    }),
+    "cold-neutral": Object.freeze({
+      id:"cold-neutral",
+      label:"Cold neutral medium",
+      hydrogenDensityCm3:30,
+      ionizationFraction:1e-3,
+      temperatureK:100,
+      advectionKms:10,
+      effectiveThermalAnnihilationCoefficientCm3S:2e-12,
+      note:"Representative exploratory CNM values; charge exchange and dust are compressed into an effective coefficient."
+    }),
+    "diffuse-molecular": Object.freeze({
+      id:"diffuse-molecular",
+      label:"Diffuse molecular medium",
+      hydrogenDensityCm3:100,
+      ionizationFraction:1e-4,
+      temperatureK:50,
+      advectionKms:10,
+      effectiveThermalAnnihilationCoefficientCm3S:2e-12,
+      note:"Representative exploratory molecular-phase values; detailed chemistry is not solved."
+    })
   });
 
   const DEFAULTS = Object.freeze({
@@ -3004,6 +3060,196 @@
     throw new RangeError("Unknown positron sourceKind: "+sourceKind);
   }
 
+  function resolveIsmPhase(phase="warm-neutral",overrides={}) {
+    const base=ISM_PHASE_PRESETS[phase];
+    if(!base)throw new RangeError("Unknown ISM phase: "+phase);
+    const out={...base,...overrides,id:phase};
+    for(const [key,value] of [
+      ["hydrogenDensityCm3",out.hydrogenDensityCm3],
+      ["temperatureK",out.temperatureK],
+      ["effectiveThermalAnnihilationCoefficientCm3S",out.effectiveThermalAnnihilationCoefficientCm3S]
+    ]){
+      if(!(Number(value)>0))throw new RangeError(key+" must be positive");
+    }
+    const x=Number(out.ionizationFraction);
+    if(!Number.isFinite(x)||x<0||x>1)throw new RangeError("ionizationFraction must be in [0,1]");
+    out.ionizationFraction=x;
+    out.electronDensityCm3=Number(out.hydrogenDensityCm3)*x;
+    out.advectionKms=Math.max(0,Number(out.advectionKms)||0);
+    return out;
+  }
+
+  function positronBetaFromKineticEnergy(kineticEnergyMeV){
+    const kinetic=assertFinitePositive(Number(kineticEnergyMeV),"kineticEnergyMeV");
+    const gamma=1+kinetic/(CONSTANTS.ELECTRON_REST_ENERGY_EV/1e6);
+    const beta=Math.sqrt(Math.max(0,1-1/(gamma*gamma)));
+    return {kineticEnergyMeV:kinetic,gamma,beta};
+  }
+
+  function inFlightAnnihilationCrossSectionCm2(kineticEnergyMeV){
+    const state=positronBetaFromKineticEnergy(kineticEnergyMeV);
+    const gamma=state.gamma;
+    const g2m1=gamma*gamma-1;
+    if(!(g2m1>0))return 0;
+    const root=Math.sqrt(g2m1);
+    const logTerm=Math.log(gamma+root);
+    const bracket=
+      ((gamma*gamma+4*gamma+1)/g2m1)*logTerm-
+      (gamma+3)/root;
+    const sigma=
+      Math.PI*CONSTANTS.CLASSICAL_ELECTRON_RADIUS_CM**2/
+      (gamma+1)*bracket;
+    return Number.isFinite(sigma)&&sigma>0?sigma:0;
+  }
+
+  function jeanCollisionalSlowingTimeSeconds(kineticEnergyMeV,hydrogenDensityCm3,{normalizationYearsAt1MeVPerCm3=1e5,energyExponent=1}={}){
+    const energy=assertFinitePositive(Number(kineticEnergyMeV),"kineticEnergyMeV");
+    const density=assertFinitePositive(Number(hydrogenDensityCm3),"hydrogenDensityCm3");
+    const norm=assertFinitePositive(Number(normalizationYearsAt1MeVPerCm3),"normalizationYearsAt1MeVPerCm3");
+    const exponent=Number(energyExponent);
+    if(!Number.isFinite(exponent))throw new RangeError("energyExponent must be finite");
+    return norm*CONSTANTS.YEAR*Math.pow(energy,exponent)/density;
+  }
+
+  function positronDiffusionCoefficientCm2S(kineticEnergyMeV,{D10GeVCm2S=1e28,delta=0.5}={}){
+    const energy=assertFinitePositive(Number(kineticEnergyMeV),"kineticEnergyMeV");
+    const d0=assertFinitePositive(Number(D10GeVCm2S),"D10GeVCm2S");
+    const d=Number(delta);
+    if(!Number.isFinite(d))throw new RangeError("delta must be finite");
+    return d0*Math.pow(energy/1e4,d);
+  }
+
+  function ismPositronTransportAudit(options={}){
+    const phase=resolveIsmPhase(options.ismPhase||"warm-neutral",options.phaseOverrides||{});
+    const injectionEnergyMeV=assertFinitePositive(Number(options.injectionEnergyMeV??1),"injectionEnergyMeV");
+    const thermalEnergyMeV=assertFinitePositive(Number(options.thermalEnergyMeV??1e-4),"thermalEnergyMeV");
+    if(!(thermalEnergyMeV<injectionEnergyMeV))throw new RangeError("thermalEnergyMeV must be below injectionEnergyMeV");
+    const mode=options.propagationMode||"diffusion-advection";
+    if(!["diffusion-advection","collisional-ballistic"].includes(mode))throw new RangeError("Unknown propagationMode");
+    const D10GeVCm2S=assertFinitePositive(Number(options.D10GeVCm2S??1e28),"D10GeVCm2S");
+    const delta=Number(options.diffusionDelta??0.5);
+    if(!Number.isFinite(delta))throw new RangeError("diffusionDelta must be finite");
+    const advectionKms=Math.max(0,Number(options.advectionKms??phase.advectionKms));
+    const fieldLineDisplacementFraction=Number(options.fieldLineDisplacementFraction??0.01);
+    if(!Number.isFinite(fieldLineDisplacementFraction)||fieldLineDisplacementFraction<0||fieldLineDisplacementFraction>1)throw new RangeError("fieldLineDisplacementFraction must be in [0,1]");
+    const bulgeAcceptanceRadiusPc=assertFinitePositive(Number(options.bulgeAcceptanceRadiusPc??1000),"bulgeAcceptanceRadiusPc");
+    const steps=Math.max(32,Math.min(256,Math.trunc(Number(options.transportEnergySteps??96))));
+    const logHi=Math.log(injectionEnergyMeV),logLo=Math.log(thermalEnergyMeV);
+    let totalTime=0,diffusionIntegral=0,pathLength=0,inFlightOpticalDepth=0;
+    const electronDensity=phase.electronDensityCm3;
+
+    for(let i=0;i<steps;i+=1){
+      const e1=Math.exp(logHi+(logLo-logHi)*i/steps);
+      const e2=Math.exp(logHi+(logLo-logHi)*(i+1)/steps);
+      const em=Math.sqrt(e1*e2);
+      const dE=e1-e2;
+      const tScale=jeanCollisionalSlowingTimeSeconds(em,phase.hydrogenDensityCm3,{
+        normalizationYearsAt1MeVPerCm3:options.slowingTimeNormalizationYears??1e5,
+        energyExponent:options.slowingEnergyExponent??1
+      });
+      const lossRateMeVPerSecond=em/tScale;
+      const dt=dE/lossRateMeVPerSecond;
+      const kin=positronBetaFromKineticEnergy(em);
+      const speed=kin.beta*CONSTANTS.C;
+      totalTime+=dt;
+      pathLength+=speed*dt;
+      diffusionIntegral+=positronDiffusionCoefficientCm2S(em,{D10GeVCm2S,delta})*dt;
+      if(electronDensity>0&&speed>0){
+        inFlightOpticalDepth+=
+          electronDensity*
+          inFlightAnnihilationCrossSectionCm2(em)*
+          speed*dt;
+      }
+    }
+
+    const diffusionSigmaCm=Math.sqrt(Math.max(0,2*diffusionIntegral));
+    const advectionDistanceCm=advectionKms*CONSTANTS.KM_TO_CM*totalTime;
+    const ballisticDisplacementCm=pathLength*fieldLineDisplacementFraction;
+    const effectiveSigmaCm=mode==="diffusion-advection"
+      ? Math.sqrt(diffusionSigmaCm**2+advectionDistanceCm**2/3)
+      : ballisticDisplacementCm/Math.sqrt(3);
+    const effectiveSmearingPc=effectiveSigmaCm/CONSTANTS.PC_TO_CM;
+    const spatialRetentionFraction=effectiveSmearingPc>0
+      ? gaussianTransportRetentionFraction(bulgeAcceptanceRadiusPc,effectiveSmearingPc)
+      : 1;
+    const inFlightSurvivalFraction=Math.exp(-Math.min(700,inFlightOpticalDepth));
+
+    const kAnn=assertFinitePositive(
+      Number(options.effectiveThermalAnnihilationCoefficientCm3S??phase.effectiveThermalAnnihilationCoefficientCm3S),
+      "effectiveThermalAnnihilationCoefficientCm3S"
+    );
+    const effectiveTargetDensity=Math.max(
+      phase.electronDensityCm3,
+      phase.hydrogenDensityCm3*(1-phase.ionizationFraction)
+    );
+    const thermalAnnihilationTimeSeconds=
+      effectiveTargetDensity>0?1/(effectiveTargetDensity*kAnn):Number.POSITIVE_INFINITY;
+
+    const dThermal=positronDiffusionCoefficientCm2S(
+      Math.max(thermalEnergyMeV,1e-4),
+      {D10GeVCm2S,delta}
+    );
+    const radiusCm=bulgeAcceptanceRadiusPc*CONSTANTS.PC_TO_CM;
+    const diffusionEscapeTimeSeconds=dThermal>0
+      ? radiusCm*radiusCm/(6*dThermal)
+      : Number.POSITIVE_INFINITY;
+    const advectionSpeed=advectionKms*CONSTANTS.KM_TO_CM;
+    const advectionEscapeTimeSeconds=advectionSpeed>0
+      ? radiusCm/advectionSpeed
+      : Number.POSITIVE_INFINITY;
+    const inverseEscape=
+      (Number.isFinite(diffusionEscapeTimeSeconds)&&diffusionEscapeTimeSeconds>0?1/diffusionEscapeTimeSeconds:0)+
+      (Number.isFinite(advectionEscapeTimeSeconds)&&advectionEscapeTimeSeconds>0?1/advectionEscapeTimeSeconds:0);
+    const bulgeEscapeTimeSeconds=inverseEscape>0?1/inverseEscape:Number.POSITIVE_INFINITY;
+    const postThermalAnnihilationFraction=
+      Number.isFinite(thermalAnnihilationTimeSeconds)&&thermalAnnihilationTimeSeconds>0
+        ? 1-Math.exp(-Math.min(700,bulgeEscapeTimeSeconds/thermalAnnihilationTimeSeconds))
+        : 0;
+
+    return {
+      status:"ism-timescale-proxy",
+      phase,
+      propagationMode:mode,
+      injectionEnergyMeV,
+      thermalEnergyMeV,
+      slowingTimeSeconds:totalTime,
+      slowingTimeYears:totalTime/CONSTANTS.YEAR,
+      pathLengthPc:pathLength/CONSTANTS.PC_TO_CM,
+      D10GeVCm2S,
+      diffusionDelta:delta,
+      diffusionCoefficientAtInjectionCm2S:
+        positronDiffusionCoefficientCm2S(injectionEnergyMeV,{D10GeVCm2S,delta}),
+      diffusionSigmaPc:diffusionSigmaCm/CONSTANTS.PC_TO_CM,
+      advectionKms,
+      advectionDistancePc:advectionDistanceCm/CONSTANTS.PC_TO_CM,
+      fieldLineDisplacementFraction,
+      effectiveSmearingPc,
+      bulgeAcceptanceRadiusPc,
+      spatialRetentionFraction,
+      inFlightAnnihilationOpticalDepth:inFlightOpticalDepth,
+      inFlightSurvivalFraction,
+      effectiveThermalAnnihilationCoefficientCm3S:kAnn,
+      thermalAnnihilationTimeSeconds,
+      thermalAnnihilationTimeYears:thermalAnnihilationTimeSeconds/CONSTANTS.YEAR,
+      diffusionEscapeTimeSeconds,
+      advectionEscapeTimeSeconds,
+      bulgeEscapeTimeSeconds,
+      postThermalAnnihilationFraction,
+      literatureScale:{
+        source:"Jean et al. 2009",
+        statement:"For low-energy (<10 MeV) positrons, MHD-wave scattering can be inefficient and collisional propagation may dominate; a 1-MeV path along field lines can reach order 30 kpc/n_H.",
+        encodedAs:"t_slow(1 MeV) ~= 1e5 yr / n_H because c * 1e5 yr ~= 30 kpc."
+      },
+      caveats:[
+        "The slowing law is a one-parameter continuous-loss fit anchored to the Jean et al. 2009 order-of-magnitude 1-MeV collisional path, not a tabulated stopping-power integration.",
+        "The diffusion coefficient is an exploratory cosmic-ray-style power law. Jean et al. 2009 warn that ordinary resonant MHD scattering can be inefficient below 10 MeV.",
+        "The ballistic mode converts field-aligned path length to spatial displacement through fieldLineDisplacementFraction; magnetic topology is not solved.",
+        "In-flight annihilation uses the free-electron two-photon cross section and omits neutral charge exchange, dust and detailed atomic chemistry.",
+        "Thermal annihilation is compressed into an effective phase coefficient and a competition with bulge escape."
+      ]
+    };
+  }
+
   function positronTransportPipeline(input,options={}) {
     const p=normalizeParams(input);
     const mode=options.mode||"cme";
@@ -3014,15 +3260,40 @@
       return x;
     };
     const sourceEscapeFraction=clamp01(options.sourceEscapeFraction??1,"sourceEscapeFraction");
-    const thermalizationSurvivalFraction=clamp01(options.thermalizationSurvivalFraction??1,"thermalizationSurvivalFraction");
-    const annihilationFraction=clamp01(options.annihilationFraction??1,"annihilationFraction");
+    const transportModel=options.transportModel||"ism-timescale";
+    if(!["ism-timescale","legacy-factors"].includes(transportModel))throw new RangeError("Unknown transportModel");
     const positroniumFraction=clamp01(options.positroniumFraction??0.95,"positroniumFraction");
-    const smearingScalePc=assertFinitePositive(Number(options.smearingScalePc??CONSTANTS.POSITRON_SMEARING_SCALE_PC),"smearingScalePc");
     const bulgeAcceptanceRadiusPc=assertFinitePositive(Number(options.bulgeAcceptanceRadiusPc??1000),"bulgeAcceptanceRadiusPc");
     const injectionEnergyMeV=assertFinitePositive(Number(options.injectionEnergyMeV??1),"injectionEnergyMeV");
-
-    const spatialRetentionFraction=
-      gaussianTransportRetentionFraction(bulgeAcceptanceRadiusPc,smearingScalePc);
+    const ismTransport=transportModel==="ism-timescale"
+      ? ismPositronTransportAudit({
+          ismPhase:options.ismPhase||"warm-neutral",
+          phaseOverrides:options.phaseOverrides||{},
+          propagationMode:options.propagationMode||"diffusion-advection",
+          injectionEnergyMeV,
+          thermalEnergyMeV:options.thermalEnergyMeV??1e-4,
+          bulgeAcceptanceRadiusPc,
+          D10GeVCm2S:options.D10GeVCm2S??1e28,
+          diffusionDelta:options.diffusionDelta??0.5,
+          advectionKms:options.advectionKms,
+          fieldLineDisplacementFraction:options.fieldLineDisplacementFraction??0.01,
+          effectiveThermalAnnihilationCoefficientCm3S:options.effectiveThermalAnnihilationCoefficientCm3S,
+          slowingTimeNormalizationYears:options.slowingTimeNormalizationYears??1e5,
+          slowingEnergyExponent:options.slowingEnergyExponent??1
+        })
+      : null;
+    const thermalizationSurvivalFraction=transportModel==="ism-timescale"
+      ? ismTransport.inFlightSurvivalFraction
+      : clamp01(options.thermalizationSurvivalFraction??1,"thermalizationSurvivalFraction");
+    const annihilationFraction=transportModel==="ism-timescale"
+      ? ismTransport.postThermalAnnihilationFraction
+      : clamp01(options.annihilationFraction??1,"annihilationFraction");
+    const smearingScalePc=transportModel==="ism-timescale"
+      ? Math.max(1e-12,ismTransport.effectiveSmearingPc)
+      : assertFinitePositive(Number(options.smearingScalePc??CONSTANTS.POSITRON_SMEARING_SCALE_PC),"smearingScalePc");
+    const spatialRetentionFraction=transportModel==="ism-timescale"
+      ? ismTransport.spatialRetentionFraction
+      : gaussianTransportRetentionFraction(bulgeAcceptanceRadiusPc,smearingScalePc);
     const productionRate=source.positronProductionRatePerSecond;
     const escapedRate=productionRate*sourceEscapeFraction;
     const bulgeRetainedRate=escapedRate*spatialRetentionFraction;
@@ -3050,6 +3321,8 @@
         : source.status,
       mode,
       source,
+      transportModel,
+      ismTransport,
       productionRatePerSecond:productionRate,
       sourceEscapeFraction,
       escapedRatePerSecond:escapedRate,
@@ -3085,17 +3358,37 @@
       smearingOffsetSigma:smearingSigmaDistance,
       smearingWithinOneSigma:smearingSigmaDistance<=1,
       caveats:[
-        "The source escape, thermalization-survival and annihilation fractions are explicit phenomenological factors, not derived from a kinetic transport calculation.",
-        "The spatial-retention factor uses an isotropic 3D Gaussian transport kernel; the observed 150±50 pc smearing scale is not itself proof of Gaussian diffusion.",
+        transportModel==="ism-timescale"
+          ? "v8.9 derives smearing, in-flight survival and post-thermal annihilation from an ISM timescale model; the source escape fraction remains external."
+          : "Legacy v8.8 transport factors are selected explicitly.",
         "The <=1.4 MeV injection-energy diagnostic is scenario-dependent and comes from a morphology/propagation interpretation, not a universal exclusion bound.",
         "The line flux assumes the same effective 8.5 kpc bulge distance used to convert the observational flux into luminosity.",
-        "The pipeline is quasi-steady and does not yet solve time-dependent diffusion, advection, Coulomb losses or phase-dependent ISM annihilation."
+        "The v8.9 ISM model is still a reduced transport model, not a Monte-Carlo orbit integration through a 3D Galactic magnetic field and multiphase gas map."
       ]
     };
   }
 
   function positronTransportSweep(input,options={}){
     const p=normalizeParams(input);
+    const transportModel=options.transportModel||"ism-timescale";
+    if(transportModel==="ism-timescale"){
+      const values=options.injectionEnergyValuesMeV||logSpace(0.03,10,64);
+      return {
+        xKey:"injectionEnergyMeV",
+        points:values.map((value)=>{
+          const result=positronTransportPipeline(p,{...options,injectionEnergyMeV:value});
+          return {
+            injectionEnergyMeV:value,
+            effectiveSmearingPc:result.smearingScalePc,
+            spatialRetentionFraction:result.spatialRetentionFraction,
+            inFlightSurvivalFraction:result.thermalizationSurvivalFraction,
+            postThermalAnnihilationFraction:result.annihilationFraction,
+            linePhotonRateToBulgeReference:result.linePhotonRateToBulgeReference,
+            lineFluxToBulgeReference:result.lineFluxToBulgeReference
+          };
+        })
+      };
+    }
     const values=options.smearingValuesPc||linearSpace(50,500,64);
     return {
       xKey:"smearingScalePc",
@@ -4528,6 +4821,8 @@
     "pair_cascade",
     "gap_closure",
     "positron_transport",
+    "ism_energy_losses",
+    "ism_propagation",
     "annihilation_observable",
     "superradiance_rate",
     "cloud_saturation",
@@ -4673,6 +4968,22 @@
           "v8.8 separates source production, escape, spatial retention, thermalization survival and annihilation. These efficiencies remain phenomenological until a kinetic ISM transport model is supplied."
       },
       {
+        id: "ism_energy_losses",
+        category: "literature-anchored-proxy",
+        title: "MeV positron slowing and in-flight survival",
+        state: "reduced continuous-loss model",
+        detail:
+          "v8.9 anchors the 1-MeV collisional slowing scale to the Jean et al. 2009 order-of-magnitude path (~30 kpc/n_H) and integrates free-electron in-flight annihilation with the exact two-photon cross section."
+      },
+      {
+        id: "ism_propagation",
+        category: "diagnostic-proxy",
+        title: "ISM diffusion / advection / field-line transport",
+        state: "two selectable reduced regimes",
+        detail:
+          "Diffusion+advection and collisional-ballistic modes are exposed separately. The diffusion law and field-line displacement fraction remain exploratory because low-MeV MHD scattering can be inefficient."
+      },
+      {
         id: "annihilation_observable",
         category: "observational-calibration",
         title: "Positronium → 511-keV line observable",
@@ -4761,6 +5072,7 @@
     MODEL_LAYERS,
     ACCRETION_CALIBRATIONS,
     FLOW_GEOMETRY_CONTEXT,
+    ISM_PHASE_PRESETS,
     CONSTANTS,
     DEFAULTS,
     derivativeAxialBackgroundPeak,
@@ -4770,6 +5082,12 @@
     positroniumLineYield,
     gaussianTransportRetentionFraction,
     positronProductionSourceAudit,
+    resolveIsmPhase,
+    positronBetaFromKineticEnergy,
+    inFlightAnnihilationCrossSectionCm2,
+    jeanCollisionalSlowingTimeSeconds,
+    positronDiffusionCoefficientCm2S,
+    ismPositronTransportAudit,
     positronTransportPipeline,
     positronTransportSweep,
     microphysicsAudit,
