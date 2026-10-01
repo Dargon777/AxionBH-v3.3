@@ -677,7 +677,7 @@ console.log("AxionBH simulator-core tests passed");
 
 
 {
-  assert.equal(A.MODEL_VERSION, "8.5.0");
+  assert.equal(A.MODEL_VERSION, "8.5.1");
   assert.equal(A.STATE_SCHEMA_VERSION, 9);
 }
 
@@ -745,7 +745,7 @@ console.log("AxionBH simulator-core tests passed");
     },
     "cme"
   );
-  assert.equal(report.modelVersion, "8.5.0");
+  assert.equal(report.modelVersion, "8.5.1");
   assert.equal(report.stateSchemaVersion, 9);
   assert.equal(report.layers.length, A.MODEL_LAYERS.length);
   assert.ok(report.accretion);
@@ -867,12 +867,12 @@ console.log("AxionBH simulator-core tests passed");
 }
 
 {
-  assert.equal(A.CONSTANTS.POSITRON_RATE_OBS_511,1.07e43);
+  assert.equal(A.CONSTANTS.POSITRON_RATE_OBS_511,2e43);
   const obs=A.positronObservableFromPower(
-    A.CONSTANTS.POSITRON_ENERGY * 1e43
+    A.CONSTANTS.PAIR_REST_ENERGY_ERG * 1e43
   );
   assert.ok(Math.abs(obs.positronRatePerSecond-1e43)/1e43<1e-12);
-  assert.ok(Math.abs(obs.ratio511-(1e43/1.07e43))<1e-12);
+  assert.ok(Math.abs(obs.ratio511-0.5)<1e-12);
 }
 {
   const audit=A.microphysicsAudit(A.DEFAULTS);
@@ -900,7 +900,7 @@ console.log("AxionBH simulator-core tests passed");
   );
   assert.ok(result.ratio511>result.legacyRatio511);
   const factor=result.ratio511/result.legacyRatio511;
-  assert.ok(factor>6.2e5&&factor<6.3e5);
+  assert.ok(factor>3.2e5&&factor<3.3e5);
 }
 
 {
@@ -945,3 +945,16 @@ console.log("AxionBH simulator-core tests passed");
 {const f=A.blackHoleRotationalField(A.DEFAULTS);assert.ok(f.electricFieldVcm>0);}
 {const a=A.gapElectrodynamicsAudit(A.DEFAULTS);assert.equal(a.status,"upper-bound-scale");assert.ok(a.fieldToRequiredRatio>0);assert.ok(a.fieldDeficitDex>0);}
 {const a=A.gapParallelElectricField(A.DEFAULTS,{screeningFraction:.1}),b=A.gapParallelElectricField(A.DEFAULTS,{screeningFraction:1});assert.ok(a.parallelElectricFieldVcm<b.parallelElectricFieldVcm);}
+
+{
+  assert.equal(A.MODEL_VERSION,"8.5.1");
+  assert.equal(A.CONSTANTS.POSITRON_RATE_OBS_511,2e43);
+  assert.equal(A.CONSTANTS.POSITRON_RATE_GALAXY_511,5e43);
+  const base=A.cme(A.DEFAULTS);
+  const gain=A.cmeWithGains(A.DEFAULTS);
+  assert.ok(Math.abs(gain.ratio511/base.ratio511-1)<1e-12);
+  const ceiling=A.cmeClosureCeiling(A.DEFAULTS);
+  assert.ok(Math.abs(ceiling.ratioMax-ceiling.positronRateMax/A.CONSTANTS.POSITRON_RATE_OBS_511)<1e-12);
+  const audit=A.microphysicsAudit(A.DEFAULTS);
+  assert.equal(audit.observed511.scope,"Galactic bulge");
+}

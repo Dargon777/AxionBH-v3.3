@@ -204,3 +204,10 @@ This semantic correction raises positive canonical ratios by `1/E_cost ≈ 6.25e
 The explicit Schwinger channel added in v8.4 is kept separate. Its energy ceiling now uses the exact pair rest energy `2 m_e c^2`, rather than reusing the phenomenological 1 MeV-per-positron proxy.
 
 The Microphysics audit additionally evaluates the derivative axion-fermion benchmark `b0_peak = C_e m_a a0/(2 f_a)` at `C_e=1`. This is an axial-background scale associated with the standard derivative coupling and is not automatically an equilibrium chiral chemical potential.
+
+
+## v8.5.1 511-keV reference calibration
+
+The canonical Galactic-bulge positron-rate reference is calibrated to 2e43 e+/s, following the model-dependent bulge production-rate estimate of Siegert et al. (2016, A&A 586 A84). A total visible Galactic rate of order 5e43 e+/s is stored as context, not used as the bulge target.
+
+All power-to-pair-rate conversions now use the same exact minimum pair rest energy, 2 m_e c^2 = 1.637421155e-6 erg. This includes the canonical CVE observable, manual Bosenova, superradiant conversion, Missing Physics and the closure ceiling. The v8.5 Gap/Schwinger layer is preserved unchanged except that it shares the same target reference.

@@ -5,7 +5,7 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  const MODEL_VERSION = "8.5.0";
+  const MODEL_VERSION = "8.5.1";
   const STATE_SCHEMA_VERSION = 9;
 
   const CONSTANTS = Object.freeze({
@@ -20,16 +20,20 @@
     ERG_PER_EV: 1.602176634e-12,
     MEV_TO_ERG: 1.602176634e-6,
     YEAR: 365.25 * 86400,
-    POSITRON_RATE_OBS_511: 1.07e43,
+    // Siegert et al. 2016: model-dependent bulge positron production rate.
+    POSITRON_RATE_OBS_511: 2e43,
+    POSITRON_RATE_GALAXY_511: 5e43,
     LINE_PHOTON_RATE_OBS_511: 5.0e42,
     SCHWINGER_ECRIT_V_CM: 1.323285474e16,
     ELECTRON_COMPTON_REDUCED_CM: 3.8615926796e-11,
     PAIR_REST_ENERGY_ERG:
       2 * 0.51099895 * 1.602176634e-6,
-    POSITRON_ENERGY_COST_ERG: 1.6e-6,
+    POSITRON_ENERGY_COST_ERG:
+      2 * 0.51099895 * 1.602176634e-6,
     POSITRON_ENERGY: 1.6e-6,
     LEGACY_L_OBS_511_NUMBER: 1.07e43,
-    L_OBS_511: 1.07e43 * 1.6e-6,
+    L_OBS_511:
+      2e43 * 2 * 0.51099895 * 1.602176634e-6,
     LINE_POWER_OBS_511:
       5.0e42 * 0.51099895 * 1.602176634e-6,
     SPIN_THRESHOLD: 0.35,
@@ -1560,7 +1564,8 @@
     const p = normalizeParams(input);
     const intervalSeconds = p.burstIntervalYears * CONSTANTS.YEAR;
     const convertedEnergy = p.burstEnergy * p.burstEfficiency;
-    const positronsPerBurst = convertedEnergy / CONSTANTS.POSITRON_ENERGY;
+    const positronsPerBurst =
+      convertedEnergy / CONSTANTS.PAIR_REST_ENERGY_ERG;
     const averageRate = positronsPerBurst / intervalSeconds;
     const averageLuminosity = convertedEnergy / intervalSeconds;
     const burstLuminosity = convertedEnergy / p.burstDuration;
@@ -1610,7 +1615,8 @@
       ? saturationFraction * massG * c.C * c.C * gamma
       : 0;
     const positronPower = saturationPower * p.burstEfficiency;
-    const positronRate = positronPower / c.POSITRON_ENERGY;
+    const positronRate =
+      positronPower / c.PAIR_REST_ENERGY_ERG;
 
     return {
       mode: "superradiant",
@@ -1918,7 +1924,7 @@
     );
   }
 
-  function positronRateFromPower(powerErgS, energyCostErg = CONSTANTS.POSITRON_ENERGY) {
+  function positronRateFromPower(powerErgS, energyCostErg = CONSTANTS.PAIR_REST_ENERGY_ERG) {
     const power = Number(powerErgS);
     const cost = Number(energyCostErg);
     if (!Number.isFinite(power) || power < 0) {
@@ -1928,7 +1934,7 @@
     return power / cost;
   }
 
-  function positronObservableFromPower(powerErgS, energyCostErg = CONSTANTS.POSITRON_ENERGY) {
+  function positronObservableFromPower(powerErgS, energyCostErg = CONSTANTS.PAIR_REST_ENERGY_ERG) {
     const rate = positronRateFromPower(powerErgS, energyCostErg);
     return {
       powerErgS,
@@ -1982,6 +1988,11 @@
         valuePerSecond:
           CONSTANTS.POSITRON_RATE_OBS_511,
         unit: "e+/s",
+        scope: "Galactic bulge",
+        reference:
+          "Siegert et al. 2016, A&A 586 A84: ~2e43 e+/s for the bulge; estimate is model-dependent.",
+        sourceUrl:
+          "https://arxiv.org/abs/1512.00325",
         historicalBug:
           "Legacy code compared model power in erg/s directly with a ~1e43 e+/s observational rate."
       },
@@ -2016,7 +2027,7 @@
         modelRelation:
           "Ndot_e+ = L_model / E_cost",
         energyCostErg:
-          CONSTANTS.POSITRON_ENERGY,
+          CONSTANTS.PAIR_REST_ENERGY_ERG,
         powerErgS: result.luminosity,
         positronRatePerSecond:
           observable.positronRatePerSecond
@@ -2385,6 +2396,8 @@
         eta5: 0,
         kappa: 0,
         luminosity: 0,
+        equivalentPositronRate: 0,
+        legacyRatio511: 0,
         ratio511: 0,
         avgB: base.fieldG,
         geometry,
@@ -2420,6 +2433,8 @@
         eta5: 0,
         kappa: 0,
         luminosity: 0,
+        equivalentPositronRate: 0,
+        legacyRatio511: 0,
         ratio511: 0,
         avgB: base.fieldG,
         geometry,
@@ -2457,7 +2472,16 @@
       baseKappa,
       kappa: Number.isFinite(kappa) && kappa > 0 ? kappa : 0,
       luminosity: safeLuminosity,
-      ratio511: safeLuminosity / CONSTANTS.L_OBS_511,
+      equivalentPositronRate:
+        safeLuminosity /
+        CONSTANTS.PAIR_REST_ENERGY_ERG,
+      legacyRatio511:
+        safeLuminosity /
+        CONSTANTS.LEGACY_L_OBS_511_NUMBER,
+      ratio511:
+        (safeLuminosity /
+          CONSTANTS.PAIR_REST_ENERGY_ERG) /
+        CONSTANTS.POSITRON_RATE_OBS_511,
       avgB: base.fieldG,
       geometry,
       closure: {
@@ -2509,8 +2533,14 @@
     const masslessMu5Max =
       Math.PI * thermal / Math.sqrt(3);
     const kappaMax = mu5Max / CONSTANTS.PROTON_MASS_GEV;
-    const luminosityMax = kappaMax * p.mdot * CONSTANTS.C * CONSTANTS.C;
-    const ratioMax = luminosityMax / CONSTANTS.L_OBS_511;
+    const luminosityMax =
+      kappaMax * p.mdot * CONSTANTS.C * CONSTANTS.C;
+    const positronRateMax =
+      luminosityMax /
+      CONSTANTS.PAIR_REST_ENERGY_ERG;
+    const ratioMax =
+      positronRateMax /
+      CONSTANTS.POSITRON_RATE_OBS_511;
     const goal = Number(target);
     if (!Number.isFinite(goal) || goal <= 0) {
       throw new RangeError("target must be positive");
@@ -2529,6 +2559,7 @@
         coefficients.electronMuGeV,
       kappaMax,
       luminosityMax,
+      positronRateMax,
       ratioMax,
       ceilingDeficitOrders: deficitOrders(ratioMax, goal),
       upstreamHeadroom:
