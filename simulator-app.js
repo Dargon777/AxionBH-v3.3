@@ -15,7 +15,7 @@
   };
 
   const modeNames = {
-    cme: "CME / стационарное облако",
+    cme: "CVE closure / стационарное облако",
     bosenova: "Bosenova / ручные вспышки",
     superradiant: "Суперрадиантный рост",
     hybrid: "Superradiant + Bosenova"
@@ -322,7 +322,7 @@
       ordered[key] = Number(p[key]);
     });
     const source = JSON.stringify({
-      model: "AxionBH-v7.6",
+      model: "AxionBH-v7.7",
       mode,
       parameters: ordered
     });
@@ -443,7 +443,7 @@
   function renderSpinAnalysis() {
     const p = params();
     const points = A.spinSweep(p, 72);
-    setAnalysisMeta("κ как функция спина", "CME-ветка · логарифмическая шкала");
+    setAnalysisMeta("κ как функция спина", "CVE closure · логарифмическая шкала");
     setAnalysisTable("");
 
     if (!window.Plotly) return toast("Plotly не загрузился; сами расчёты работают.");
@@ -894,7 +894,7 @@
       view === "deficit" ? "CME deficit map" : "3D Parameter Explorer",
       view === "deficit"
         ? "Сколько порядков величины отделяет L/L₅₁₁ от единицы; нулевые точки не имеют конечного log-gap"
-        : "CME · spin × B₀ · fₐ задаёт логарифмический срез; A и B используют один fₐ"
+        : "CVE closure · spin × B₀ · fₐ задаёт логарифмический срез; A и B используют один fₐ"
     );
 
     const data = getExplorerComparison();
@@ -984,7 +984,7 @@
     if ($("mode").value !== "cme") {
       setAnalysisMeta(
         "Parameter Inference",
-        "v7.6 inverse solver сейчас определён для CME closure"
+        "v7.7 inverse solver сейчас определён для CVE closure"
       );
       setAnalysisTable(
         '<div class="inference-empty">Переключи режим на CME, чтобы оценить дефицит и требуемые однопараметрические сдвиги.</div>'
@@ -1104,11 +1104,113 @@
       row.remainingDeficitOrders.toFixed(2) + ' dex short</span></div>';
   }
 
+
+  function renderTransport() {
+    if ($("mode").value !== "cme") {
+      setAnalysisMeta(
+        "Anomalous Transport",
+        "CVE/CME decomposition сейчас привязана к стационарной axion closure"
+      );
+      setAnalysisTable(
+        '<div class="inference-empty">Переключи режим на CVE closure. Этот анализ сравнивает токи и не преобразует их автоматически в L₅₁₁.</div>'
+      );
+      if (window.Plotly) Plotly.purge("plot");
+      return;
+    }
+
+    const p = params();
+    const result = A.cme(p);
+    const transport = A.anomalousTransportDiagnostics(p, result);
+
+    setAnalysisMeta(
+      "Anomalous Transport",
+      "Axial CVE: J₅ ∥ ω · magnetic CME: j ∥ B · величины в natural units, токи не складываются"
+    );
+
+    const ratioText = Number.isFinite(transport.magnitudeRatio)
+      ? A.formatScientific(transport.magnitudeRatio, 3)
+      : "—";
+    const chemicalShare = Number.isFinite(transport.chemicalFraction)
+      ? (100 * transport.chemicalFraction).toExponential(2) + "%"
+      : "—";
+
+    const summary = [
+      '<div class="transport-summary">',
+      '<div><span>μ₅</span><strong>' +
+        A.formatScientific(transport.mu5, 3) + ' GeV</strong></div>',
+      '<div><span>⟨B⟩</span><strong>' +
+        A.formatScientific(transport.fieldG, 3) + ' G</strong></div>',
+      '<div><span>ω</span><strong>' +
+        A.formatScientific(transport.omegaGeV, 3) + ' GeV</strong></div>',
+      '<div><span>|J₅,CVE|</span><strong>' +
+        A.formatScientific(Math.abs(transport.jCVE), 3) + ' GeV³</strong></div>',
+      '<div><span>|jCME|</span><strong>' +
+        A.formatScientific(Math.abs(transport.jCME), 3) + ' GeV³</strong></div>',
+      '<div><span>|CME/CVE|</span><strong>' + ratioText + '</strong></div>',
+      '</div>'
+    ].join("");
+
+    const table = [
+      '<div class="analysis-row analysis-row-head transport"><span>Канал</span><span>Тип тока</span><span>Направление</span><span>Коэффициент</span></div>',
+      '<div class="analysis-row transport"><strong>Axial CVE</strong><span>axial J₅</span><span>∥ ω</span><span>T²/6 + μ₅²/(2π²)</span></div>',
+      '<div class="analysis-row transport"><strong>Magnetic CME</strong><span>vector/electric j</span><span>∥ B</span><span>e² μ₅/(2π²)</span></div>'
+    ].join("");
+
+    const note =
+      '<div class="missing-note"><strong>Не суммируется в L₅₁₁:</strong> ' +
+      'это разные токи с разными направлениями и квантовыми числами. ' +
+      'Без отдельной геометрии, кинетики, relaxation и pair-production closure ' +
+      'перевод jCME в позитронную светимость был бы выдуманным. ' +
+      'В текущем CVE коэффициенте доля μ₅²-члена = ' +
+      chemicalShare + '.</div>';
+
+    setAnalysisTable(summary + table + note);
+
+    if (!window.Plotly) return;
+
+    const sweep = A.anomalousTransportSweep(p, {
+      xKey: "B0",
+      values: A.logSpace(1, 2e5, 100)
+    });
+    const valid = sweep.points.filter((point) =>
+      Number.isFinite(point.jCVE) &&
+      Number.isFinite(point.jCME) &&
+      point.jCVE > 0 &&
+      point.jCME > 0
+    );
+
+    const colors = themeColors();
+    const layout = plotLayout("B₀, G", "log₁₀ |J|, GeV³");
+    layout.xaxis.type = "log";
+    Plotly.react("plot", [
+      {
+        type: "scatter",
+        mode: "lines",
+        name: "Axial CVE",
+        x: valid.map((point) => point.value),
+        y: valid.map((point) => Math.log10(Math.abs(point.jCVE))),
+        line: { color: colors.accent, width: 2 },
+        hovertemplate:
+          "CVE<br>B₀=%{x:.3e} G<br>log₁₀|J|=%{y:.2f}<extra></extra>"
+      },
+      {
+        type: "scatter",
+        mode: "lines",
+        name: "Magnetic CME",
+        x: valid.map((point) => point.value),
+        y: valid.map((point) => Math.log10(Math.abs(point.jCME))),
+        line: { color: colors.accent2, width: 2 },
+        hovertemplate:
+          "CME<br>B₀=%{x:.3e} G<br>log₁₀|j|=%{y:.2f}<extra></extra>"
+      }
+    ], layout, { responsive: true, displaylogo: false });
+  }
+
   function renderMissingPhysics() {
     if ($("mode").value !== "cme") {
       setAnalysisMeta(
         "Missing Physics Lab",
-        "Феноменологические gain-каналы определены только для CME closure"
+        "Феноменологические gain-каналы определены только для CVE closure"
       );
       setAnalysisTable(
         '<div class="inference-empty">Переключи режим на CME. Эта вкладка не меняет основной расчёт и служит только диагностикой.</div>'
@@ -1126,7 +1228,7 @@
 
     setAnalysisMeta(
       "Missing Physics Lab",
-      "g_extra — феноменологический диагностический множитель; основной CME-результат остаётся неизменным"
+      "g_extra — феноменологический диагностический множитель; основной CVE-результат остаётся неизменным"
     );
 
     const selectedState = selected.closureValid
@@ -1290,6 +1392,7 @@
         if (kind === "explorer") renderParameterExplorer();
         else if (kind === "sensitivity") renderSensitivity();
         else if (kind === "inference") renderInference();
+        else if (kind === "transport") renderTransport();
         else if (kind === "missing") renderMissingPhysics();
         else if (kind === "compare") renderComparison();
         else renderSpinAnalysis();
@@ -1336,7 +1439,7 @@
     const diagnostics = currentDiagnostics();
     const payload = {
       generatedAt: new Date().toISOString(),
-      model: "AxionBH research workbench v7.6",
+      model: "AxionBH research workbench v7.7",
       stateId: runStateId(state.lastMode, state.lastParams),
       mode: state.lastMode,
       parameters: state.lastParams,
@@ -1348,6 +1451,12 @@
         faExp: Number($("explorerFaExp").value),
         resolution: $("explorerResolution").value
       },
+      transport: state.lastMode === "cme"
+        ? A.anomalousTransportDiagnostics(
+            state.lastParams,
+            state.lastResult
+          )
+        : null,
       missingPhysics: {
         placement: $("missingPlacement").value,
         gainExp: Number($("missingGainExp").value),
@@ -1371,7 +1480,7 @@
     const lines = [
       "# AxionBH reproducibility report",
       "",
-      "- Model: AxionBH Research Workbench v7.6",
+      "- Model: AxionBH Research Workbench v7.7",
       "- Generated: " + new Date().toISOString(),
       "- State ID: " + stateId,
       "- Mode: " + modeNames[state.lastMode],
@@ -1545,7 +1654,7 @@
       applyParameters(restored);
       if (modeNames[payload.mode]) $("mode").value = payload.mode;
 
-      if (["spin", "explorer", "sensitivity", "inference", "missing", "compare"].includes(payload.analysis)) {
+      if (["spin", "explorer", "sensitivity", "inference", "transport", "missing", "compare"].includes(payload.analysis)) {
         state.analysis = payload.analysis;
       }
 

@@ -123,8 +123,8 @@ for (const feature of [
   );
 }
 
-assert.ok(html.includes("v7.6"));
-assert.ok(app.includes("AxionBH research workbench v7.6"));
+assert.ok(html.includes("v7.7"));
+assert.ok(app.includes("AxionBH research workbench v7.7"));
 
 
 for (const feature of [
@@ -170,3 +170,21 @@ for (const feature of [
 }
 
 assert.ok(html.includes('data-analysis="missing"'));
+
+
+for (const feature of [
+  "chiralMagneticConductivity",
+  "chiralMagneticCurrent",
+  "axialVorticalCurrent",
+  "anomalousTransportDiagnostics",
+  "anomalousTransportSweep",
+  "renderTransport"
+]) {
+  assert.ok(
+    core.includes(feature) || app.includes(feature),
+    "missing v7.7 transport feature: " + feature
+  );
+}
+
+assert.ok(html.includes('data-analysis="transport"'));
+assert.ok(app.includes("CVE closure / стационарное облако"));
