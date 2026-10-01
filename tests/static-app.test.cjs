@@ -123,8 +123,8 @@ for (const feature of [
   );
 }
 
-assert.ok(html.includes("v8.5.2"));
-assert.ok(app.includes("AxionBH research workbench v8.5.2"));
+assert.ok(html.includes("v8.6.0"));
+assert.ok(app.includes("AxionBH research workbench v8.6.0"));
 
 
 for (const feature of [
@@ -369,3 +369,33 @@ for (const feature of [
 }
 assert.ok(html.includes('id="superradianceFields"'));
 assert.ok(html.includes('id="conversionEfficiencyField"'));
+
+
+for (const feature of [
+  "goldreichJulianDensityScale",
+  "gapChargeStarvationAudit",
+  "gapPotentialDrop",
+  "curvatureRadiationAudit",
+  "breitWheelerCrossSection",
+  "softPhotonFieldAudit",
+  "gammaGammaPairAudit",
+  "gapCascadeAudit",
+  "currentGapOptions",
+  "updateGapLabels"
+]) {
+  assert.ok(
+    core.includes(feature) || app.includes(feature) || html.includes(feature),
+    "missing v8.6 gap-cascade feature: " + feature
+  );
+}
+for (const id of [
+  'id="gapControls"',
+  'id="gapPotentialModel"',
+  'id="gapHeightExp"',
+  'id="gapInjectionExp"',
+  'id="gapCurvatureExp"',
+  'id="gapSoftEnergyExp"',
+  'id="gapSoftLumExp"'
+]) {
+  assert.ok(html.includes(id), "missing v8.6 gap control: " + id);
+}

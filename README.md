@@ -3,7 +3,7 @@
 
 AxionBH is an exploratory browser simulator for the black-hole / axion model documented in `index.html`.
 
-## Research Workbench v8.5.2
+## Research Workbench v8.6.0
 
 Open `sim.html` in a modern browser.
 
@@ -232,3 +232,24 @@ For the scalar `211` level it now:
 The growth formula is a small-`alpha` approximation, not a numerical Teukolsky solution. The saturation estimate omits accretion during growth, gravitational-wave losses and axion self-interactions.
 
 The previous default point `M=4.28e6 M_sun`, `a_*=0.89`, `m_a=1e-17 eV` is now correctly classified as kinematically closed for scalar-211 superradiance rather than forced active by a spin-only gate.
+
+
+## v8.6 charge-starved gap and pair cascade
+
+The Gap analysis is promoted from a Schwinger field ceiling to an explicit diagnostic chain:
+
+`charge supply → Goldreich-Julian deficit → analytic gap potential → particle acceleration → curvature photons → gamma-gamma pairs`.
+
+The implementation adds:
+
+- a classical order-of-magnitude Goldreich-Julian number-density scale `n_GJ ~= |Omega_F B|/(2 pi e c)`;
+- a charge-starvation audit comparing `n_GJ` with the existing accretion-continuity density multiplied by an explicit funnel-injection fraction;
+- the analytic black-hole gap voltage scalings summarized by Rieger & Katsoulakos (2017): vacuum `DeltaV ~ Phi0 (h/r_g)^2` and near-GJ `DeltaV ~ Phi0 (h/r_g)^3/6`, where `Phi0 ~ Omega_F r_g^2 B/c`;
+- potential-limited and curvature-radiation-reaction electron Lorentz factors;
+- characteristic curvature-photon energy;
+- the head-on Breit-Wheeler `gamma gamma → e+ e-` cross section, threshold, optical depth and conversion probability in an isotropic monoenergetic soft-photon bath;
+- a one-generation pair multiplicity and Goldreich-Julian refill diagnostic;
+- an electrical-power ceiling on the pair rate;
+- a direct comparison with the already implemented vacuum Schwinger channel.
+
+The gap model remains deliberately diagnostic. The full Kerr Goldreich-Julian density, gap Poisson equation, photon spectra, inverse-Compton losses, pair feedback and time-dependent GR PIC evolution are not solved. The funnel-injection fraction and soft-photon bath are exploratory inputs rather than observational posteriors.

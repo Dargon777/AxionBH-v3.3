@@ -382,7 +382,7 @@
       ordered[key] = Number(p[key]);
     });
     const source = JSON.stringify({
-      model: "AxionBH-v8.5.2",
+      model: "AxionBH-v8.6.0",
       mode,
       parameters: ordered
     });
@@ -1052,7 +1052,7 @@
     if ($("mode").value !== "cme") {
       setAnalysisMeta(
         "Parameter Inference",
-        "v8.5.2 inverse solver сейчас определён для CVE closure"
+        "v8.6 inverse solver сейчас определён для CVE closure"
       );
       setAnalysisTable(
         '<div class="inference-empty">Переключи режим на CME, чтобы оценить дефицит и требуемые однопараметрические сдвиги.</div>'
@@ -1314,6 +1314,51 @@
       horizonSeconds: chiralityHorizonValue(),
       electricAlignment: chiralityElectricAlignment()
     };
+  }
+
+
+  function gapHeightValue() {
+    return Math.pow(10, Number($("gapHeightExp").value));
+  }
+
+  function gapInjectionValue() {
+    return Math.pow(10, Number($("gapInjectionExp").value));
+  }
+
+  function gapCurvatureValue() {
+    return Math.pow(10, Number($("gapCurvatureExp").value));
+  }
+
+  function gapSoftEnergyValue() {
+    return Math.pow(10, Number($("gapSoftEnergyExp").value));
+  }
+
+  function gapSoftLuminosityValue() {
+    return Math.pow(10, Number($("gapSoftLumExp").value));
+  }
+
+  function currentGapOptions() {
+    return {
+      potentialModel: $("gapPotentialModel").value,
+      gapHeightRg: gapHeightValue(),
+      plasmaInjectionFraction: gapInjectionValue(),
+      curvatureRadiusRg: gapCurvatureValue(),
+      softPhotonEnergyEv: gapSoftEnergyValue(),
+      softPhotonLuminosityErgS: gapSoftLuminosityValue()
+    };
+  }
+
+  function updateGapLabels() {
+    $("gapHeightOut").textContent =
+      A.formatScientific(gapHeightValue(), 2);
+    $("gapInjectionOut").textContent =
+      A.formatScientific(gapInjectionValue(), 2);
+    $("gapCurvatureOut").textContent =
+      A.formatScientific(gapCurvatureValue(), 2);
+    $("gapSoftEnergyOut").textContent =
+      A.formatScientific(gapSoftEnergyValue(), 2);
+    $("gapSoftLumOut").textContent =
+      A.formatScientific(gapSoftLuminosityValue(), 2);
   }
 
 
@@ -1920,7 +1965,7 @@
         '</span><span>E_cost=' +
         A.formatScientific(audit.mu5ToPositrons.energyCostErg,3) +
         ' erg/e⁺; no microscopic pair-production rate is derived.</span></div>',
-      '<div class="missing-note"><strong>Observable correction:</strong> the Galactic ~10⁴³ quantity is an annihilation/injection rate in e⁺/s, not an energy luminosity in erg/s. v8.5.2 therefore audits the corrected rate ratio separately; the legacy numerical e⁺ budget ratio fields remain untouched for backward reproducibility.</div>'
+      '<div class="missing-note"><strong>Observable correction:</strong> the Galactic ~10⁴³ quantity is an annihilation/injection rate in e⁺/s, not an energy luminosity in erg/s. v8.6 therefore audits the corrected rate ratio separately; the legacy numerical e⁺ budget ratio fields remain untouched for backward reproducibility.</div>'
     ].join("");
     setAnalysisTable(html);
     if (!window.Plotly) return;
@@ -1940,18 +1985,78 @@
     if ($("mode").value !== "cme") {setAnalysisMeta("Pair Production","Schwinger diagnostic");setAnalysisTable('<div class="inference-empty">Переключи режим на CVE closure.</div>');if(window.Plotly)Plotly.purge("plot");return;}
     const audit=A.pairProductionAudit(params()),req=audit.required;
     setAnalysisMeta("Explicit Pair Production","idealized constant-field Schwinger channel · 1 r_g shell");
-    setAnalysisTable(['<div class="pair-summary">','<div><span>Ecrit</span><strong>'+A.formatScientific(audit.criticalFieldVcm,3)+' V/cm</strong></div>','<div><span>Required E/Ecrit</span><strong>'+A.formatScientific(req.electricFieldOverCritical,3)+'</strong></div>','<div><span>Required E</span><strong>'+A.formatScientific(req.electricFieldVcm,3)+' V/cm</strong></div>','<div><span>Min pair power</span><strong>'+A.formatScientific(audit.minimumObservedPairPowerErgS,3)+' erg/s</strong></div>','<div><span>Ṁc² / min pair power</span><strong>'+A.formatScientific(audit.energyBudgetRatio,3)+'×</strong></div>','</div>','<div class="missing-note"><strong>Interpretation:</strong> Schwinger production is explicit QED, but AxionBH does not yet predict the required local electric field. Plasma screening, backreaction and active volume remain unresolved. The power check is necessary, not sufficient.</div>'].join(""));
+    setAnalysisTable(['<div class="pair-summary">','<div><span>Ecrit</span><strong>'+A.formatScientific(audit.criticalFieldVcm,3)+' V/cm</strong></div>','<div><span>Required E/Ecrit</span><strong>'+A.formatScientific(req.electricFieldOverCritical,3)+'</strong></div>','<div><span>Required E</span><strong>'+A.formatScientific(req.electricFieldVcm,3)+' V/cm</strong></div>','<div><span>Min pair power</span><strong>'+A.formatScientific(audit.minimumObservedPairPowerErgS,3)+' erg/s</strong></div>','<div><span>Ṁc² / min pair power</span><strong>'+A.formatScientific(audit.energyBudgetRatio,3)+'×</strong></div>','</div>','<div class="missing-note"><strong>Interpretation:</strong> Schwinger production remains an explicit vacuum-QED channel. The v8.6 Gap tab now supplies a separate charge-starvation and analytic-potential cascade diagnostic; neither channel is a self-consistent GR plasma solution.</div>'].join(""));
     if(!window.Plotly)return;const xs=[],ys=[];for(let i=-4;i<=0.3;i+=0.08){const x=10**i,r=A.schwingerPairProduction(params(),{electricFieldVcm:x*audit.criticalFieldVcm});xs.push(x);ys.push(Math.log10(Math.max(r.rawRatio511,1e-320)));}
     const layout=plotLayout("E / Ecrit","log10(pair rate / observed)");layout.xaxis.type="log";Plotly.react("plot",[{type:"scatter",mode:"lines",x:xs,y:ys},{type:"scatter",mode:"markers",x:[req.electricFieldOverCritical],y:[0],marker:{size:11,color:themeColors().accent},name:"required"}],layout,{responsive:true,displaylogo:false});
   }
 
 
   function renderGapElectrodynamics() {
-    if ($("mode").value !== "cme") {setAnalysisMeta("Gap Electrodynamics","BH field ceiling");setAnalysisTable('<div class="inference-empty">Переключи режим на CVE closure.</div>');if(window.Plotly)Plotly.purge("plot");return;}
-    const a=A.gapElectrodynamicsAudit(params());
-    setAnalysisMeta("BH Gap Electrodynamics","optimistic unscreened rotational ceiling");
-    setAnalysisTable('<div class="missing-note"><strong>Unscreened E∥ ceiling:</strong> '+A.formatScientific(a.field.parallelElectricFieldVcm,3)+' V/cm · <strong>Schwinger required:</strong> '+A.formatScientific(a.required.electricFieldVcm,3)+' V/cm · <strong>field deficit:</strong> '+a.fieldDeficitDex.toFixed(2)+' dex. This is an upper-bound scale, not a self-consistent GR gap solution.</div>');
-    if(!window.Plotly)return;const xs=[],ys=[];for(let i=0;i<40;i++){const B=10**(1+i*5/39),q=A.gapElectrodynamicsAudit({...params(),B0:B});xs.push(B);ys.push(Math.log10(Math.max(q.fieldToRequiredRatio,1e-320)));}const layout=plotLayout("B0 / G","log10(Egap / Erequired)");layout.xaxis.type="log";Plotly.react("plot",[{type:"scatter",mode:"lines",x:xs,y:ys}],layout,{responsive:true,displaylogo:false});
+    if ($("mode").value !== "cme") {
+      setAnalysisMeta("Gap / Pair Cascade","charge starvation → curvature γ → γγ");
+      setAnalysisTable('<div class="inference-empty">Переключи режим на CVE closure.</div>');
+      if(window.Plotly)Plotly.purge("plot");
+      return;
+    }
+
+    const options=currentGapOptions();
+    const audit=A.gapElectrodynamicsAudit(params(),options);
+    const c=audit.cascade;
+    const starve=c.starvation;
+    const curvature=c.curvature;
+    const gg=c.gammaGamma;
+    const thresholdRatio=gg.headOnThresholdGammaEnergyEv>0
+      ? curvature.characteristicPhotonEnergyEv/gg.headOnThresholdGammaEnergyEv
+      : 0;
+
+    setAnalysisMeta(
+      "BH Gap + Pair Cascade",
+      "charge starvation → analytic ΔV → curvature radiation → γγ pairs · one-generation diagnostic"
+    );
+
+    const html=[
+      '<div class="pair-summary">',
+      '<div><span>gap state</span><strong>'+c.status+'</strong></div>',
+      '<div><span>n_GJ scale</span><strong>'+A.formatScientific(starve.goldreichJulian.numberDensityCm3,3)+' cm⁻³</strong></div>',
+      '<div><span>charge supply / n_GJ</span><strong>'+A.formatScientific(starve.supplyRatio,3)+'×</strong></div>',
+      '<div><span>injection for screening</span><strong>'+A.formatScientific(starve.requiredInjectionFractionForScreening,3)+'</strong></div>',
+      '<div><span>ΔV_gap</span><strong>'+A.formatScientific(c.potential.voltageV,3)+' V</strong></div>',
+      '<div><span>⟨E∥⟩</span><strong>'+A.formatScientific(c.potential.averageParallelElectricFieldVcm,3)+' V/cm</strong></div>',
+      '<div><span>γ_e</span><strong>'+A.formatScientific(curvature.gamma,3)+'</strong></div>',
+      '<div><span>curvature photon</span><strong>'+A.formatScientific(curvature.characteristicPhotonEnergyEv,3)+' eV</strong></div>',
+      '<div><span>γγ threshold ratio</span><strong>'+A.formatScientific(thresholdRatio,3)+'×</strong></div>',
+      '<div><span>τ_γγ</span><strong>'+A.formatScientific(gg.opticalDepth,3)+'</strong></div>',
+      '<div><span>1-gen pair multiplicity</span><strong>'+A.formatScientific(c.multiplicityOneGeneration,3)+'</strong></div>',
+      '<div><span>cascade closure</span><strong>'+(c.cascadeSelfSustaining?'candidate':'subcritical')+'</strong></div>',
+      '<div><span>pair refill / GJ flux</span><strong>'+A.formatScientific(c.closureSupplyRatio,3)+'×</strong></div>',
+      '<div><span>pair rate / bulge target</span><strong>'+A.formatScientific(c.pairRateToBulgeTarget,3)+'×</strong></div>',
+      '<div><span>Schwinger / bulge target</span><strong>'+A.formatScientific(c.schwinger.cappedRatio511,3)+'×</strong></div>',
+      '</div>',
+      '<div class="missing-note"><strong>Interpretation:</strong> v8.6 no longer treats the rotational field scale as a predicted gap. It first asks whether the adopted funnel charge supply is below the Goldreich–Julian scale, then applies an analytic gap-potential model, curvature-radiation limit and head-on Breit–Wheeler conversion in a monoenergetic soft-photon bath. A multiplicity ≥1 is only a closure diagnostic; it is not a GR PIC solution.</div>'
+    ].join("");
+    setAnalysisTable(html);
+
+    if(!window.Plotly)return;
+    const xs=[],ym=[],yth=[],ytau=[];
+    for(let i=0;i<48;i++){
+      const h=10**(-3+3*i/47);
+      const q=A.gapCascadeAudit(params(),{...options,gapHeightRg:h});
+      xs.push(h);
+      ym.push(Math.log10(Math.max(q.multiplicityOneGeneration,1e-30)));
+      const thr=q.gammaGamma.headOnThresholdGammaEnergyEv>0
+        ? q.curvature.characteristicPhotonEnergyEv/q.gammaGamma.headOnThresholdGammaEnergyEv
+        : 0;
+      yth.push(Math.log10(Math.max(thr,1e-30)));
+      ytau.push(Math.log10(Math.max(q.gammaGamma.opticalDepth,1e-30)));
+    }
+    const layout=plotLayout("h / r_g","log₁₀ diagnostic");
+    layout.xaxis.type="log";
+    layout.shapes=[{type:"line",x0:1e-3,x1:1,y0:0,y1:0,line:{dash:"dot"}}];
+    Plotly.react("plot",[
+      {type:"scatter",mode:"lines",name:"pair multiplicity",x:xs,y:ym},
+      {type:"scatter",mode:"lines",name:"Eγ / γγ threshold",x:xs,y:yth},
+      {type:"scatter",mode:"lines",name:"τγγ",x:xs,y:ytau}
+    ],layout,{responsive:true,displaylogo:false});
   }
 
   function renderValidity() {
@@ -2361,6 +2466,7 @@
 
     $("explorerControls").classList.toggle("hidden", kind !== "explorer");
     $("chiralityControls").classList.toggle("hidden", kind !== "chirality");
+    $("gapControls").classList.toggle("hidden", kind !== "gap");
     $("missingPhysicsControls").classList.toggle("hidden", kind !== "missing");
     $("plot").classList.toggle("plot-tall", kind === "explorer");
 
@@ -2425,7 +2531,7 @@
     const diagnostics = currentDiagnostics();
     const payload = {
       generatedAt: new Date().toISOString(),
-      model: "AxionBH research workbench v8.5.2",
+      model: "AxionBH research workbench v8.6.0",
       modelVersion: A.MODEL_VERSION,
       stateSchemaVersion: A.STATE_SCHEMA_VERSION,
       stateId: runStateId(state.lastMode, state.lastParams),
@@ -2478,7 +2584,10 @@
           : null,
       gapElectrodynamicsAudit:
         state.lastMode === "cme"
-          ? A.gapElectrodynamicsAudit(state.lastParams)
+          ? A.gapElectrodynamicsAudit(
+              state.lastParams,
+              currentGapOptions()
+            )
           : null,
       missingPhysics: {
         placement: $("missingPlacement").value,
@@ -2503,7 +2612,7 @@
     const lines = [
       "# AxionBH reproducibility report",
       "",
-      "- Model: AxionBH Research Workbench v8.5.2",
+      "- Model: AxionBH Research Workbench v8.6.0",
       "- Generated: " + new Date().toISOString(),
       "- State ID: " + stateId,
       "- Mode: " + modeNames[state.lastMode],
@@ -2676,6 +2785,14 @@
         anomalyMode: $("chiralityAnomalyMode").value,
         eExp: Number($("chiralityEExp").value)
       },
+      gap: {
+        potentialModel: $("gapPotentialModel").value,
+        heightExp: Number($("gapHeightExp").value),
+        injectionExp: Number($("gapInjectionExp").value),
+        curvatureExp: Number($("gapCurvatureExp").value),
+        softEnergyExp: Number($("gapSoftEnergyExp").value),
+        softLumExp: Number($("gapSoftLumExp").value)
+      },
       missingPhysics: {
         placement: $("missingPlacement").value,
         gainExp: Number($("missingGainExp").value)
@@ -2737,6 +2854,23 @@
         }
       }
 
+      if (payload.gap && typeof payload.gap === "object") {
+        if (["vacuum-h2","near-gj-h3"].includes(payload.gap.potentialModel)) {
+          $("gapPotentialModel").value = payload.gap.potentialModel;
+        }
+        const gapRanges = [
+          ["gapHeightExp", payload.gap.heightExp, -3, 0],
+          ["gapInjectionExp", payload.gap.injectionExp, -24, 0],
+          ["gapCurvatureExp", payload.gap.curvatureExp, -1, 1],
+          ["gapSoftEnergyExp", payload.gap.softEnergyExp, -3, 5],
+          ["gapSoftLumExp", payload.gap.softLumExp, 30, 42]
+        ];
+        gapRanges.forEach(([id,value,min,max]) => {
+          const x=Number(value);
+          if(Number.isFinite(x)&&x>=min&&x<=max) $(id).value=x;
+        });
+      }
+
       if (payload.missingPhysics && typeof payload.missingPhysics === "object") {
         if (missingPlacementNames[payload.missingPhysics.placement]) {
           $("missingPlacement").value = payload.missingPhysics.placement;
@@ -2749,6 +2883,7 @@
 
       updateExplorerFaLabel();
       updateChiralityLabels();
+      updateGapLabels();
       updateMissingGainLabel();
       $("preset").value = "custom";
       updateConditionalFields();
@@ -2861,6 +2996,20 @@
       }
     });
 
+    ["gapHeightExp","gapInjectionExp","gapCurvatureExp","gapSoftEnergyExp","gapSoftLumExp"].forEach((id) => {
+      $(id).addEventListener("input", () => {
+        updateGapLabels();
+        if (state.analysis === "gap" && state.lastResult) {
+          renderAnalysis("gap");
+        }
+      });
+    });
+    $("gapPotentialModel").addEventListener("change", () => {
+      if (state.analysis === "gap" && state.lastResult) {
+        renderAnalysis("gap");
+      }
+    });
+
     $("missingGainExp").addEventListener("input", () => {
       updateMissingGainLabel();
       if (state.analysis === "missing" && state.lastResult) {
@@ -2876,6 +3025,7 @@
     updateConditionalFields();
     updateExplorerFaLabel();
     updateChiralityLabels();
+    updateGapLabels();
     updateMissingGainLabel();
     restoreSharedState();
     run();

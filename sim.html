@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="AxionBH interactive browser simulator and parameter-analysis workbench.">
-  <title>AxionBH — Research Workbench v8.5.2</title>
+  <title>AxionBH — Research Workbench v8.6.0</title>
   <link rel="stylesheet" href="simulator.css">
   <script defer src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <script defer src="simulator-core.js"></script>
@@ -15,7 +15,7 @@
     <div class="topbar-inner">
       <a class="brand" href="index.html">
         <span class="brand-mark">A</span>
-        <span>AxionBH<small>research workbench · v8.5.2</small></span>
+        <span>AxionBH<small>research workbench · v8.6.0</small></span>
       </a>
       <nav class="nav">
         <a href="index.html">Теория</a>
@@ -39,14 +39,14 @@
     </section>
 
     <div class="notice">
-      <strong>Исследовательский калькулятор.</strong> AxionBH реализует текущие допущения модели и не является подтверждённым инструментом наблюдательной астрофизики. В v8.5.2 модель разбита на явные слои; CVE closure считается в natural units, порог a/M = 0.35 остаётся феноменологическим gate, а не выведенным результатом.
+      <strong>Исследовательский калькулятор.</strong> AxionBH реализует текущие допущения модели и не является подтверждённым инструментом наблюдательной астрофизики. В v8.6.0 модель разбита на явные слои; CVE closure считается в natural units, порог a/M = 0.35 остаётся феноменологическим gate, а не выведенным результатом.
     </div>
 
     <section class="workspace">
       <aside class="panel controls">
         <div class="panel-title">
           <h2>Параметры</h2>
-          <span class="muted">v8.5.2</span>
+          <span class="muted">v8.6.0</span>
         </div>
 
         <div class="field">
@@ -265,6 +265,51 @@
               <div class="range-row">
                 <input id="chiralityEExp" type="range" min="-40" max="0" step="0.25" value="-30">
                 <span id="chiralityEOut" class="range-value">1.00e-30</span>
+              </div>
+            </div>
+          </div>
+
+          <div id="gapControls" class="explorer-controls hidden">
+            <div class="explorer-field">
+              <label for="gapPotentialModel">Gap potential</label>
+              <select id="gapPotentialModel" class="select compact-select">
+                <option value="vacuum-h2">vacuum · ΔV ∝ h²</option>
+                <option value="near-gj-h3">near-GJ · ΔV ∝ h³/6</option>
+              </select>
+            </div>
+            <div class="explorer-field explorer-fa">
+              <label for="gapHeightExp">log₁₀(h/r_g)</label>
+              <div class="range-row">
+                <input id="gapHeightExp" type="range" min="-3" max="0" step="0.05" value="-1">
+                <span id="gapHeightOut" class="range-value">1.00e-1</span>
+              </div>
+            </div>
+            <div class="explorer-field explorer-fa">
+              <label for="gapInjectionExp">log₁₀ funnel injection</label>
+              <div class="range-row">
+                <input id="gapInjectionExp" type="range" min="-24" max="0" step="0.25" value="-18">
+                <span id="gapInjectionOut" class="range-value">1.00e-18</span>
+              </div>
+            </div>
+            <div class="explorer-field explorer-fa">
+              <label for="gapCurvatureExp">log₁₀(ρ_c/r_g)</label>
+              <div class="range-row">
+                <input id="gapCurvatureExp" type="range" min="-1" max="1" step="0.05" value="0">
+                <span id="gapCurvatureOut" class="range-value">1.00e+0</span>
+              </div>
+            </div>
+            <div class="explorer-field explorer-fa">
+              <label for="gapSoftEnergyExp">log₁₀ ε_soft, eV</label>
+              <div class="range-row">
+                <input id="gapSoftEnergyExp" type="range" min="-3" max="5" step="0.1" value="3">
+                <span id="gapSoftEnergyOut" class="range-value">1.00e+3</span>
+              </div>
+            </div>
+            <div class="explorer-field explorer-fa">
+              <label for="gapSoftLumExp">log₁₀ L_soft, erg/s</label>
+              <div class="range-row">
+                <input id="gapSoftLumExp" type="range" min="30" max="42" step="0.1" value="36">
+                <span id="gapSoftLumOut" class="range-value">1.00e+36</span>
               </div>
             </div>
           </div>
