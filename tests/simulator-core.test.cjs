@@ -677,7 +677,7 @@ console.log("AxionBH simulator-core tests passed");
 
 
 {
-  assert.equal(A.MODEL_VERSION, "8.4.1");
+  assert.equal(A.MODEL_VERSION, "8.5.0");
   assert.equal(A.STATE_SCHEMA_VERSION, 9);
 }
 
@@ -745,7 +745,7 @@ console.log("AxionBH simulator-core tests passed");
     },
     "cme"
   );
-  assert.equal(report.modelVersion, "8.4.1");
+  assert.equal(report.modelVersion, "8.5.0");
   assert.equal(report.stateSchemaVersion, 9);
   assert.equal(report.layers.length, A.MODEL_LAYERS.length);
   assert.ok(report.accretion);
@@ -941,3 +941,7 @@ console.log("AxionBH simulator-core tests passed");
     ) < 1e-12
   );
 }
+
+{const f=A.blackHoleRotationalField(A.DEFAULTS);assert.ok(f.electricFieldVcm>0);}
+{const a=A.gapElectrodynamicsAudit(A.DEFAULTS);assert.equal(a.status,"upper-bound-scale");assert.ok(a.fieldToRequiredRatio>0);assert.ok(a.fieldDeficitDex>0);}
+{const a=A.gapParallelElectricField(A.DEFAULTS,{screeningFraction:.1}),b=A.gapParallelElectricField(A.DEFAULTS,{screeningFraction:1});assert.ok(a.parallelElectricFieldVcm<b.parallelElectricFieldVcm);}

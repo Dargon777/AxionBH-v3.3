@@ -5,7 +5,7 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  const MODEL_VERSION = "8.4.1";
+  const MODEL_VERSION = "8.5.0";
   const STATE_SCHEMA_VERSION = 9;
 
   const CONSTANTS = Object.freeze({
@@ -2062,6 +2062,22 @@
     return {mechanism:"Schwinger constant-field e+e- production",status:"explicit-idealized",assumptions:["locally constant homogeneous electric field","vacuum Schwinger rate; plasma screening/backreaction omitted","fiducial active volume 4π r² Δr with r=Δr=r_g and filling factor 1","energy ceiling uses mdot c², not a derived electromagnetic extraction efficiency"],criticalFieldVcm:CONSTANTS.SCHWINGER_ECRIT_V_CM,required,accretionPowerErgS:accretionPower,minimumObservedPairPowerErgS:minimumObservedPairPower,energyBudgetRatio:accretionPower/minimumObservedPairPower,energyBudgetCanSupplyMinimumRestMass:accretionPower>=minimumObservedPairPower};
   }
 
+
+  function statvoltPerCmToVoltPerCm(value){return Number(value)*299.792458;}
+  function blackHoleRotationalField(input,{radiusRg=1,fieldG=null,fieldLineOmegaFraction=0.5}={}){
+    const p=normalizeParams(input),geometry=kerrGeometry(p.massSolar*CONSTANTS.MSUN,p.spin),radius=assertFinitePositive(Number(radiusRg),"radiusRg")*geometry.rg;
+    const B=fieldG===null?averageMagneticField(p.B0,geometry,p.nProfile):assertFinitePositive(Number(fieldG),"fieldG");
+    const fraction=Number(fieldLineOmegaFraction);if(!(fraction>=0&&fraction<=1))throw new RangeError("fieldLineOmegaFraction must be in [0,1]");
+    const omegaF=geometry.omegaH*fraction,eStat=Math.abs(omegaF*radius/CONSTANTS.C)*B;
+    return {radiusRg:Number(radiusRg),radiusCm:radius,fieldG:B,omegaHPerSecond:geometry.omegaH,fieldLineOmegaFraction:fraction,omegaFPerSecond:omegaF,electricFieldStatvoltCm:eStat,electricFieldVcm:statvoltPerCmToVoltPerCm(eStat),interpretation:"rotation-induced unscreened field scale; not a self-consistent E_parallel solution"};
+  }
+  function gapParallelElectricField(input,options={}){const u=blackHoleRotationalField(input,options),s=options.screeningFraction==null?1:Number(options.screeningFraction);if(!(s>=0&&s<=1))throw new RangeError("screeningFraction must be in [0,1]");return {...u,screeningFraction:s,parallelElectricFieldVcm:u.electricFieldVcm*s};}
+  function gapElectrodynamicsAudit(input,options={}){
+    const p=normalizeParams(input),field=gapParallelElectricField(p,options),required=inferSchwingerFieldForObservedRate(p,{radiusRg:options.activeRadiusRg||1,thicknessRg:options.activeThicknessRg||1,fillingFactor:options.fillingFactor||1}),ratio=field.parallelElectricFieldVcm/required.electricFieldVcm;
+    const rawPairs=schwingerPairProduction(p,{electricFieldVcm:field.parallelElectricFieldVcm,radiusRg:options.activeRadiusRg||1,thicknessRg:options.activeThicknessRg||1,fillingFactor:options.fillingFactor||1});
+    return {status:"upper-bound-scale",field,required,fieldToRequiredRatio:ratio,fieldDeficitDex:ratio>0?-Math.log10(ratio):Number.POSITIVE_INFINITY,schwingerAtGapField:rawPairs,caveats:["E~(Omega_F r/c)B is an unscreened rotational scale, not a GR gap Poisson solution.","Force-free plasma screens E_parallel; screeningFraction=1 is therefore an optimistic ceiling.","Real black-hole gaps are regulated by pair cascades, radiation and soft-photon fields.","Schwinger vacuum production is distinct from gamma-gamma pair cascades usually studied in BH gaps."]};
+  }
+
   function deficitOrders(value, target = 1) {
     const metric = Number(value);
     const goal = Number(target);
@@ -3572,6 +3588,10 @@
     schwingerPairProduction,
     inferSchwingerFieldForObservedRate,
     pairProductionAudit,
+    statvoltPerCmToVoltPerCm,
+    blackHoleRotationalField,
+    gapParallelElectricField,
+    gapElectrodynamicsAudit,
     PRESETS,
     mdotGsFromMsunPerYear,
     mdotMsunPerYearFromGs,
