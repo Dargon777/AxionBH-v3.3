@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="AxionBH interactive browser simulator and parameter-analysis workbench.">
-  <title>AxionBH — Research Workbench v8.6.0</title>
+  <title>AxionBH — Research Workbench v8.7.0</title>
   <link rel="stylesheet" href="simulator.css">
   <script defer src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <script defer src="simulator-core.js"></script>
@@ -15,7 +15,7 @@
     <div class="topbar-inner">
       <a class="brand" href="index.html">
         <span class="brand-mark">A</span>
-        <span>AxionBH<small>research workbench · v8.6.0</small></span>
+        <span>AxionBH<small>research workbench · v8.7.0</small></span>
       </a>
       <nav class="nav">
         <a href="index.html">Теория</a>
@@ -39,14 +39,14 @@
     </section>
 
     <div class="notice">
-      <strong>Исследовательский калькулятор.</strong> AxionBH реализует текущие допущения модели и не является подтверждённым инструментом наблюдательной астрофизики. В v8.6.0 модель разбита на явные слои; CVE closure считается в natural units, порог a/M = 0.35 остаётся феноменологическим gate, а не выведенным результатом.
+      <strong>Исследовательский калькулятор.</strong> AxionBH реализует текущие допущения модели и не является подтверждённым инструментом наблюдательной астрофизики. В v8.7.0 модель разбита на явные слои; CVE closure считается в natural units, порог a/M = 0.35 остаётся феноменологическим gate, а не выведенным результатом.
     </div>
 
     <section class="workspace">
       <aside class="panel controls">
         <div class="panel-title">
           <h2>Параметры</h2>
-          <span class="muted">v8.6.0</span>
+          <span class="muted">v8.7.0</span>
         </div>
 
         <div class="field">
@@ -277,8 +277,15 @@
                 <option value="near-gj-h3">near-GJ · ΔV ∝ h³/6</option>
               </select>
             </div>
+            <div class="explorer-field">
+              <label for="gapClosureMode">Gap height</label>
+              <select id="gapClosureMode" class="select compact-select">
+                <option value="solve">solve pair/GJ closure</option>
+                <option value="manual">manual h/r_g</option>
+              </select>
+            </div>
             <div class="explorer-field explorer-fa">
-              <label for="gapHeightExp">log₁₀(h/r_g)</label>
+              <label for="gapHeightExp">log₁₀(h/r_g), manual</label>
               <div class="range-row">
                 <input id="gapHeightExp" type="range" min="-3" max="0" step="0.05" value="-1">
                 <span id="gapHeightOut" class="range-value">1.00e-1</span>
@@ -299,10 +306,24 @@
               </div>
             </div>
             <div class="explorer-field explorer-fa">
-              <label for="gapSoftEnergyExp">log₁₀ ε_soft, eV</label>
+              <label for="gapSoftMinExp">log₁₀ ε_min, eV</label>
               <div class="range-row">
-                <input id="gapSoftEnergyExp" type="range" min="-3" max="5" step="0.1" value="3">
-                <span id="gapSoftEnergyOut" class="range-value">1.00e+3</span>
+                <input id="gapSoftMinExp" type="range" min="-6" max="3" step="0.1" value="-3">
+                <span id="gapSoftMinOut" class="range-value">1.00e-3</span>
+              </div>
+            </div>
+            <div class="explorer-field explorer-fa">
+              <label for="gapSoftMaxExp">log₁₀ ε_max, eV</label>
+              <div class="range-row">
+                <input id="gapSoftMaxExp" type="range" min="-2" max="6" step="0.1" value="4">
+                <span id="gapSoftMaxOut" class="range-value">1.00e+4</span>
+              </div>
+            </div>
+            <div class="explorer-field explorer-fa">
+              <label for="gapPhotonIndex">photon-number index p</label>
+              <div class="range-row">
+                <input id="gapPhotonIndex" type="range" min="0.5" max="4" step="0.05" value="2">
+                <span id="gapPhotonIndexOut" class="range-value">2.00</span>
               </div>
             </div>
             <div class="explorer-field explorer-fa">
