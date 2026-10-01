@@ -439,7 +439,13 @@
   function finiteRange(...matrices) {
     const values = matrices.flatMap((matrix) => finiteValues(matrix));
     if (!values.length) return [-1, 1];
-    return [Math.min(...values), Math.max(...values)];
+    const minimum = Math.min(...values);
+    const maximum = Math.max(...values);
+    if (minimum === maximum) {
+      const padding = Math.max(0.5, Math.abs(minimum) * 0.05);
+      return [minimum - padding, maximum + padding];
+    }
+    return [minimum, maximum];
   }
 
   function robustSymmetricRange(matrix) {
