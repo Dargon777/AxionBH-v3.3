@@ -33,6 +33,10 @@
     electronMuMeV: "μ_V(e)",
     electronDensityMode: "plasma closure",
     electronDensityCm3: "nₑ,net",
+    accretionRadiusRg: "r/r_g",
+    radialVelocityFracC: "|v_r|/c",
+    scaleHeightRatio: "H/r",
+    electronFractionYe: "Y_e",
     nProfile: "n",
     axionMassEv: "mₐ",
     burstEnergy: "E_burst",
@@ -44,7 +48,9 @@
   const parameterIds = [
     "massSolar", "spin", "B0", "betaTurb", "faGev", "mEff", "mdot",
     "temperature", "electronMuMeV", "electronDensityMode",
-    "electronDensityCm3", "nProfile", "axionMassEv", "burstEnergy",
+    "electronDensityCm3", "accretionRadiusRg",
+    "radialVelocityFracC", "scaleHeightRatio",
+    "electronFractionYe", "nProfile", "axionMassEv", "burstEnergy",
     "burstIntervalYears", "burstDuration", "burstEfficiency"
   ];
 
@@ -222,10 +228,18 @@
     );
     $("burstManualFields").classList.toggle("hidden", mode !== "bosenova");
 
-    const densityClosure =
-      Number($("electronDensityMode").value) === 1;
-    $("electronMuMeV").disabled = densityClosure;
-    $("electronDensityCm3").disabled = !densityClosure;
+    const plasmaMode =
+      Number($("electronDensityMode").value);
+    $("electronMuMeV").disabled = plasmaMode !== 0;
+    $("electronDensityCm3").disabled = plasmaMode !== 1;
+    [
+      "accretionRadiusRg",
+      "radialVelocityFracC",
+      "scaleHeightRatio",
+      "electronFractionYe"
+    ].forEach((id) => {
+      $(id).disabled = plasmaMode !== 2;
+    });
   }
 
   function formatRatio(value) {
@@ -284,10 +298,17 @@
         ["ā", A.formatScientific(result.aBar) + " GeV"],
         ["μ₅", A.formatScientific(result.mu5) + " GeV"],
         ["η₅ = μ₅/T", A.formatScientific(result.eta5)],
-        ["Electron plasma closure", result.closure && result.closure.electronDensityMode === 1 ? "nₑ,net → μ_V" : "manual μ_V"],
+        ["Electron plasma closure",
+          result.closure && result.closure.electronDensityMode === 2
+            ? "Ṁ → nₑ,net → μ_V"
+            : result.closure && result.closure.electronDensityMode === 1
+              ? "nₑ,net → μ_V"
+              : "manual μ_V"],
         ["μ_V(e), resolved", result.closure ? A.formatScientific(result.closure.electronMuMeV) + " MeV" : "—"],
         ["nₑ,net, resolved", result.closure ? A.formatScientific(result.closure.resolvedElectronDensityCm3) + " cm⁻³" : "—"],
         ["e⁺ / e⁻", result.closure ? A.formatScientific(result.closure.positronFraction) : "—"],
+        ["Accretion ρ", result.closure && result.closure.accretion ? A.formatScientific(result.closure.accretion.massDensityGcm3) + " g/cm³" : "—"],
+        ["Inflow time", result.closure && result.closure.accretion ? A.formatDuration(result.closure.accretion.inflowTimeSeconds) : "—"],
         ["Finite-mass CVE suppression", result.closure ? A.formatScientific(result.closure.finiteMassSuppression) : "—"],
         ["σ_CVE,base", result.closure ? A.formatScientific(result.closure.cveBaseCoefficient) + " GeV²" : "—"],
         ["Closure D", result.closure ? A.formatScientific(result.closure.discriminant) : "—"],
@@ -337,7 +358,7 @@
       ordered[key] = Number(p[key]);
     });
     const source = JSON.stringify({
-      model: "AxionBH-v7.10",
+      model: "AxionBH-v8.0",
       mode,
       parameters: ordered
     });
@@ -999,7 +1020,7 @@
     if ($("mode").value !== "cme") {
       setAnalysisMeta(
         "Parameter Inference",
-        "v7.10 inverse solver сейчас определён для CVE closure"
+        "v8.0 inverse solver сейчас определён для CVE closure"
       );
       setAnalysisTable(
         '<div class="inference-empty">Переключи режим на CME, чтобы оценить дефицит и требуемые однопараметрические сдвиги.</div>'
@@ -1279,9 +1300,11 @@
 
     const p = params();
     const plasma = A.finiteMassPlasmaDiagnostics(p);
-    const closureMode = plasma.densityClosureActive
-      ? "density closure"
-      : "manual μ_V";
+    const closureMode = plasma.accretionClosureActive
+      ? "accretion closure"
+      : plasma.densityClosureActive
+        ? "density closure"
+        : "manual μ_V";
     const suppressionDex =
       plasma.suppression > 0
         ? Math.log10(plasma.suppression)
@@ -1354,7 +1377,7 @@
     ].join("");
 
     const note =
-      '<div class="missing-note"><strong>Scope:</strong> the coefficient is the free massive-Dirac bulk linear-response CVE at vector chemical potential μ_V. It does not determine μ_V for an accretion flow. The nonlinear μ₅² term in the AxionBH closure remains the legacy massless ansatz and is reported separately.</div>';
+      '<div class="missing-note"><strong>Scope:</strong> the coefficient is the free massive-Dirac bulk linear-response CVE at vector chemical potential μ_V. In accretion-closure mode μ_V is derived from a steady continuity proxy; the flow geometry and velocity remain explicit assumptions. The nonlinear μ₅² term in the AxionBH closure remains the legacy massless ansatz and is reported separately.</div>';
 
     setAnalysisTable(summary + table + note);
 
@@ -1418,6 +1441,68 @@
       responsive: true,
       displaylogo: false
     });
+  }
+
+
+  function renderValidity() {
+    const p = params();
+    const mode = $("mode").value;
+    const result = A.simulate(mode, p);
+    const report = A.modelValidityReport(
+      p,
+      mode,
+      result
+    );
+
+    setAnalysisMeta(
+      "Model Validity / Layer Map",
+      "Что выведено внутри принятой модели, что идеализировано, а что остаётся phenomenological ansatz"
+    );
+
+    const summary = [
+      '<div class="validity-summary">',
+      '<div><span>Model</span><strong>AxionBH ' +
+        report.modelVersion + '</strong></div>',
+      '<div><span>State schema</span><strong>v' +
+        report.stateSchemaVersion + '</strong></div>',
+      '<div><span>Mode</span><strong>' +
+        modeNames[mode] + '</strong></div>',
+      '<div><span>Plasma closure</span><strong>' +
+        (report.activePlasmaClosure || "n/a") +
+        '</strong></div>',
+      '</div>'
+    ].join("");
+
+    const rows = [
+      '<div class="analysis-row analysis-row-head validity"><span>Layer</span><span>Category</span><span>State</span><span>What it means</span></div>',
+      ...report.layers.map((layer) =>
+        '<div class="analysis-row validity"><strong>' +
+        layer.title +
+        '</strong><span class="validity-tag ' +
+        layer.category.replace(/[^a-z-]/g, "") +
+        '">' + layer.category +
+        '</span><span>' + layer.state +
+        '</span><span>' + layer.detail +
+        '</span></div>'
+      )
+    ].join("");
+
+    const accretion = report.accretion
+      ? '<div class="missing-note"><strong>Active accretion closure:</strong> ' +
+        'r=' + A.formatScientific(report.accretion.radiusRg, 3) +
+        ' r_g · H/r=' +
+        A.formatScientific(report.accretion.scaleHeightRatio, 3) +
+        ' · |v_r|/c=' +
+        A.formatScientific(report.accretion.radialVelocityFracC, 3) +
+        ' · Y_e=' +
+        A.formatScientific(report.accretion.electronFractionYe, 3) +
+        ' · nₑ,net=' +
+        A.formatScientific(report.accretion.netElectronDensityCm3, 3) +
+        ' cm⁻³.</div>'
+      : '';
+
+    setAnalysisTable(summary + rows + accretion);
+    if (window.Plotly) Plotly.purge("plot");
   }
 
   function renderChirality() {
@@ -1777,6 +1862,7 @@
         else if (kind === "inference") renderInference();
         else if (kind === "transport") renderTransport();
         else if (kind === "plasma") renderPlasma();
+        else if (kind === "validity") renderValidity();
         else if (kind === "chirality") renderChirality();
         else if (kind === "missing") renderMissingPhysics();
         else if (kind === "compare") renderComparison();
@@ -1824,7 +1910,9 @@
     const diagnostics = currentDiagnostics();
     const payload = {
       generatedAt: new Date().toISOString(),
-      model: "AxionBH research workbench v7.10",
+      model: "AxionBH research workbench v8.0",
+      modelVersion: A.MODEL_VERSION,
+      stateSchemaVersion: A.STATE_SCHEMA_VERSION,
       stateId: runStateId(state.lastMode, state.lastParams),
       mode: state.lastMode,
       parameters: state.lastParams,
@@ -1848,6 +1936,11 @@
             currentChiralityOptions()
           )
         : null,
+      validity: A.modelValidityReport(
+        state.lastParams,
+        state.lastMode,
+        state.lastResult
+      ),
       missingPhysics: {
         placement: $("missingPlacement").value,
         gainExp: Number($("missingGainExp").value),
@@ -1871,7 +1964,7 @@
     const lines = [
       "# AxionBH reproducibility report",
       "",
-      "- Model: AxionBH Research Workbench v7.10",
+      "- Model: AxionBH Research Workbench v8.0",
       "- Generated: " + new Date().toISOString(),
       "- State ID: " + stateId,
       "- Mode: " + modeNames[state.lastMode],
@@ -1899,6 +1992,20 @@
           ? " (" + A.formatScientific(Number(item.value), 6) + ")"
           : "";
       lines.push("- [" + item.level.toUpperCase() + "] " + item.message + value);
+    });
+
+    const validity = A.modelValidityReport(
+      state.lastParams,
+      state.lastMode,
+      state.lastResult
+    );
+    lines.push("", "## Model layers", "");
+    validity.layers.forEach((layer) => {
+      lines.push(
+        "- **" + layer.title + "** — " +
+        layer.category + " / " + layer.state +
+        ": " + layer.detail
+      );
     });
 
     lines.push(
@@ -2013,6 +2120,8 @@
     const url = new URL(window.location.href);
     url.search = "";
     url.searchParams.set("state", encodeState({
+      schemaVersion: A.STATE_SCHEMA_VERSION,
+      modelVersion: A.MODEL_VERSION,
       mode: $("mode").value,
       params: p,
       analysis: state.analysis,
@@ -2051,7 +2160,7 @@
       applyParameters(restored);
       if (modeNames[payload.mode]) $("mode").value = payload.mode;
 
-      if (["spin", "explorer", "sensitivity", "inference", "transport", "plasma", "chirality", "missing", "compare"].includes(payload.analysis)) {
+      if (["spin", "explorer", "sensitivity", "inference", "transport", "plasma", "validity", "chirality", "missing", "compare"].includes(payload.analysis)) {
         state.analysis = payload.analysis;
       }
 

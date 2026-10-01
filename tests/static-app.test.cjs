@@ -123,8 +123,8 @@ for (const feature of [
   );
 }
 
-assert.ok(html.includes("v7.10"));
-assert.ok(app.includes("AxionBH research workbench v7.10"));
+assert.ok(html.includes("v8.0"));
+assert.ok(app.includes("AxionBH research workbench v8.0"));
 
 
 for (const feature of [
@@ -271,3 +271,32 @@ for (const feature of [
     "missing v7.10 density closure feature: " + feature
   );
 }
+
+
+for (const id of [
+  "accretionRadiusRg",
+  "radialVelocityFracC",
+  "scaleHeightRatio",
+  "electronFractionYe"
+]) {
+  assert.ok(
+    html.includes('id="' + id + '"'),
+    "missing v8.0 accretion UI id: " + id
+  );
+}
+
+for (const feature of [
+  "MODEL_VERSION",
+  "STATE_SCHEMA_VERSION",
+  "accretionElectronDensity",
+  "modelValidityReport",
+  "renderValidity"
+]) {
+  assert.ok(
+    core.includes(feature) || app.includes(feature),
+    "missing v8.0 architecture feature: " + feature
+  );
+}
+
+assert.ok(html.includes('data-analysis="validity"'));
+assert.ok(html.includes('<option value="2">Ṁ → nₑ,net → μ_V</option>'));
