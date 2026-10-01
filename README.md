@@ -3,7 +3,7 @@
 
 AxionBH is an exploratory browser simulator for the black-hole / axion model documented in `index.html`.
 
-## Research Workbench v8.8.0
+## Research Workbench v8.9.0
 
 Open `sim.html` in a modern browser.
 
@@ -297,3 +297,29 @@ Key additions:
 The previous `LINE_PHOTON_RATE_OBS_511 = 5e42 s^-1` value is retained only as `LINE_PHOTON_RATE_OBS_511_LEGACY`; the canonical line-photon reference is now derived from the measured bulge flux.
 
 The transport kernel remains phenomenological. v8.8 does not yet solve pitch-angle scattering, diffusion/advection, Coulomb and ionisation losses, ISM phase transitions, or time-dependent injection. The `150 ± 50 pc` and `<=1.4 MeV` values are observationally motivated context for a specific propagation interpretation, not universal transport laws.
+
+
+## v8.9 reduced multiphase ISM transport
+
+v8.9 replaces the default manual smearing/survival/annihilation factors in the 511 Pipeline with a reduced physical transport model while preserving the v8.8 factors as an explicit legacy mode.
+
+The new ISM layer provides:
+
+- selectable warm-neutral, warm-ionized, hot-ionized, cold-neutral and diffuse-molecular phase presets;
+- a continuous collisional slowing model anchored to the Jean et al. (2009) order-of-magnitude result that a 1-MeV positron can travel roughly `30 kpc / n_H` along magnetic field lines before annihilation when low-energy MHD scattering is inefficient;
+- an exact free-electron two-photon in-flight annihilation cross section, integrated along the slowing trajectory;
+- a `diffusion + advection` reduced regime with `D(E)=D_10GeV (E/10 GeV)^delta`;
+- a separate `collisional / ballistic` regime that converts the field-aligned collisional path to a spatial displacement through an explicit magnetic-topology fraction;
+- a derived slowing time, field-line path, diffusive width, advection length and effective smearing scale;
+- competition between thermal annihilation and bulge escape using an explicit effective phase annihilation coefficient;
+- energy-dependent transport sweeps instead of only manual-smearing sweeps.
+
+The default WNM example at 1 MeV, `D(10 GeV)=1e28 cm^2 s^-1`, `delta=0.5` gives a slowing time of about `3.33e5 yr` and a diffusion+advection smearing of only about `12.8 pc`; the same collisional path interpreted through a 1% field-line displacement fraction gives a much larger spatial scale of order `4.7e2 pc`. This is intentionally exposed as a regime uncertainty rather than hidden inside a fitted coefficient.
+
+Important limitations:
+
+- Jean et al. (2009) explicitly warn that low-energy (<10 MeV) positrons can have weak resonant interaction with MHD waves, so the ordinary cosmic-ray-style diffusion law is exploratory when extrapolated to MeV energies.
+- The slowing law is not a full stopping-power table.
+- Neutral charge exchange, dust, detailed atomic/molecular chemistry and phase transitions are not yet integrated explicitly.
+- The effective thermal annihilation coefficient is a reduced phase parameter, not a complete reaction network.
+- Galactic magnetic topology and a 3D gas distribution are not solved.
