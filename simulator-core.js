@@ -26,7 +26,15 @@
     TURB_GAIN: 150.0,
     P_B: 0.7,
     P_T: 0.5,
-    P_M: 1.8
+    P_M: 1.8,
+    ALPHA_FINE: 1 / 137.035999084,
+    ELECTRON_MASS_GEV: 5.1099895e-4,
+    PROTON_MASS_GEV: 0.93827208816,
+    MU_B_GEV_INV: 296.3040539,
+    GAUSS_TO_GEV2: 1.95e-20,
+    CM_TO_GEV_INV: 5.067730716e13,
+    S_INV_TO_GEV: 6.582119569e-25,
+    K_TO_GEV: 8.617333262e-14
   });
 
   const DEFAULTS = Object.freeze({
@@ -115,23 +123,57 @@
     return c.C0_TURB * (1 + enhancement);
   }
 
+  function temperatureGeV(temperature) {
+    return assertFinitePositive(temperature, "temperature") * CONSTANTS.K_TO_GEV;
+  }
+
+  function magneticFieldGeV2(B) {
+    return assertFinitePositive(B, "B") * CONSTANTS.GAUSS_TO_GEV2;
+  }
+
+  function inverseLengthGeV(inverseCm, name = "inverseLength") {
+    return assertFinitePositive(inverseCm, name) / CONSTANTS.CM_TO_GEV_INV;
+  }
+
+  function lengthGeVInv(cm, name = "length") {
+    return assertFinitePositive(cm, name) * CONSTANTS.CM_TO_GEV_INV;
+  }
+
+  function angularFrequencyGeV(perSecond) {
+    return assertFinitePositive(perSecond, "angularFrequency", true) *
+      CONSTANTS.S_INV_TO_GEV;
+  }
+
+  function mu5Coupling(B, temperature, faGev, betaTurb) {
+    const field = magneticFieldGeV2(B);
+    const fa = assertFinitePositive(faGev, "faGev");
+    const ct = turbulentFactor(B, temperature, betaTurb);
+    return CONSTANTS.ALPHA_FINE *
+      CONSTANTS.MU_B_GEV_INV *
+      field *
+      ct /
+      fa;
+  }
+
   function mu5FromA(aBar, B, temperature, faGev, betaTurb) {
     if (!Number.isFinite(aBar) || aBar <= 0) return 0;
-    const c = CONSTANTS;
-    const faErg = assertFinitePositive(faGev, "faGev") * c.ERG_PER_GEV;
-    const thermal = c.KB * assertFinitePositive(temperature, "temperature");
-    const ct = turbulentFactor(B, temperature, betaTurb);
-    return (aBar / faErg) * (c.MU_B * B / thermal) * ct;
+    return aBar * mu5Coupling(B, temperature, faGev, betaTurb);
+  }
+
+  function chiralDegeneracy(mu5, temperature) {
+    const thermal = temperatureGeV(temperature);
+    const chemical = Number(mu5);
+    if (!Number.isFinite(chemical)) return Number.NaN;
+    return chemical / thermal;
   }
 
   function chiralConductivity(mu5, temperature) {
-    const c = CONSTANTS;
-    const thermal = c.KB * assertFinitePositive(temperature, "temperature");
-    const prefactor = (thermal * thermal) / Math.pow(c.HBAR * c.C, 3);
-    const chemical = (mu5 * mu5) / (2 * Math.PI * Math.PI);
-    const thermalTerm =
-      Math.pow(Math.PI * thermal, 2) / (6 * Math.PI * Math.PI);
-    const result = prefactor * (chemical + thermalTerm);
+    const thermal = temperatureGeV(temperature);
+    const chemical = Number(mu5);
+    if (!Number.isFinite(chemical)) return Number.POSITIVE_INFINITY;
+    const result =
+      (chemical * chemical) / (2 * Math.PI * Math.PI) +
+      (thermal * thermal) / 6;
     return Number.isFinite(result) ? result : Number.POSITIVE_INFINITY;
   }
 
@@ -148,112 +190,163 @@
       (geometry.rErgEquator - geometry.rPlus);
   }
 
-  function selfConsistencyRhs(aBar, p) {
+  function selfConsistencyCoefficients(input) {
+    const p = normalizeParams(input);
     const massG = p.massSolar * CONSTANTS.MSUN;
     const geometry = kerrGeometry(massG, p.spin);
-    const mu5 = mu5FromA(aBar, p.B0, p.temperature, p.faGev, p.betaTurb);
-    const sigma5 = chiralConductivity(mu5, p.temperature);
-    const faErg = p.faGev * CONSTANTS.ERG_PER_GEV;
-    const source = sigma5 * geometry.omegaH * geometry.rErgEquator * 1.2;
-    const denominator = faErg * p.mEff * p.mEff + 1e-300;
-    const rhs = source / denominator;
-    return Number.isFinite(rhs) ? rhs : Number.POSITIVE_INFINITY;
+    const fieldG = averageMagneticField(p.B0, geometry, p.nProfile);
+    const temperature = temperatureGeV(p.temperature);
+    const mass = inverseLengthGeV(p.mEff, "mEff");
+    const omega = angularFrequencyGeV(geometry.omegaH);
+    const effectiveLength =
+      lengthGeVInv(1.2 * geometry.rErgEquator, "effectiveLength");
+    const qMu = mu5Coupling(
+      fieldG,
+      p.temperature,
+      p.faGev,
+      p.betaTurb
+    );
+
+    // In natural units J5 = sigma5 * omega with
+    // sigma5 = mu5^2/(2*pi^2) + T^2/6 and mu5 = qMu * a.
+    // Using div J5 ~ J5/L_eff gives RHS = c0 + c2*a^2.
+    const scale = omega /
+      (p.faGev * mass * mass * effectiveLength + 1e-300);
+    const c0 = scale * temperature * temperature / 6;
+    const c2 = scale * qMu * qMu / (2 * Math.PI * Math.PI);
+    const discriminant = 1 - 4 * c0 * c2;
+
+    return {
+      geometry,
+      fieldG,
+      temperatureGeV: temperature,
+      mEffGeV: mass,
+      omegaGeV: omega,
+      effectiveLengthGeVInv: effectiveLength,
+      qMu,
+      c0,
+      c2,
+      discriminant
+    };
   }
 
-  function selfConsistencyResidual(aBar, p) {
-    const rhs = selfConsistencyRhs(aBar, p);
+  function selfConsistencyRhs(aBar, input) {
+    const coefficients = selfConsistencyCoefficients(input);
+    const value =
+      coefficients.c0 +
+      coefficients.c2 * Number(aBar) * Number(aBar);
+    return Number.isFinite(value) ? value : Number.POSITIVE_INFINITY;
+  }
+
+  function selfConsistencyResidual(aBar, input) {
+    const rhs = selfConsistencyRhs(aBar, input);
     if (!Number.isFinite(rhs)) return Number.NEGATIVE_INFINITY;
-    return aBar - rhs;
+    return Number(aBar) - rhs;
   }
 
-  function bisectRoot(fn, low, high, iterations = 90) {
-    let fl = fn(low);
-    let fh = fn(high);
-    if (!Number.isFinite(fl) && !Number.isFinite(fh)) return null;
-    if (fl === 0) return low;
-    if (fh === 0) return high;
-    if (Math.sign(fl) === Math.sign(fh)) return null;
+  function selfConsistencyBranches(input) {
+    const p = normalizeParams(input);
+    const coefficients = selfConsistencyCoefficients(p);
 
-    for (let i = 0; i < iterations; i += 1) {
-      const mid = Math.sqrt(low * high);
-      const fm = fn(mid);
-      if (fm === 0 || Math.abs(Math.log(high / low)) < 1e-12) return mid;
-      if (Math.sign(fm) === Math.sign(fl)) {
-        low = mid;
-        fl = fm;
-      } else {
-        high = mid;
-        fh = fm;
-      }
+    if (p.spin < CONSTANTS.SPIN_THRESHOLD) {
+      return {
+        ...coefficients,
+        active: false,
+        hasRealRoots: false,
+        stableRoot: 0,
+        unstableRoot: null,
+        stableSlope: null
+      };
     }
-    return Math.sqrt(low * high);
+
+    if (!Number.isFinite(coefficients.discriminant) ||
+        coefficients.discriminant < 0) {
+      return {
+        ...coefficients,
+        active: true,
+        hasRealRoots: false,
+        stableRoot: 0,
+        unstableRoot: null,
+        stableSlope: null
+      };
+    }
+
+    const sqrtD = Math.sqrt(Math.max(0, coefficients.discriminant));
+    const stableRoot =
+      2 * coefficients.c0 / Math.max(1 + sqrtD, 1e-300);
+    const unstableRoot =
+      coefficients.c2 > 0
+        ? (1 + sqrtD) / (2 * coefficients.c2)
+        : null;
+    const stableSlope =
+      2 * coefficients.c2 * stableRoot;
+
+    return {
+      ...coefficients,
+      active: true,
+      hasRealRoots: Number.isFinite(stableRoot) && stableRoot > 0,
+      stableRoot:
+        Number.isFinite(stableRoot) && stableRoot > 0 ? stableRoot : 0,
+      unstableRoot:
+        Number.isFinite(unstableRoot) && unstableRoot > 0
+          ? unstableRoot
+          : null,
+      stableSlope:
+        Number.isFinite(stableSlope) ? stableSlope : null
+    };
   }
 
   function findCloud(input) {
-    const p = normalizeParams(input);
-    if (p.spin < CONSTANTS.SPIN_THRESHOLD) return 0;
-
-    const residual = (x) => selfConsistencyResidual(x, p);
-    const roots = [];
-    let previousX = 1e-32;
-    let previousF = residual(previousX);
-
-    for (let i = 1; i <= 320; i += 1) {
-      const exponent = -32 + (i / 320) * 44;
-      const x = Math.pow(10, exponent);
-      const fx = residual(x);
-
-      if (Number.isFinite(previousF) || Number.isFinite(fx)) {
-        if (Math.sign(previousF) !== Math.sign(fx)) {
-          const root = bisectRoot(residual, previousX, x);
-          if (root && Number.isFinite(root) && root > 1e-30) roots.push(root);
-        }
-      }
-      previousX = x;
-      previousF = fx;
-    }
-
-    if (!roots.length) return 0;
-    return Math.max(...roots);
+    return selfConsistencyBranches(input).stableRoot;
   }
 
   function cme(input) {
     const p = normalizeParams(input);
-    const massG = p.massSolar * CONSTANTS.MSUN;
-    const geometry = kerrGeometry(massG, p.spin);
+    const closure = selfConsistencyBranches(p);
+    const geometry = closure.geometry;
 
     if (p.spin < CONSTANTS.SPIN_THRESHOLD) {
       return {
         mode: "cme",
         aBar: 0,
         mu5: 0,
+        eta5: 0,
         kappa: 0,
         luminosity: 0,
         ratio511: 0,
-        avgB: averageMagneticField(p.B0, geometry, p.nProfile),
+        avgB: closure.fieldG,
         geometry,
+        closure,
         thresholdPassed: false
       };
     }
 
-    const aBar = findCloud(p);
-    const avgB = averageMagneticField(p.B0, geometry, p.nProfile);
-    const mu5 = mu5FromA(aBar, avgB, p.temperature, p.faGev, p.betaTurb);
-    const kappa = mu5 / (CONSTANTS.MP * CONSTANTS.C * CONSTANTS.C);
+    const aBar = closure.stableRoot;
+    const avgB = closure.fieldG;
+    const mu5 = mu5FromA(
+      aBar,
+      avgB,
+      p.temperature,
+      p.faGev,
+      p.betaTurb
+    );
+    const eta5 = chiralDegeneracy(mu5, p.temperature);
+    const kappa = mu5 / CONSTANTS.PROTON_MASS_GEV;
     const luminosity = kappa * p.mdot * CONSTANTS.C * CONSTANTS.C;
-    const safeLuminosity = Number.isFinite(luminosity) && luminosity > 0
-      ? luminosity
-      : 0;
+    const safeLuminosity =
+      Number.isFinite(luminosity) && luminosity > 0 ? luminosity : 0;
 
     return {
       mode: "cme",
       aBar,
       mu5,
+      eta5,
       kappa: Number.isFinite(kappa) && kappa > 0 ? kappa : 0,
       luminosity: safeLuminosity,
       ratio511: safeLuminosity / CONSTANTS.L_OBS_511,
       avgB,
       geometry,
+      closure,
       thresholdPassed: true
     };
   }
@@ -704,31 +797,51 @@
     }
 
     if (mode === "cme") {
+      add(
+        "info",
+        "unit_system",
+        "CME closure решается после явного перевода B, T, Ω, m_eff и L_eff в natural units (ℏ=c=k_B=1)."
+      );
+
       if (p.spin < CONSTANTS.SPIN_THRESHOLD) {
         add(
           "info",
           "spin_threshold",
-          "Спин ниже порога CME в текущей реализации; стационарная ветка принудительно даёт нулевой выход.",
+          "Спин ниже феноменологического порога CME; этот gate задан моделью и не выводится из quadratic closure.",
           p.spin
         );
-      } else if (!(Number(r.aBar) > 0)) {
+      } else if (!r.closure || !r.closure.hasRealRoots) {
         add(
           "warning",
-          "cloud_root",
-          "Выше спинового порога не найден положительный самосогласованный корень поля ā.",
-          Number(r.aBar)
+          "closure_discriminant",
+          "Quadratic closure не имеет положительной вещественной устойчивой ветви.",
+          r.closure ? Number(r.closure.discriminant) : null
         );
       } else {
         const residual = selfConsistencyResidual(Number(r.aBar), p);
         const relativeResidual =
           Math.abs(residual) / Math.max(Math.abs(Number(r.aBar)), 1e-300);
         add(
-          relativeResidual <= 1e-8 ? "ok" : "warning",
+          relativeResidual <= 1e-10 ? "ok" : "warning",
           "root_residual",
-          relativeResidual <= 1e-8
-            ? "Самосогласованный корень CME сошёлся по относительному residual."
-            : "Относительный residual самосогласованного корня выше диагностического порога 1e-8.",
+          relativeResidual <= 1e-10
+            ? "Устойчивая CME-ветвь удовлетворяет самосогласованному уравнению."
+            : "Относительный residual устойчивой CME-ветви выше 1e-10.",
           relativeResidual
+        );
+        add(
+          Number(r.closure.stableSlope) < 0.8 ? "ok" : "warning",
+          "fixed_point_slope",
+          Number(r.closure.stableSlope) < 0.8
+            ? "Малая ветвь устойчива как fixed point (|F′| < 0.8)."
+            : "Малая ветвь приближается к границе fixed-point устойчивости.",
+          Number(r.closure.stableSlope)
+        );
+        add(
+          "info",
+          "closure_discriminant",
+          "Дискриминант quadratic closure; D ≥ 0 означает вещественные ветви.",
+          Number(r.closure.discriminant)
         );
       }
 
@@ -811,10 +924,20 @@
     normalizeParams,
     kerrGeometry,
     turbulentFactor,
+    temperatureGeV,
+    magneticFieldGeV2,
+    inverseLengthGeV,
+    lengthGeVInv,
+    angularFrequencyGeV,
+    mu5Coupling,
     mu5FromA,
+    chiralDegeneracy,
     chiralConductivity,
     averageMagneticField,
+    selfConsistencyCoefficients,
+    selfConsistencyRhs,
     selfConsistencyResidual,
+    selfConsistencyBranches,
     findCloud,
     cme,
     manualBosenova,

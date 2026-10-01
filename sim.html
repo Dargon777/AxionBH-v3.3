@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="AxionBH interactive browser simulator and parameter-analysis workbench.">
-  <title>AxionBH — Research Workbench v7.3</title>
+  <title>AxionBH — Research Workbench v7.4</title>
   <link rel="stylesheet" href="simulator.css">
   <script defer src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <script defer src="simulator-core.js"></script>
@@ -15,7 +15,7 @@
     <div class="topbar-inner">
       <a class="brand" href="index.html">
         <span class="brand-mark">A</span>
-        <span>AxionBH<small>research workbench · v7.3</small></span>
+        <span>AxionBH<small>research workbench · v7.4</small></span>
       </a>
       <nav class="nav">
         <a href="index.html">Теория</a>
@@ -30,7 +30,7 @@
       <div>
         <div class="eyebrow">AxionBH · research workbench</div>
         <h1>Аксионное облако вокруг вращающейся чёрной дыры</h1>
-        <p>Локальный интерактивный расчёт CME, Bosenova, суперрадиантного и гибридного режимов — теперь со сравнением сценариев, картой параметров, анализом чувствительности и диагностикой воспроизводимости.</p>
+        <p>Локальный интерактивный расчёт CME, Bosenova, суперрадиантного и гибридного режимов — теперь со сравнением сценариев, картой параметров, анализом чувствительности, диагностикой воспроизводимости и размерностно согласованной CME closure.</p>
       </div>
       <div class="status-stack">
         <span class="badge"><span id="runStatusDot" class="dot"></span><span id="runStatus">Движок готов</span></span>
@@ -39,14 +39,14 @@
     </section>
 
     <div class="notice">
-      <strong>Исследовательский калькулятор.</strong> AxionBH реализует текущие допущения модели и не является подтверждённым инструментом наблюдательной астрофизики. Карты и sensitivity показывают поведение именно этой реализации, а не доверительные интервалы природы.
+      <strong>Исследовательский калькулятор.</strong> AxionBH реализует текущие допущения модели и не является подтверждённым инструментом наблюдательной астрофизики. В v7.4 CME-ветка считается в единой системе natural units; порог a/M = 0.35 остаётся феноменологическим gate, а не выведенным результатом.
     </div>
 
     <section class="workspace">
       <aside class="panel controls">
         <div class="panel-title">
           <h2>Параметры</h2>
-          <span class="muted">v7.3</span>
+          <span class="muted">v7.4</span>
         </div>
 
         <div class="field">
