@@ -30,6 +30,7 @@
     mEff: "m_eff",
     mdot: "Ṁ",
     temperature: "T",
+    electronMuMeV: "μ_V(e)",
     nProfile: "n",
     axionMassEv: "mₐ",
     burstEnergy: "E_burst",
@@ -40,7 +41,7 @@
 
   const parameterIds = [
     "massSolar", "spin", "B0", "betaTurb", "faGev", "mEff", "mdot",
-    "temperature", "nProfile", "axionMassEv", "burstEnergy",
+    "temperature", "electronMuMeV", "nProfile", "axionMassEv", "burstEnergy",
     "burstIntervalYears", "burstDuration", "burstEfficiency"
   ];
 
@@ -275,6 +276,9 @@
         ["ā", A.formatScientific(result.aBar) + " GeV"],
         ["μ₅", A.formatScientific(result.mu5) + " GeV"],
         ["η₅ = μ₅/T", A.formatScientific(result.eta5)],
+        ["μ_V(e)", result.closure ? A.formatScientific(result.closure.electronMuGeV * 1e3) + " MeV" : "—"],
+        ["Finite-mass CVE suppression", result.closure ? A.formatScientific(result.closure.finiteMassSuppression) : "—"],
+        ["σ_CVE,base", result.closure ? A.formatScientific(result.closure.cveBaseCoefficient) + " GeV²" : "—"],
         ["Closure D", result.closure ? A.formatScientific(result.closure.discriminant) : "—"],
         ["Fixed-point slope", result.closure ? A.formatScientific(result.closure.stableSlope) : "—"],
         ["r₊", A.formatScientific(result.geometry.rPlus) + " cm"],
@@ -322,7 +326,7 @@
       ordered[key] = Number(p[key]);
     });
     const source = JSON.stringify({
-      model: "AxionBH-v7.8",
+      model: "AxionBH-v7.9",
       mode,
       parameters: ordered
     });
@@ -984,7 +988,7 @@
     if ($("mode").value !== "cme") {
       setAnalysisMeta(
         "Parameter Inference",
-        "v7.8 inverse solver сейчас определён для CVE closure"
+        "v7.9 inverse solver сейчас определён для CVE closure"
       );
       setAnalysisTable(
         '<div class="inference-empty">Переключи режим на CME, чтобы оценить дефицит и требуемые однопараметрические сдвиги.</div>'
@@ -1124,7 +1128,7 @@
 
     setAnalysisMeta(
       "Anomalous Transport",
-      "Axial CVE: J₅ ∥ ω · magnetic CME: j ∥ B · величины в natural units, токи не складываются"
+      "Axial CVE: massive free-Dirac base + legacy μ₅² term · magnetic CME: j ∥ B"
     );
 
     const ratioText = Number.isFinite(transport.magnitudeRatio)
@@ -1147,6 +1151,11 @@
       '<div><span>|jCME|</span><strong>' +
         A.formatScientific(Math.abs(transport.jCME), 3) + ' GeV³</strong></div>',
       '<div><span>|CME/CVE|</span><strong>' + ratioText + '</strong></div>',
+      '<div><span>mass suppression</span><strong>' +
+        A.formatScientific(
+          transport.finiteMassSuppression,
+          3
+        ) + '</strong></div>',
       '</div>'
     ].join("");
 
@@ -1241,6 +1250,128 @@
       horizonSeconds: chiralityHorizonValue(),
       electricAlignment: chiralityElectricAlignment()
     };
+  }
+
+
+  function renderPlasma() {
+    if ($("mode").value !== "cme") {
+      setAnalysisMeta(
+        "Finite-Mass Plasma",
+        "massive Dirac CVE diagnostic is attached to the stationary CVE closure"
+      );
+      setAnalysisTable(
+        '<div class="inference-empty">Переключи режим на CVE closure.</div>'
+      );
+      if (window.Plotly) Plotly.purge("plot");
+      return;
+    }
+
+    const p = params();
+    const plasma = A.finiteMassPlasmaDiagnostics(p);
+    const suppressionDex =
+      plasma.suppression > 0
+        ? Math.log10(plasma.suppression)
+        : -Infinity;
+    const pairDex =
+      plasma.pairSymmetricSuppression > 0
+        ? Math.log10(plasma.pairSymmetricSuppression)
+        : -Infinity;
+
+    setAnalysisMeta(
+      "Finite-Mass Plasma",
+      "free massive Dirac bulk axial-CVE coefficient · μ_V is vector electron chemical potential"
+    );
+
+    const summary = [
+      '<div class="plasma-summary">',
+      '<div><span>mₑ/T</span><strong>' +
+        A.formatScientific(plasma.massOverT, 3) + '</strong></div>',
+      '<div><span>μ_V/T</span><strong>' +
+        A.formatScientific(plasma.vectorMuOverT, 3) + '</strong></div>',
+      '<div><span>σ massive</span><strong>' +
+        A.formatScientific(plasma.sigmaMassive, 3) +
+        ' GeV²</strong></div>',
+      '<div><span>σ massless ref</span><strong>' +
+        A.formatScientific(plasma.sigmaMassless, 3) +
+        ' GeV²</strong></div>',
+      '<div><span>suppression</span><strong>' +
+        A.formatScientific(plasma.suppression, 3) + '</strong></div>',
+      '<div><span>log₁₀ suppression</span><strong>' +
+        (Number.isFinite(suppressionDex)
+          ? suppressionDex.toFixed(2)
+          : "−∞") + ' dex</strong></div>',
+      '</div>'
+    ].join("");
+
+    const table = [
+      '<div class="analysis-row analysis-row-head plasma"><span>Case</span><span>μ_V(e)</span><span>Suppression</span><span>Interpretation</span></div>',
+      '<div class="analysis-row plasma"><strong>Selected</strong><span>' +
+        A.formatScientific(p.electronMuMeV, 3) +
+        ' MeV</span><span>' +
+        A.formatScientific(plasma.suppression, 3) +
+        '</span><span>used by the closure</span></div>',
+      '<div class="analysis-row plasma"><strong>Pair-symmetric</strong><span>0 MeV</span><span>' +
+        A.formatScientific(
+          plasma.pairSymmetricSuppression,
+          3
+        ) +
+        '</span><span>' +
+        (Number.isFinite(pairDex)
+          ? pairDex.toFixed(2) + ' dex'
+          : 'underflow') +
+        ' vs massless T²/6</span></div>'
+    ].join("");
+
+    const note =
+      '<div class="missing-note"><strong>Scope:</strong> the coefficient is the free massive-Dirac bulk linear-response CVE at vector chemical potential μ_V. It does not determine μ_V for an accretion flow. The nonlinear μ₅² term in the AxionBH closure remains the legacy massless ansatz and is reported separately.</div>';
+
+    setAnalysisTable(summary + table + note);
+
+    if (!window.Plotly) return;
+
+    const maxMu = Math.max(2, p.electronMuMeV * 1.25);
+    const sweep = A.finiteMassPlasmaSweep(p, {
+      maxMuMeV: maxMu,
+      points: 110
+    });
+    const valid = sweep.points.filter((point) =>
+      Number.isFinite(point.suppression) &&
+      point.suppression > 0
+    );
+    const colors = themeColors();
+    const layout = plotLayout(
+      "μ_V(e), MeV",
+      "log₁₀(σ_massive / σ_massless)"
+    );
+    layout.shapes = [{
+      type: "line",
+      x0: A.CONSTANTS.ELECTRON_MASS_GEV * 1e3,
+      x1: A.CONSTANTS.ELECTRON_MASS_GEV * 1e3,
+      y0: valid.length
+        ? Math.min(...valid.map((point) =>
+            Math.log10(point.suppression)
+          ))
+        : -1,
+      y1: 0,
+      line: { color: colors.muted, dash: "dash", width: 1 }
+    }];
+
+    Plotly.react("plot", [{
+      type: "scatter",
+      mode: "lines",
+      x: valid.map((point) => point.electronMuMeV),
+      y: valid.map((point) =>
+        Math.log10(point.suppression)
+      ),
+      line: { color: colors.accent2, width: 2 },
+      hovertemplate:
+        "μ_V=%{x:.4f} MeV" +
+        "<br>log₁₀ suppression=%{y:.2f}" +
+        "<extra></extra>"
+    }], layout, {
+      responsive: true,
+      displaylogo: false
+    });
   }
 
   function renderChirality() {
@@ -1454,10 +1585,35 @@
 
     if (!window.Plotly) return;
 
+    const criticalExp =
+      Number.isFinite(ceiling.criticalUpstreamProduct) &&
+      ceiling.criticalUpstreamProduct > 0
+        ? Math.log10(ceiling.criticalUpstreamProduct)
+        : 60;
+    const sweepMax = placement === "conversion"
+      ? Math.min(
+          220,
+          Math.max(
+            60,
+            Number.isFinite(
+              ceiling.requiredPostGainAtCurrent
+            ) &&
+            ceiling.requiredPostGainAtCurrent > 0
+              ? Math.log10(
+                  ceiling.requiredPostGainAtCurrent
+                ) * 1.02
+              : 60
+          )
+        )
+      : Math.min(
+          220,
+          Math.max(60, criticalExp * 1.02)
+        );
+
     const sweep = A.missingPhysicsSweep(p, placement, {
       minExp: 0,
-      maxExp: 60,
-      steps: 181
+      maxExp: sweepMax,
+      steps: 220
     });
     const valid = sweep.points.filter((point) =>
       Number.isFinite(point.ratio511) && point.ratio511 > 0
@@ -1474,7 +1630,7 @@
     layout.shapes = [{
       type: "line",
       x0: 0,
-      x1: 60,
+      x1: sweepMax,
       y0: 0,
       y1: 0,
       line: { color: colors.muted, dash: "dash", width: 1 }
@@ -1574,6 +1730,7 @@
         else if (kind === "sensitivity") renderSensitivity();
         else if (kind === "inference") renderInference();
         else if (kind === "transport") renderTransport();
+        else if (kind === "plasma") renderPlasma();
         else if (kind === "chirality") renderChirality();
         else if (kind === "missing") renderMissingPhysics();
         else if (kind === "compare") renderComparison();
@@ -1621,7 +1778,7 @@
     const diagnostics = currentDiagnostics();
     const payload = {
       generatedAt: new Date().toISOString(),
-      model: "AxionBH research workbench v7.8",
+      model: "AxionBH research workbench v7.9",
       stateId: runStateId(state.lastMode, state.lastParams),
       mode: state.lastMode,
       parameters: state.lastParams,
@@ -1668,7 +1825,7 @@
     const lines = [
       "# AxionBH reproducibility report",
       "",
-      "- Model: AxionBH Research Workbench v7.8",
+      "- Model: AxionBH Research Workbench v7.9",
       "- Generated: " + new Date().toISOString(),
       "- State ID: " + stateId,
       "- Mode: " + modeNames[state.lastMode],
@@ -1848,7 +2005,7 @@
       applyParameters(restored);
       if (modeNames[payload.mode]) $("mode").value = payload.mode;
 
-      if (["spin", "explorer", "sensitivity", "inference", "transport", "chirality", "missing", "compare"].includes(payload.analysis)) {
+      if (["spin", "explorer", "sensitivity", "inference", "transport", "plasma", "chirality", "missing", "compare"].includes(payload.analysis)) {
         state.analysis = payload.analysis;
       }
 
@@ -1891,7 +2048,7 @@
           $("missingPlacement").value = payload.missingPhysics.placement;
         }
         const gainExp = Number(payload.missingPhysics.gainExp);
-        if (Number.isFinite(gainExp) && gainExp >= 0 && gainExp <= 60) {
+        if (Number.isFinite(gainExp) && gainExp >= 0 && gainExp <= 220) {
           $("missingGainExp").value = gainExp;
         }
       }
