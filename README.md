@@ -3,7 +3,7 @@
 
 AxionBH is an exploratory browser simulator for the black-hole / axion model documented in `index.html`.
 
-## Research Workbench v8.7.0
+## Research Workbench v8.8.0
 
 Open `sim.html` in a modern browser.
 
@@ -272,3 +272,28 @@ The new layer:
 The closure solver deliberately returns `closure-not-found` if either criterion fails throughout the configured `10^-3 <= h/r_g <= 1` interval.
 
 This is still an exploratory stationary closure. The photon spectrum is not a fitted Sgr A* SED, the IC treatment does not use the exact Klein-Nishina redistribution kernel, angular radiative transfer is simplified, and secondary pairs are not evolved recursively. GRPIC calculations show that real black-hole spark gaps can be intermittent even when steady algebraic closure criteria appear possible.
+
+
+## v8.8 positron transport and 511-keV observable pipeline
+
+v8.8 separates near-source positron production from the observable Galactic-bulge 511-keV signal.
+
+The new pipeline is
+
+`production -> source escape -> spatial retention -> thermalisation survival -> annihilation -> positronium branching -> 511-keV line flux`.
+
+Key additions:
+
+- source selection between the current mode's positron-rate output, the self-consistent v8.7 gap cascade, and Schwinger production evaluated at a solved gap;
+- explicit source-escape, thermalisation-survival and annihilation fractions;
+- an isotropic 3D Gaussian transport-kernel proxy with an adjustable smearing scale and bulge acceptance radius;
+- an observational morphology context of `150 ± 50 pc` from Siegert et al. (2021), stored as a diagnostic rather than a fitted diffusion coefficient;
+- an injection-energy diagnostic using the scenario-dependent `<= 1.4 MeV` propagation interpretation from the same morphology analysis;
+- explicit positronium branching: direct annihilation gives two 511-keV photons, para-positronium gives two line photons in 1/4 of Ps decays, and ortho-positronium gives a three-photon continuum in 3/4;
+- a calibrated bulge line-flux reference of `(0.96 ± 0.07)e-3 ph cm^-2 s^-1` from Siegert et al. (2016);
+- conversion of that flux to a line-photon luminosity using the same effective bulge distance of `8.5 kpc`, giving about `8.30e42 photons/s`;
+- separate reporting of production rate, annihilation rate, line-photon rate and predicted Earth flux.
+
+The previous `LINE_PHOTON_RATE_OBS_511 = 5e42 s^-1` value is retained only as `LINE_PHOTON_RATE_OBS_511_LEGACY`; the canonical line-photon reference is now derived from the measured bulge flux.
+
+The transport kernel remains phenomenological. v8.8 does not yet solve pitch-angle scattering, diffusion/advection, Coulomb and ionisation losses, ISM phase transitions, or time-dependent injection. The `150 ± 50 pc` and `<=1.4 MeV` values are observationally motivated context for a specific propagation interpretation, not universal transport laws.
