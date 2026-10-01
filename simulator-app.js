@@ -322,7 +322,7 @@
       ordered[key] = Number(p[key]);
     });
     const source = JSON.stringify({
-      model: "AxionBH-v7.5",
+      model: "AxionBH-v7.6",
       mode,
       parameters: ordered
     });
@@ -984,7 +984,7 @@
     if ($("mode").value !== "cme") {
       setAnalysisMeta(
         "Parameter Inference",
-        "v7.5 inverse solver сейчас определён для CME closure"
+        "v7.6 inverse solver сейчас определён для CME closure"
       );
       setAnalysisTable(
         '<div class="inference-empty">Переключи режим на CME, чтобы оценить дефицит и требуемые однопараметрические сдвиги.</div>'
@@ -1071,6 +1071,161 @@
     }], layout, { responsive: true, displaylogo: false });
   }
 
+
+  const missingPlacementNames = {
+    source: "Closure source",
+    chiral: "Axion → μ₅ coupling",
+    conversion: "Post-closure e⁺ conversion"
+  };
+
+  function missingGainValue() {
+    return Math.pow(10, Number($("missingGainExp").value));
+  }
+
+  function updateMissingGainLabel() {
+    $("missingGainOut").textContent =
+      A.formatScientific(missingGainValue(), 2) + "×";
+  }
+
+  function missingPhysicsRow(row) {
+    if (row.placement === "conversion") {
+      return '<div class="analysis-row missing"><strong>' +
+        missingPlacementNames[row.placement] +
+        '</strong><span>SOLVABLE</span><span>' +
+        A.formatScientific(row.requiredGain, 3) + '×</span><span>' +
+        A.formatScientific(row.achievedMetric, 3) +
+        '</span></div>';
+    }
+
+    return '<div class="analysis-row missing"><strong>' +
+      missingPlacementNames[row.placement] +
+      '</strong><span>CEILING</span><span>' +
+      A.formatScientific(row.criticalGain, 3) + '×</span><span>' +
+      row.remainingDeficitOrders.toFixed(2) + ' dex short</span></div>';
+  }
+
+  function renderMissingPhysics() {
+    if ($("mode").value !== "cme") {
+      setAnalysisMeta(
+        "Missing Physics Lab",
+        "Феноменологические gain-каналы определены только для CME closure"
+      );
+      setAnalysisTable(
+        '<div class="inference-empty">Переключи режим на CME. Эта вкладка не меняет основной расчёт и служит только диагностикой.</div>'
+      );
+      if (window.Plotly) Plotly.purge("plot");
+      return;
+    }
+
+    const p = params();
+    const analysis = A.missingPhysicsAnalysis(p, 1);
+    const ceiling = analysis.ceiling;
+    const placement = $("missingPlacement").value;
+    const gain = missingGainValue();
+    const selected = A.missingPhysicsPoint(p, placement, gain);
+
+    setAnalysisMeta(
+      "Missing Physics Lab",
+      "g_extra — феноменологический диагностический множитель; основной CME-результат остаётся неизменным"
+    );
+
+    const selectedState = selected.closureValid
+      ? A.formatScientific(selected.ratio511, 3)
+      : "closure invalid";
+
+    const summary = [
+      '<div class="missing-summary">',
+      '<div><span>Baseline gap</span><strong>' +
+        ceiling.currentDeficitOrders.toFixed(2) + ' dex</strong></div>',
+      '<div><span>Closure ceiling</span><strong>' +
+        A.formatScientific(ceiling.ratioMax, 3) + ' L₅₁₁</strong></div>',
+      '<div><span>Ceiling gap</span><strong>' +
+        ceiling.ceilingDeficitOrders.toFixed(2) + ' dex</strong></div>',
+      '<div><span>μ₅ max</span><strong>' +
+        A.formatScientific(ceiling.mu5Max, 3) + ' GeV</strong></div>',
+      '<div><span>Selected g_extra</span><strong>' +
+        A.formatScientific(gain, 3) + '×</strong></div>',
+      '<div><span>Selected L/L₅₁₁</span><strong>' +
+        selectedState + '</strong></div>',
+      '</div>'
+    ].join("");
+
+    const table = [
+      '<div class="analysis-row analysis-row-head missing"><span>Placement</span><span>Limit</span><span>Gain</span><span>Outcome</span></div>',
+      ...analysis.rows.map(missingPhysicsRow)
+    ].join("");
+
+    const headroomDex = Number.isFinite(ceiling.upstreamHeadroom)
+      ? Math.log10(ceiling.upstreamHeadroom).toFixed(2)
+      : "∞";
+
+    const note =
+      '<div class="missing-note"><strong>Analytic ceiling:</strong> ' +
+      'D ≥ 0 forces μ₅ ≤ πT/√3. Therefore any multiplicative gain placed upstream ' +
+      'inside the present quadratic closure can add at most ' +
+      headroomDex +
+      ' dex over the current run. Even at that boundary a downstream factor of ≈' +
+      A.formatScientific(ceiling.requiredPostGainAtCeiling, 3) +
+      '× is still required.</div>';
+
+    setAnalysisTable(summary + table + note);
+
+    if (!window.Plotly) return;
+
+    const sweep = A.missingPhysicsSweep(p, placement, {
+      minExp: 0,
+      maxExp: 60,
+      steps: 181
+    });
+    const valid = sweep.points.filter((point) =>
+      Number.isFinite(point.ratio511) && point.ratio511 > 0
+    );
+
+    const x = valid.map((point) => point.exponent);
+    const y = valid.map((point) => Math.log10(point.ratio511));
+    const selectedY =
+      selected.closureValid && selected.ratio511 > 0
+        ? Math.log10(selected.ratio511)
+        : null;
+    const colors = themeColors();
+    const layout = plotLayout("log₁₀ g_extra", "log₁₀ L/L₅₁₁");
+    layout.shapes = [{
+      type: "line",
+      x0: 0,
+      x1: 60,
+      y0: 0,
+      y1: 0,
+      line: { color: colors.muted, dash: "dash", width: 1 }
+    }];
+
+    const traces = [{
+      type: "scatter",
+      mode: "lines",
+      x,
+      y,
+      line: { color: colors.accent, width: 2 },
+      hovertemplate:
+        "log₁₀ g=%{x:.2f}<br>log₁₀ L/L₅₁₁=%{y:.2f}<extra></extra>"
+    }];
+
+    if (selectedY !== null) {
+      traces.push({
+        type: "scatter",
+        mode: "markers",
+        x: [Number($("missingGainExp").value)],
+        y: [selectedY],
+        marker: { size: 10, color: colors.accent2 },
+        hovertemplate:
+          "selected<br>log₁₀ g=%{x:.2f}<br>log₁₀ L/L₅₁₁=%{y:.2f}<extra></extra>"
+      });
+    }
+
+    Plotly.react("plot", traces, layout, {
+      responsive: true,
+      displaylogo: false
+    });
+  }
+
   function renderComparison() {
     const mode = $("mode").value;
     const scenarios = A.comparePresets(mode);
@@ -1126,6 +1281,7 @@
     });
 
     $("explorerControls").classList.toggle("hidden", kind !== "explorer");
+    $("missingPhysicsControls").classList.toggle("hidden", kind !== "missing");
     $("plot").classList.toggle("plot-tall", kind === "explorer");
 
     setAnalysisBusy(true);
@@ -1134,6 +1290,7 @@
         if (kind === "explorer") renderParameterExplorer();
         else if (kind === "sensitivity") renderSensitivity();
         else if (kind === "inference") renderInference();
+        else if (kind === "missing") renderMissingPhysics();
         else if (kind === "compare") renderComparison();
         else renderSpinAnalysis();
       } catch (error) {
@@ -1179,7 +1336,7 @@
     const diagnostics = currentDiagnostics();
     const payload = {
       generatedAt: new Date().toISOString(),
-      model: "AxionBH research workbench v7.5",
+      model: "AxionBH research workbench v7.6",
       stateId: runStateId(state.lastMode, state.lastParams),
       mode: state.lastMode,
       parameters: state.lastParams,
@@ -1190,6 +1347,13 @@
         reference: $("explorerReference").value,
         faExp: Number($("explorerFaExp").value),
         resolution: $("explorerResolution").value
+      },
+      missingPhysics: {
+        placement: $("missingPlacement").value,
+        gainExp: Number($("missingGainExp").value),
+        analysis: state.lastMode === "cme"
+          ? A.missingPhysicsAnalysis(state.lastParams, 1)
+          : null
       },
       note: "Exploratory model output; not a validated astrophysical inference."
     };
@@ -1207,7 +1371,7 @@
     const lines = [
       "# AxionBH reproducibility report",
       "",
-      "- Model: AxionBH Research Workbench v7.5",
+      "- Model: AxionBH Research Workbench v7.6",
       "- Generated: " + new Date().toISOString(),
       "- State ID: " + stateId,
       "- Mode: " + modeNames[state.lastMode],
@@ -1357,6 +1521,10 @@
         reference: $("explorerReference").value,
         faExp: Number($("explorerFaExp").value),
         resolution: $("explorerResolution").value
+      },
+      missingPhysics: {
+        placement: $("missingPlacement").value,
+        gainExp: Number($("missingGainExp").value)
       }
     }));
 
@@ -1377,7 +1545,7 @@
       applyParameters(restored);
       if (modeNames[payload.mode]) $("mode").value = payload.mode;
 
-      if (["spin", "explorer", "sensitivity", "inference", "compare"].includes(payload.analysis)) {
+      if (["spin", "explorer", "sensitivity", "inference", "missing", "compare"].includes(payload.analysis)) {
         state.analysis = payload.analysis;
       }
 
@@ -1397,7 +1565,18 @@
         }
       }
 
+      if (payload.missingPhysics && typeof payload.missingPhysics === "object") {
+        if (missingPlacementNames[payload.missingPhysics.placement]) {
+          $("missingPlacement").value = payload.missingPhysics.placement;
+        }
+        const gainExp = Number(payload.missingPhysics.gainExp);
+        if (Number.isFinite(gainExp) && gainExp >= 0 && gainExp <= 60) {
+          $("missingGainExp").value = gainExp;
+        }
+      }
+
       updateExplorerFaLabel();
+      updateMissingGainLabel();
       $("preset").value = "custom";
       updateConditionalFields();
       updatePresetButtons();
@@ -1490,8 +1669,21 @@
     $("explorerReference").addEventListener("change", () => scheduleExplorerRender(0));
     $("explorerResolution").addEventListener("change", () => scheduleExplorerRender(0));
 
+    $("missingGainExp").addEventListener("input", () => {
+      updateMissingGainLabel();
+      if (state.analysis === "missing" && state.lastResult) {
+        renderAnalysis("missing");
+      }
+    });
+    $("missingPlacement").addEventListener("change", () => {
+      if (state.analysis === "missing" && state.lastResult) {
+        renderAnalysis("missing");
+      }
+    });
+
     updateConditionalFields();
     updateExplorerFaLabel();
+    updateMissingGainLabel();
     restoreSharedState();
     run();
   }

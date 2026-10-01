@@ -123,8 +123,8 @@ for (const feature of [
   );
 }
 
-assert.ok(html.includes("v7.5"));
-assert.ok(app.includes("AxionBH research workbench v7.5"));
+assert.ok(html.includes("v7.6"));
+assert.ok(app.includes("AxionBH research workbench v7.6"));
 
 
 for (const feature of [
@@ -143,3 +143,30 @@ for (const feature of [
 
 assert.ok(html.includes('data-analysis="inference"'));
 assert.ok(html.includes('<option value="deficit">'));
+
+
+for (const id of [
+  "missingPhysicsControls",
+  "missingPlacement",
+  "missingGainExp",
+  "missingGainOut"
+]) {
+  assert.ok(html.includes('id="' + id + '"'), "missing v7.6 UI id: " + id);
+}
+
+for (const feature of [
+  "cmeWithGains",
+  "cmeClosureCeiling",
+  "missingPhysicsPoint",
+  "missingPhysicsSweep",
+  "missingPhysicsAnalysis",
+  "renderMissingPhysics",
+  "missingGainValue"
+]) {
+  assert.ok(
+    core.includes(feature) || app.includes(feature),
+    "missing v7.6 missing-physics feature: " + feature
+  );
+}
+
+assert.ok(html.includes('data-analysis="missing"'));
