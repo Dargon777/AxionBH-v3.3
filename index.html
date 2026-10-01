@@ -305,7 +305,31 @@
                     светимость без дополнительной кинетической модели.
                 </p>
 
-                <h3>4.8 Динамика хирального заряда</h3>
+                <h3>4.8 Finite-mass electron CVE</h3>
+                <p>
+                    В v7.9 базовый коэффициент axial CVE больше не аппроксимируется
+                    безмассовым $T^2/6$ при любых температурах. Для свободного massive
+                    Dirac-поля в bulk linear response используется одномерный
+                    Fermi–Dirac integral при конечных $m_e/T$ и vector chemical
+                    potential $\mu_V/T$. В massless-пределе этот integral точно
+                    возвращает
+                    $
+                    \sigma_{V,0}\to\frac{T^2}{6}
+                    +\frac{\mu_V^2}{2\pi^2}.
+                    $
+                    Параметр $\mu_V(e)$ вынесен в интерфейс отдельно, поскольку его
+                    нельзя определить из одной температуры: он зависит от электронной
+                    плотности, состава и состояния аккреционной плазмы.
+                </p>
+                <p>
+                    Для baseline $T=10^7$ K и $\mu_V=0$ имеем
+                    $m_e/T\simeq593$, поэтому massive coefficient экспоненциально
+                    подавлен относительно massless $T^2/6$. Это pair-symmetric
+                    reference point, а не утверждение, что реальная electron-ion
+                    plasma около Sgr A* обязана иметь $\mu_V=0$.
+                </p>
+
+                <h3>4.9 Динамика хирального заряда</h3>
                 <p>
                     Для отдельной диагностической ветки v7.9 вводится плотность аксиального
                     заряда $n_5$. В massless free-Dirac приближении при нулевом vector chemical
@@ -340,33 +364,6 @@
                     структурной диагностикой, а не количественно надёжной моделью
                     электрон-позитронной плазмы. Для физического вывода требуется finite-mass
                     kinetic treatment и обоснованный $\Gamma_{\rm flip}$.
-                </div>
-
-                <h3>4.9 Finite-mass axial CVE</h3>
-                <p>
-                    Для massive Dirac carrier v7.9 реализует коэффициент axial CVE
-                    из Lin &amp; Yang, Phys. Rev. D 98, 114022. При постоянных $T$ и
-                    vector chemical potential $\mu$:
-                    $
-                    \sigma_V=\frac{2F_3+m^2F_2}{2\pi^2},
-                    $
-                    где $F_2$ и $F_3$ являются Fermi–Dirac momentum integrals.
-                    В пределе $m\to0$ численная реализация воспроизводит
-                    $\sigma_V=\mu^2/(2\pi^2)+T^2/6$.
-                </p>
-                <p>
-                    Вкладка Finite Mass использует $m=m_e$ и позволяет менять
-                    $\mu_{\rm vec}/m_e$. Она одновременно показывает massive/massless
-                    suppression и идеальные free-gas плотности $n_{e^-}$ и $n_{e^+}$,
-                    соответствующие выбранному $\mu_{\rm vec}$. Это диагностический
-                    plasma-state parameter: charge neutrality, density profile и
-                    accretion kinetics пока не замкнуты.
-                </p>
-                <div class="alert alert-warning">
-                    При $m\ne0$ axial charge явно не сохраняется. Поэтому finite-mass
-                    vector susceptibility в v7.9 не выдаётся за точный $\chi_5$, а
-                    magnetic CME и Chirality Dynamics не получают автоматически
-                    «mass correction» простым переименованием коэффициента.
                 </div>
 
                 <h3>4.10 Эффективность конверсии $\kappa$ и светимость</h3>
@@ -418,13 +415,17 @@
                     Это устраняет зависимость результата от произвольного диапазона логарифмического сканирования.
                 </p>
                 <p>
+                    Вкладка Plasma v7.9 показывает exact finite-mass free-Dirac CVE
+                    suppression как функцию $\mu_V(e)$ и сравнивает его с massless
+                    reference. Основная stationary closure теперь использует именно
+                    этот massive base coefficient; legacy $\mu_5^2$ nonlinear term
+                    остаётся отдельно помеченным phenomenological ansatz.
+                </p>
+                <p>
                     Вкладка Anomalous Transport v7.9 дополнительно показывает отдельно
                     величины axial CVE и magnetic CME токов, их направления и отношение
                     модулей как функцию магнитного поля. Она является диагностикой транспорта,
-                    а не новым каналом светимости. Finite-Mass Plasma вычисляет massive axial-CVE
-                    kernel при выбранном $\mu_{\rm vec}/m_e$, показывает suppression относительно
-                    massless result и соответствующие ideal-gas carrier densities. Вкладка
-                    Chirality Dynamics строит
+                    а не новым каналом светимости. Вкладка Chirality Dynamics строит
                     аналитическую эволюцию $n_5(t)$ при выбранном $\Gamma_{\rm flip}$ и
                     signed $E\cdot B$ source, отдельно показывая область применимости
                     massless approximation через $T/m_e$.

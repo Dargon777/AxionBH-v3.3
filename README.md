@@ -30,7 +30,7 @@ The v7 simulator:
 - adds a Missing Physics Lab that places a phenomenological `g_extra` at three distinct stages without changing the baseline simulation;
 - separates the axial chiral vortical current from the magnetic chiral magnetic current in an Anomalous Transport diagnostic;
 - adds a Chirality Dynamics lab for `n5(t)`, finite chirality-flip relaxation, and a signed `E·B` anomaly source;
-- adds a finite-mass axial-CVE kernel using the massive-QED Fermi–Dirac integrals of Lin & Yang (Phys. Rev. D 98, 114022), plus carrier-density diagnostics.
+- replaces the massless `T^2/6` CVE base source with the exact free massive-Dirac bulk linear-response integral at user-selected electron vector chemical potential `mu_V`.
 
 The simulator is an implementation of an exploratory model. Its output is not a validated astrophysical inference.
 
@@ -64,7 +64,6 @@ The v7.9 analysis tools are deterministic transformations of the current AxionBH
 - **Missing Physics Lab**: compares a gain in the closure source, a gain in the effective axion→chiral coupling, and a downstream positron-conversion gain. Upstream gains are stopped when the quadratic discriminant becomes negative.
 - **Anomalous Transport**: explicitly distinguishes the axial CVE current `J5 = sigmaV * omega` from the magnetic CME vector current `j = (e^2 mu5 / 2 pi^2) B`. The two are reported separately and are not added into a positron luminosity.
 - **Chirality Dynamics**: evolves axial charge exactly for constant source and flip rate, using the free massless-Dirac relation `n5 = mu5 T^2/3 + mu5^3/(3 pi^2)`. It can add a signed anomaly source proportional to `E·B`, while clearly flagging the regime `T/m_e`.
-- **Finite-Mass Plasma**: evaluates the massive axial-CVE coefficient at finite vector chemical potential, compares it with the massless reference, and reports the ideal-gas electron/positron densities implied by the selected `mu_vec/m_e`.
 
 The explorer uses a single `fₐ` slice for both A and B so the comparison isolates the remaining scenario assumptions. Grid resolution is user-selectable and calculations are cached locally for responsive switching between surface, contour and difference views.
 
@@ -113,12 +112,12 @@ For a free massless Dirac gas at zero vector chemical potential the panel uses `
 
 Important regime warning: the baseline temperature `1e7 K` corresponds to `T/m_e ~ 1.7e-3`. Therefore the massless-fermion susceptibility and transport formulas are not a quantitatively reliable electron-plasma model at the baseline point. v7.9 exposes this explicitly instead of hiding it.
 
-## v7.9 finite-mass axial CVE
+## v7.9 finite-mass electron plasma
 
-For a massive Dirac fermion at constant temperature and vector chemical potential, v7.9 evaluates the axial chiral-vortical coefficient from Lin & Yang, Phys. Rev. D 98, 114022 (2018), arXiv:1810.02979. In their notation `sigma_V = [2 F3 + m^2 F2]/(2 pi^2)` with `F2` and `F3` written as Fermi-Dirac momentum integrals.
+The stationary CVE source no longer assumes the massless thermal coefficient at the baseline electron temperature. v7.9 evaluates the free massive-Dirac bulk axial vortical conductivity in linear response using a direct Fermi-Dirac integral. The new input `electronMuMeV` is the magnitude of the electron vector chemical potential.
 
-The implementation rewrites the integrals in the dimensionless variables `x=q/T`, `z=m/T`, and `nu=mu_vec/T`, evaluates them by composite Simpson quadrature, and recovers `mu_vec^2/(2 pi^2) + T^2/6` in the massless limit.
+At `m -> 0` the numerical integral reproduces `T^2/6 + mu_V^2/(2 pi^2)`. At the default `T = 1e7 K` and `mu_V = 0`, `m_e/T ~ 593` and the finite-mass coefficient is suppressed by about `3.2e-254` relative to the massless `T^2/6` reference.
 
-At the baseline `T=1e7 K` and `mu_vec=0`, taking the carrier mass to be `m_e` gives an enormous thermal suppression of the axial-CVE coefficient. This is not a statement that the accretion flow contains no electrons: a real ionized plasma has a vector chemical potential fixed by charge neutrality and density. The `mu_vec/m_e` control therefore exposes how strongly the result depends on the missing plasma-density closure.
+This does not imply that a real Sgr A* accretion plasma has `mu_V = 0`. A charge-neutral electron-ion plasma contains net electrons supplied by baryons, so the relevant vector chemical potential must be determined by density/composition/kinetics rather than assumed. The Plasma tab therefore scans `mu_V` explicitly.
 
-v7.9 intentionally does not replace the magnetic-CME formula or the axial-charge dynamics with a pretend 'massive mu5 chemical potential'. For nonzero fermion mass, axial charge is explicitly non-conserved and the massive kinetic problem requires more structure than substituting one susceptibility for another.
+The nonlinear `mu5^2/(2 pi^2)` piece in the AxionBH quadratic closure is retained for continuity but is explicitly labeled a legacy massless ansatz: for massive fermions axial charge is not exactly conserved, so a true equilibrium axial chemical potential requires extra care.

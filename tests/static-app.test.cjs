@@ -225,25 +225,21 @@ assert.ok(html.includes('data-analysis="chirality"'));
 
 
 for (const id of [
-  "massivePlasmaControls",
-  "massiveCarrier",
-  "massiveMuRatio",
-  "massiveMuRatioOut"
+  "electronMuMeV"
 ]) {
   assert.ok(
     html.includes('id="' + id + '"'),
-    "missing v7.9 finite-mass UI id: " + id
+    "missing v7.9 plasma UI id: " + id
   );
 }
 
 for (const feature of [
-  "finiteMassFermiKernel",
-  "finiteMassAxialVorticalConductivity",
-  "finiteMassVectorSusceptibility",
-  "finiteMassCarrierDensities",
+  "massiveCveDimensionlessIntegral",
+  "massiveAxialVorticalConductivity",
+  "masslessAxialVorticalReference",
   "finiteMassPlasmaDiagnostics",
   "finiteMassPlasmaSweep",
-  "renderMassivePlasma"
+  "renderPlasma"
 ]) {
   assert.ok(
     core.includes(feature) || app.includes(feature),
@@ -251,4 +247,4 @@ for (const feature of [
   );
 }
 
-assert.ok(html.includes('data-analysis="massive"'));
+assert.ok(html.includes('data-analysis="plasma"'));

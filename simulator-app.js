@@ -30,6 +30,7 @@
     mEff: "m_eff",
     mdot: "Ṁ",
     temperature: "T",
+    electronMuMeV: "μ_V(e)",
     nProfile: "n",
     axionMassEv: "mₐ",
     burstEnergy: "E_burst",
@@ -40,7 +41,7 @@
 
   const parameterIds = [
     "massSolar", "spin", "B0", "betaTurb", "faGev", "mEff", "mdot",
-    "temperature", "nProfile", "axionMassEv", "burstEnergy",
+    "temperature", "electronMuMeV", "nProfile", "axionMassEv", "burstEnergy",
     "burstIntervalYears", "burstDuration", "burstEfficiency"
   ];
 
@@ -275,6 +276,9 @@
         ["ā", A.formatScientific(result.aBar) + " GeV"],
         ["μ₅", A.formatScientific(result.mu5) + " GeV"],
         ["η₅ = μ₅/T", A.formatScientific(result.eta5)],
+        ["μ_V(e)", result.closure ? A.formatScientific(result.closure.electronMuGeV * 1e3) + " MeV" : "—"],
+        ["Finite-mass CVE suppression", result.closure ? A.formatScientific(result.closure.finiteMassSuppression) : "—"],
+        ["σ_CVE,base", result.closure ? A.formatScientific(result.closure.cveBaseCoefficient) + " GeV²" : "—"],
         ["Closure D", result.closure ? A.formatScientific(result.closure.discriminant) : "—"],
         ["Fixed-point slope", result.closure ? A.formatScientific(result.closure.stableSlope) : "—"],
         ["r₊", A.formatScientific(result.geometry.rPlus) + " cm"],
@@ -1124,7 +1128,7 @@
 
     setAnalysisMeta(
       "Anomalous Transport",
-      "Axial CVE: J₅ ∥ ω · magnetic CME: j ∥ B · величины в natural units, токи не складываются"
+      "Axial CVE: massive free-Dirac base + legacy μ₅² term · magnetic CME: j ∥ B"
     );
 
     const ratioText = Number.isFinite(transport.magnitudeRatio)
@@ -1147,6 +1151,11 @@
       '<div><span>|jCME|</span><strong>' +
         A.formatScientific(Math.abs(transport.jCME), 3) + ' GeV³</strong></div>',
       '<div><span>|CME/CVE|</span><strong>' + ratioText + '</strong></div>',
+      '<div><span>mass suppression</span><strong>' +
+        A.formatScientific(
+          transport.finiteMassSuppression,
+          3
+        ) + '</strong></div>',
       '</div>'
     ].join("");
 
@@ -1244,143 +1253,105 @@
   }
 
 
-  function massiveMuRatioValue() {
-    return Number($("massiveMuRatio").value);
-  }
-
-  function updateMassiveLabels() {
-    $("massiveMuRatioOut").textContent =
-      massiveMuRatioValue().toFixed(2);
-  }
-
-  function renderMassivePlasma() {
+  function renderPlasma() {
     if ($("mode").value !== "cme") {
       setAnalysisMeta(
         "Finite-Mass Plasma",
-        "Massive ACVE diagnostic привязан к стационарной CVE closure"
+        "massive Dirac CVE diagnostic is attached to the stationary CVE closure"
       );
       setAnalysisTable(
-        '<div class="inference-empty">Переключи режим на CVE closure. Эта вкладка не меняет основную luminosity-ветку.</div>'
+        '<div class="inference-empty">Переключи режим на CVE closure.</div>'
       );
       if (window.Plotly) Plotly.purge("plot");
       return;
     }
 
     const p = params();
-    const analysis = A.finiteMassPlasmaDiagnostics(p, {
-      carrierMassGeV: A.CONSTANTS.ELECTRON_MASS_GEV,
-      vectorMuOverMass: massiveMuRatioValue(),
-      intervals: 760
-    });
+    const plasma = A.finiteMassPlasmaDiagnostics(p);
+    const suppressionDex =
+      plasma.suppression > 0
+        ? Math.log10(plasma.suppression)
+        : -Infinity;
+    const pairDex =
+      plasma.pairSymmetricSuppression > 0
+        ? Math.log10(plasma.pairSymmetricSuppression)
+        : -Infinity;
 
     setAnalysisMeta(
       "Finite-Mass Plasma",
-      "Massive axial CVE · free Dirac gas · vector μ · electron mass · exact Fermi–Dirac integrals"
+      "free massive Dirac bulk axial-CVE coefficient · μ_V is vector electron chemical potential"
     );
 
-    const suppressionDex =
-      analysis.cveSuppression > 0
-        ? Math.log10(analysis.cveSuppression)
-        : Number.NEGATIVE_INFINITY;
-
     const summary = [
-      '<div class="massive-summary">',
+      '<div class="plasma-summary">',
       '<div><span>mₑ/T</span><strong>' +
-        A.formatScientific(analysis.massOverT, 3) + '</strong></div>',
-      '<div><span>μ_vec/mₑ</span><strong>' +
-        analysis.vectorMuOverMass.toFixed(3) + '</strong></div>',
-      '<div><span>σV massive</span><strong>' +
-        A.formatScientific(
-          analysis.sigmaVFiniteGeV2,
-          3
-        ) + ' GeV²</strong></div>',
-      '<div><span>σV / massless</span><strong>' +
-        A.formatScientific(
-          analysis.cveSuppression,
-          3
-        ) + '</strong></div>',
+        A.formatScientific(plasma.massOverT, 3) + '</strong></div>',
+      '<div><span>μ_V/T</span><strong>' +
+        A.formatScientific(plasma.vectorMuOverT, 3) + '</strong></div>',
+      '<div><span>σ massive</span><strong>' +
+        A.formatScientific(plasma.sigmaMassive, 3) +
+        ' GeV²</strong></div>',
+      '<div><span>σ massless ref</span><strong>' +
+        A.formatScientific(plasma.sigmaMassless, 3) +
+        ' GeV²</strong></div>',
       '<div><span>suppression</span><strong>' +
+        A.formatScientific(plasma.suppression, 3) + '</strong></div>',
+      '<div><span>log₁₀ suppression</span><strong>' +
         (Number.isFinite(suppressionDex)
-          ? suppressionDex.toFixed(2) + ' dex'
-          : '−∞') + '</strong></div>',
-      '<div><span>nₑ implied</span><strong>' +
-        A.formatScientific(
-          analysis.electronDensityCm3,
-          3
-        ) + ' cm⁻³</strong></div>',
+          ? suppressionDex.toFixed(2)
+          : "−∞") + ' dex</strong></div>',
       '</div>'
     ].join("");
 
     const table = [
-      '<div class="analysis-row analysis-row-head massive"><span>Quantity</span><span>Finite-mass</span><span>Reference / note</span></div>',
-      '<div class="analysis-row massive"><strong>Axial CVE current</strong><span>' +
+      '<div class="analysis-row analysis-row-head plasma"><span>Case</span><span>μ_V(e)</span><span>Suppression</span><span>Interpretation</span></div>',
+      '<div class="analysis-row plasma"><strong>Selected</strong><span>' +
+        A.formatScientific(p.electronMuMeV, 3) +
+        ' MeV</span><span>' +
+        A.formatScientific(plasma.suppression, 3) +
+        '</span><span>used by the closure</span></div>',
+      '<div class="analysis-row plasma"><strong>Pair-symmetric</strong><span>0 MeV</span><span>' +
         A.formatScientific(
-          analysis.finiteMassCurrentGeV3,
+          plasma.pairSymmetricSuppression,
           3
-        ) + ' GeV³</span><span>massless ref ' +
-        A.formatScientific(
-          analysis.masslessReferenceCurrentGeV3,
-          3
-        ) + ' GeV³</span></div>',
-      '<div class="analysis-row massive"><strong>Source proxy</strong><span>' +
-        A.formatScientific(
-          analysis.finiteMassSourceProxyGeV4,
-          3
-        ) + ' GeV⁴</span><span>|J₅|/L_eff</span></div>',
-      '<div class="analysis-row massive"><strong>χ_vec</strong><span>' +
-        A.formatScientific(
-          analysis.vectorSusceptibilityGeV2,
-          3
-        ) + ' GeV²</span><span>vector susceptibility; not conserved axial χ₅</span></div>',
-      '<div class="analysis-row massive"><strong>nₑ</strong><span>' +
-        A.formatScientific(
-          analysis.electronDensityCm3,
-          3
-        ) + ' cm⁻³</span><span>ideal free gas at selected μ_vec</span></div>',
-      '<div class="analysis-row massive"><strong>nₑ⁺</strong><span>' +
-        A.formatScientific(
-          analysis.positronDensityCm3,
-          3
-        ) + ' cm⁻³</span><span>thermal positron density</span></div>',
-      '<div class="analysis-row massive"><strong>n_net</strong><span>' +
-        A.formatScientific(
-          analysis.netDensityCm3,
-          3
-        ) + ' cm⁻³</span><span>nₑ − nₑ⁺</span></div>'
+        ) +
+        '</span><span>' +
+        (Number.isFinite(pairDex)
+          ? pairDex.toFixed(2) + ' dex'
+          : 'underflow') +
+        ' vs massless T²/6</span></div>'
     ].join("");
 
-    const caveat =
-      '<div class="missing-note"><strong>Interpretation:</strong> ' +
-      'the finite-mass formula here is the axial CVE coefficient at finite vector chemical potential. ' +
-      'For m≠0 axial charge is explicitly non-conserved, so v7.9 does not pretend that replacing the massless χ₅ by χ_vec creates a complete massive chirality theory. ' +
-      'The selected μ_vec is an exploratory plasma state; charge neutrality and accretion dynamics are not solved here.</div>';
+    const note =
+      '<div class="missing-note"><strong>Scope:</strong> the coefficient is the free massive-Dirac bulk linear-response CVE at vector chemical potential μ_V. It does not determine μ_V for an accretion flow. The nonlinear μ₅² term in the AxionBH closure remains the legacy massless ansatz and is reported separately.</div>';
 
-    setAnalysisTable(summary + table + caveat);
+    setAnalysisTable(summary + table + note);
 
     if (!window.Plotly) return;
 
+    const maxMu = Math.max(2, p.electronMuMeV * 1.25);
     const sweep = A.finiteMassPlasmaSweep(p, {
-      carrierMassGeV: A.CONSTANTS.ELECTRON_MASS_GEV,
-      muRatioMin: 0,
-      muRatioMax: 2,
-      points: 61,
-      intervals: 360
+      maxMuMeV: maxMu,
+      points: 110
     });
-
     const valid = sweep.points.filter((point) =>
       Number.isFinite(point.suppression) &&
       point.suppression > 0
     );
     const colors = themeColors();
     const layout = plotLayout(
-      "μ_vec / mₑ",
-      "log₁₀(σV massive / massless)"
+      "μ_V(e), MeV",
+      "log₁₀(σ_massive / σ_massless)"
     );
     layout.shapes = [{
       type: "line",
-      x0: 0,
-      x1: 2,
-      y0: 0,
+      x0: A.CONSTANTS.ELECTRON_MASS_GEV * 1e3,
+      x1: A.CONSTANTS.ELECTRON_MASS_GEV * 1e3,
+      y0: valid.length
+        ? Math.min(...valid.map((point) =>
+            Math.log10(point.suppression)
+          ))
+        : -1,
       y1: 0,
       line: { color: colors.muted, dash: "dash", width: 1 }
     }];
@@ -1388,20 +1359,14 @@
     Plotly.react("plot", [{
       type: "scatter",
       mode: "lines",
-      x: valid.map((point) => point.vectorMuOverMass),
+      x: valid.map((point) => point.electronMuMeV),
       y: valid.map((point) =>
         Math.log10(point.suppression)
       ),
-      customdata: valid.map((point) => [
-        point.electronDensityCm3,
-        point.positronDensityCm3
-      ]),
       line: { color: colors.accent2, width: 2 },
       hovertemplate:
-        "μ/m=%{x:.3f}" +
+        "μ_V=%{x:.4f} MeV" +
         "<br>log₁₀ suppression=%{y:.2f}" +
-        "<br>nₑ=%{customdata[0]:.3e} cm⁻³" +
-        "<br>nₑ⁺=%{customdata[1]:.3e} cm⁻³" +
         "<extra></extra>"
     }], layout, {
       responsive: true,
@@ -1729,7 +1694,6 @@
     });
 
     $("explorerControls").classList.toggle("hidden", kind !== "explorer");
-    $("massivePlasmaControls").classList.toggle("hidden", kind !== "massive");
     $("chiralityControls").classList.toggle("hidden", kind !== "chirality");
     $("missingPhysicsControls").classList.toggle("hidden", kind !== "missing");
     $("plot").classList.toggle("plot-tall", kind === "explorer");
@@ -1741,7 +1705,7 @@
         else if (kind === "sensitivity") renderSensitivity();
         else if (kind === "inference") renderInference();
         else if (kind === "transport") renderTransport();
-        else if (kind === "massive") renderMassivePlasma();
+        else if (kind === "plasma") renderPlasma();
         else if (kind === "chirality") renderChirality();
         else if (kind === "missing") renderMissingPhysics();
         else if (kind === "compare") renderComparison();
@@ -1805,15 +1769,6 @@
         ? A.anomalousTransportDiagnostics(
             state.lastParams,
             state.lastResult
-          )
-        : null,
-      finiteMassPlasma: state.lastMode === "cme"
-        ? A.finiteMassPlasmaDiagnostics(
-            state.lastParams,
-            {
-              carrierMassGeV: A.CONSTANTS.ELECTRON_MASS_GEV,
-              vectorMuOverMass: massiveMuRatioValue()
-            }
           )
         : null,
       chirality: state.lastMode === "cme"
@@ -1996,9 +1951,6 @@
         faExp: Number($("explorerFaExp").value),
         resolution: $("explorerResolution").value
       },
-      massivePlasma: {
-        vectorMuOverMass: massiveMuRatioValue()
-      },
       chirality: {
         flipExp: Number($("chiralityFlipExp").value),
         timeExp: Number($("chiralityTimeExp").value),
@@ -2028,7 +1980,7 @@
       applyParameters(restored);
       if (modeNames[payload.mode]) $("mode").value = payload.mode;
 
-      if (["spin", "explorer", "sensitivity", "inference", "transport", "massive", "chirality", "missing", "compare"].includes(payload.analysis)) {
+      if (["spin", "explorer", "sensitivity", "inference", "transport", "plasma", "chirality", "missing", "compare"].includes(payload.analysis)) {
         state.analysis = payload.analysis;
       }
 
@@ -2045,19 +1997,6 @@
         }
         if (explorerResolutions[payload.explorer.resolution]) {
           $("explorerResolution").value = payload.explorer.resolution;
-        }
-      }
-
-      if (payload.massivePlasma && typeof payload.massivePlasma === "object") {
-        const vectorMuOverMass = Number(
-          payload.massivePlasma.vectorMuOverMass
-        );
-        if (
-          Number.isFinite(vectorMuOverMass) &&
-          vectorMuOverMass >= 0 &&
-          vectorMuOverMass <= 2
-        ) {
-          $("massiveMuRatio").value = vectorMuOverMass;
         }
       }
 
@@ -2090,7 +2029,6 @@
       }
 
       updateExplorerFaLabel();
-      updateMassiveLabels();
       updateChiralityLabels();
       updateMissingGainLabel();
       $("preset").value = "custom";
@@ -2185,13 +2123,6 @@
     $("explorerReference").addEventListener("change", () => scheduleExplorerRender(0));
     $("explorerResolution").addEventListener("change", () => scheduleExplorerRender(0));
 
-    $("massiveMuRatio").addEventListener("input", () => {
-      updateMassiveLabels();
-      if (state.analysis === "massive" && state.lastResult) {
-        renderAnalysis("massive");
-      }
-    });
-
     ["chiralityFlipExp", "chiralityTimeExp", "chiralityEExp"].forEach((id) => {
       $(id).addEventListener("input", () => {
         updateChiralityLabels();
@@ -2220,7 +2151,6 @@
 
     updateConditionalFields();
     updateExplorerFaLabel();
-    updateMassiveLabels();
     updateChiralityLabels();
     updateMissingGainLabel();
     restoreSharedState();

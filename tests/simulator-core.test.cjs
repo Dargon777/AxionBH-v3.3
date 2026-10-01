@@ -263,7 +263,7 @@ console.log("AxionBH simulator-core tests passed");
   const baseline = A.cme(A.DEFAULTS);
   const deficit = A.deficitOrders(baseline.ratio511, 1);
   assert.ok(Number.isFinite(deficit));
-  assert.ok(deficit > 50 && deficit < 52);
+  assert.ok(deficit > 300 && deficit < 310);
 }
 
 {
@@ -285,10 +285,9 @@ console.log("AxionBH simulator-core tests passed");
     "mdot",
     { target: 1, steps: 220 }
   );
-  assert.equal(mdot.status, "solved");
-  assert.ok(mdot.requiredValue > A.DEFAULTS.mdot);
-  assert.ok(mdot.requiredFactor > 1e40);
-  assert.ok(Math.abs(Math.log10(mdot.achievedMetric)) < 1e-8);
+  assert.equal(mdot.status, "unreachable");
+  assert.ok(mdot.bestMetric > A.cme(A.DEFAULTS).ratio511);
+  assert.ok(mdot.remainingDeficitOrders > 0);
 }
 
 {
@@ -309,8 +308,8 @@ console.log("AxionBH simulator-core tests passed");
     steps: 180
   });
   assert.equal(inference.rows.length, 2);
-  assert.ok(inference.deficitOrders > 50);
-  assert.ok(inference.requiredGain > 1e50);
+  assert.ok(inference.deficitOrders > 300);
+  assert.ok(inference.requiredGain > 1e300);
 }
 
 
@@ -327,12 +326,10 @@ console.log("AxionBH simulator-core tests passed");
   const expectedMu = Math.PI * t / Math.sqrt(3);
   assert.ok(Math.abs(ceiling.mu5Max / expectedMu - 1) < 1e-12);
   assert.ok(ceiling.ratioMax > A.cme(A.DEFAULTS).ratio511);
-  assert.ok(ceiling.ratioMax > 8e-6 && ceiling.ratioMax < 1e-5);
-  assert.ok(
-    ceiling.ceilingDeficitOrders > 5 &&
-    ceiling.ceilingDeficitOrders < 5.1
-  );
-  assert.ok(ceiling.requiredPostGainAtCeiling > 1e5);
+  assert.ok(ceiling.ratioMax > 0);
+  assert.ok(ceiling.ratioMax < 1e-120);
+  assert.ok(ceiling.ceilingDeficitOrders > 120);
+  assert.ok(ceiling.requiredPostGainAtCeiling > 1e120);
 }
 
 {
@@ -368,7 +365,7 @@ console.log("AxionBH simulator-core tests passed");
   assert.equal(source.status, "ceiling-limited");
   assert.equal(chiral.status, "ceiling-limited");
   assert.equal(conversion.status, "solved");
-  assert.ok(conversion.requiredGain > 1e50);
+  assert.ok(conversion.requiredGain > 1e300);
   assert.ok(Math.abs(Math.log10(conversion.achievedMetric)) < 1e-8);
 }
 
@@ -511,81 +508,65 @@ console.log("AxionBH simulator-core tests passed");
 
 
 {
-  const masslessLike = A.finiteMassAxialVorticalConductivity(
-    1e-12,
-    1e7,
+  const sigma = A.massiveAxialVorticalConductivity(
+    1e12,
     0,
-    900
+    1e-12
   );
-  assert.ok(Number.isFinite(masslessLike.sigmaV));
-  assert.ok(Math.abs(masslessLike.suppression - 1) < 1e-4);
+  const ref = A.masslessAxialVorticalReference(
+    1e12,
+    0
+  );
+  assert.ok(Math.abs(sigma / ref - 1) < 1e-6);
 }
 
 {
-  const electron = A.finiteMassAxialVorticalConductivity(
-    A.CONSTANTS.ELECTRON_MASS_GEV,
-    1e7,
-    0,
-    1000
-  );
-  assert.ok(electron.sigmaV > 0);
-  assert.ok(electron.suppression > 0);
-  assert.ok(electron.suppression < 1e-250);
+  const T = 1e7;
+  const plasma = A.finiteMassPlasmaDiagnostics({
+    ...A.DEFAULTS,
+    temperature: T,
+    electronMuMeV: 0
+  });
+  assert.ok(plasma.massOverT > 500);
   assert.ok(
-    Math.log10(electron.suppression) < -253 &&
-    Math.log10(electron.suppression) > -254
+    plasma.pairSymmetricSuppression > 1e-255 &&
+    plasma.pairSymmetricSuppression < 1e-253
   );
 }
 
 {
-  const atThreshold = A.finiteMassPlasmaDiagnostics(
-    A.DEFAULTS,
-    {
-      carrierMassGeV: A.CONSTANTS.ELECTRON_MASS_GEV,
-      vectorMuOverMass: 1,
-      intervals: 800
-    }
-  );
-  assert.ok(atThreshold.cveSuppression > 0.02);
-  assert.ok(atThreshold.cveSuppression < 0.05);
-  assert.ok(atThreshold.electronDensityCm3 > 1e25);
-  assert.ok(atThreshold.positronDensityCm3 < 1);
+  const lowMu = A.finiteMassPlasmaDiagnostics({
+    ...A.DEFAULTS,
+    electronMuMeV: 0
+  });
+  const highMu = A.finiteMassPlasmaDiagnostics({
+    ...A.DEFAULTS,
+    electronMuMeV: 1
+  });
+  assert.ok(highMu.sigmaMassive > lowMu.sigmaMassive);
+  assert.ok(highMu.suppression > lowMu.suppression);
 }
 
 {
-  const baseline = A.finiteMassPlasmaDiagnostics(
-    A.DEFAULTS,
-    {
-      carrierMassGeV: A.CONSTANTS.ELECTRON_MASS_GEV,
-      vectorMuOverMass: 0,
-      intervals: 900
-    }
-  );
-  assert.ok(baseline.massOverT > 500);
-  assert.ok(baseline.finiteMassCurrentGeV3 > 0);
-  assert.ok(
-    baseline.finiteMassCurrentGeV3 <
-    baseline.masslessReferenceCurrentGeV3
-  );
-  assert.equal(
-    baseline.assumptions.finiteMassCmeImplemented,
-    false
-  );
+  const result = A.cme({
+    ...A.DEFAULTS,
+    electronMuMeV: 0
+  });
+  assert.ok(result.closure.finiteMassSuppression < 1e-250);
+  assert.ok(result.ratio511 > 0);
+  assert.ok(result.ratio511 < 1e-300);
 }
 
 {
-  const sweep = A.finiteMassPlasmaSweep(
-    A.DEFAULTS,
-    {
-      muRatioMin: 0,
-      muRatioMax: 1,
-      points: 20,
-      intervals: 260
-    }
+  const ceiling = A.cmeClosureCeiling({
+    ...A.DEFAULTS,
+    electronMuMeV: 0
+  });
+  const expected = Math.sqrt(
+    2 * Math.PI * Math.PI *
+    A.finiteMassPlasmaDiagnostics(A.DEFAULTS)
+      .sigmaMassive
   );
-  assert.equal(sweep.points.length, 20);
-  assert.ok(
-    sweep.points[0].suppression <
-    sweep.points[sweep.points.length - 1].suppression
-  );
+  assert.ok(Math.abs(ceiling.mu5Max / expected - 1) < 1e-10);
+  assert.ok(ceiling.mu5Max < ceiling.masslessMu5Max);
 }

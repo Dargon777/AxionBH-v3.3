@@ -46,6 +46,7 @@
     mEff: 2.8e-16,
     mdot: 6.3e22,
     temperature: 1e7,
+    electronMuMeV: 0,
     nProfile: 1.8,
     axionMassEv: 1e-17,
     burstEnergy: 1e55,
@@ -88,6 +89,13 @@
       p[key] = Number(p[key]);
       assertFinitePositive(p[key], key);
     });
+    p.electronMuMeV = Number(p.electronMuMeV);
+    assertFinitePositive(
+      p.electronMuMeV,
+      "electronMuMeV",
+      true
+    );
+
     p.spin = Number(p.spin);
     if (!Number.isFinite(p.spin) || p.spin < 0 || p.spin >= 1) {
       throw new RangeError("spin must satisfy 0 <= spin < 1");
@@ -211,12 +219,17 @@
     const thermal = temperatureGeV(p.temperature);
 
     const sigmaCME = chiralMagneticConductivity(mu5);
-    const sigmaCVE = chiralConductivity(mu5, p.temperature);
+    const plasma = finiteMassPlasmaDiagnostics(p);
+    const sigmaCVEBase = plasma.sigmaMassive;
+    const sigmaCVENonlinear =
+      mu5 * mu5 / (2 * Math.PI * Math.PI);
+    const sigmaCVE =
+      sigmaCVEBase + sigmaCVENonlinear;
     const jCME = sigmaCME * fieldGeV2;
     const jCVE = sigmaCVE * omegaGeV;
-    const jCVEThermal = (thermal * thermal / 6) * omegaGeV;
+    const jCVEThermal = sigmaCVEBase * omegaGeV;
     const jCVEChemical =
-      (mu5 * mu5 / (2 * Math.PI * Math.PI)) * omegaGeV;
+      sigmaCVENonlinear * omegaGeV;
     const magnitudeRatio =
       Number.isFinite(jCME) && Number.isFinite(jCVE) && jCVE !== 0
         ? Math.abs(jCME / jCVE)
@@ -238,6 +251,11 @@
       temperatureGeV: thermal,
       sigmaCME,
       sigmaCVE,
+      sigmaCVEBase,
+      sigmaCVENonlinear,
+      finiteMassSuppression: plasma.suppression,
+      electronMuGeV: plasma.vectorMuGeV,
+      massOverT: plasma.massOverT,
       jCME,
       jCVE,
       jCVEThermal,
@@ -579,346 +597,225 @@
   }
 
 
-  function stableFermi(y) {
-    const value = Number(y);
-    if (!Number.isFinite(value)) {
-      return value === Number.NEGATIVE_INFINITY ? 1 : 0;
-    }
-    if (value > 40) return Math.exp(-value);
-    if (value < -40) return 1;
-    return 1 / (Math.exp(value) + 1);
-  }
+  const massiveCveCache = new Map();
 
-  function stableSoftplus(value) {
+  function fermiDerivativeKernel(value) {
     const x = Number(value);
-    if (!Number.isFinite(x)) {
-      return x === Number.POSITIVE_INFINITY ? Number.POSITIVE_INFINITY : 0;
+    if (!Number.isFinite(x)) return 0;
+    if (x >= 0) {
+      if (x > 745) return 0;
+      const z = Math.exp(-x);
+      return z / ((1 + z) * (1 + z));
     }
-    if (x > 40) return x;
-    if (x < -40) return Math.exp(x);
-    return Math.log1p(Math.exp(x));
+    if (x < -745) return 0;
+    const z = Math.exp(x);
+    return z / ((1 + z) * (1 + z));
   }
 
-  function simpsonIntegral(fn, start, stop, intervals = 600) {
-    if (!Number.isFinite(start) || !Number.isFinite(stop) || stop < start) {
-      throw new RangeError("simpsonIntegral requires finite stop >= start");
-    }
-    if (stop === start) return 0;
-    let n = Math.max(40, Math.min(2400, Math.trunc(intervals)));
-    if (n % 2 !== 0) n += 1;
+  function simpson1D(fn, start, stop, intervals = 800) {
+    if (!(stop > start)) return 0;
+    let n = Math.max(20, Math.trunc(intervals));
+    if (n % 2) n += 1;
     const h = (stop - start) / n;
     let sum = fn(start) + fn(stop);
     for (let i = 1; i < n; i += 1) {
-      sum += (i % 2 === 0 ? 2 : 4) * fn(start + i * h);
+      sum += (i % 2 ? 4 : 2) * fn(start + i * h);
     }
     return sum * h / 3;
   }
 
-  function finiteMassIntegrationLimit(massOverT, muOverT) {
-    const z = Math.max(0, Number(massOverT));
-    const nu = Math.abs(Number(muOverT));
-    const energyMax = Math.max(z, nu) + 42;
-    return Math.sqrt(
-      Math.max(0, energyMax * energyMax - z * z)
-    );
+  function massiveCveDimensionlessIntegral(
+    massOverT,
+    muOverT
+  ) {
+    const a = Math.max(0, Number(massOverT));
+    const b = Math.abs(Number(muOverT));
+    if (!Number.isFinite(a) || !Number.isFinite(b)) {
+      return Number.NaN;
+    }
+
+    const key =
+      a.toPrecision(12) + "|" + b.toPrecision(12);
+    if (massiveCveCache.has(key)) {
+      return massiveCveCache.get(key);
+    }
+
+    function phase(x) {
+      return x * Math.sqrt(Math.max(0, x * x - a * a));
+    }
+
+    function integrateNearThreshold(kernelShift, upperExtra) {
+      const tMax = Math.sqrt(upperExtra);
+      return simpson1D((t) => {
+        const x = a + t * t;
+        return (
+          phase(x) *
+          fermiDerivativeKernel(x + kernelShift) *
+          2 * t
+        );
+      }, 0, tMax, 1000);
+    }
+
+    let particle = 0;
+    if (b > a + 40) {
+      const lo = Math.max(a, b - 40);
+      const hi = b + 40;
+      particle = simpson1D(
+        (x) => phase(x) * fermiDerivativeKernel(x - b),
+        lo,
+        hi,
+        1200
+      );
+    } else {
+      const extra = Math.max(60, b - a + 40);
+      particle = integrateNearThreshold(-b, extra);
+    }
+
+    const antiparticle = integrateNearThreshold(b, 60);
+    const result =
+      (particle + antiparticle) /
+      (2 * Math.PI * Math.PI);
+
+    massiveCveCache.set(key, result);
+    if (massiveCveCache.size > 256) {
+      const first = massiveCveCache.keys().next().value;
+      massiveCveCache.delete(first);
+    }
+    return result;
   }
 
-  function finiteMassFermiKernel(
-    massGeV,
+  function massiveAxialVorticalConductivity(
     temperature,
     vectorMuGeV = 0,
-    intervals = 700
+    massGeV = CONSTANTS.ELECTRON_MASS_GEV
   ) {
-    const mass = assertFinitePositive(Number(massGeV), "carrierMassGeV", true);
+    const thermal = temperatureGeV(temperature);
+    const mass = assertFinitePositive(massGeV, "massGeV");
+    const mu = Number(vectorMuGeV);
+    if (!Number.isFinite(mu)) {
+      throw new RangeError("vectorMuGeV must be finite");
+    }
+    const dimensionless = massiveCveDimensionlessIntegral(
+      mass / thermal,
+      mu / thermal
+    );
+    const sigma = thermal * thermal * dimensionless;
+    return Number.isFinite(sigma) ? sigma : Number.NaN;
+  }
+
+  function masslessAxialVorticalReference(
+    temperature,
+    vectorMuGeV = 0
+  ) {
     const thermal = temperatureGeV(temperature);
     const mu = Number(vectorMuGeV);
     if (!Number.isFinite(mu)) {
       throw new RangeError("vectorMuGeV must be finite");
     }
-
-    const z = mass / thermal;
-    const nu = mu / thermal;
-    const xMax = finiteMassIntegrationLimit(z, nu);
-
-    function energyBar(x) {
-      return Math.sqrt(x * x + z * z);
-    }
-
-    const f2 = simpsonIntegral((x) => {
-      const e = energyBar(x);
-      if (e === 0) return 0;
-      return (
-        stableFermi(e - nu) +
-        stableFermi(e + nu)
-      ) / e;
-    }, 0, xMax, intervals);
-
-    const f3Dimensionless = simpsonIntegral((x) => {
-      const e = energyBar(x);
-      return (
-        stableSoftplus(nu - e) +
-        stableSoftplus(-nu - e)
-      );
-    }, 0, xMax, intervals);
-
-    const electronIntegral = simpsonIntegral((x) => {
-      const e = energyBar(x);
-      return x * x * stableFermi(e - nu);
-    }, 0, xMax, intervals);
-
-    const positronIntegral = simpsonIntegral((x) => {
-      const e = energyBar(x);
-      return x * x * stableFermi(e + nu);
-    }, 0, xMax, intervals);
-
-    const susceptibilityIntegral = simpsonIntegral((x) => {
-      const e = energyBar(x);
-      const fm = stableFermi(e - nu);
-      const fp = stableFermi(e + nu);
-      return x * x * (
-        fm * (1 - fm) +
-        fp * (1 - fp)
-      );
-    }, 0, xMax, intervals);
-
-    return {
-      massGeV: mass,
-      temperatureGeV: thermal,
-      vectorMuGeV: mu,
-      massOverT: z,
-      muOverT: nu,
-      integrationLimit: xMax,
-      f2,
-      f3Dimensionless,
-      electronIntegral,
-      positronIntegral,
-      susceptibilityIntegral
-    };
-  }
-
-  function finiteMassAxialVorticalConductivity(
-    massGeV,
-    temperature,
-    vectorMuGeV = 0,
-    intervals = 700
-  ) {
-    const kernel = finiteMassFermiKernel(
-      massGeV,
-      temperature,
-      vectorMuGeV,
-      intervals
+    return (
+      thermal * thermal / 6 +
+      mu * mu / (2 * Math.PI * Math.PI)
     );
-    const T = kernel.temperatureGeV;
-    const z = kernel.massOverT;
-
-    // Lin & Yang, Phys. Rev. D 98, 114022 (2018), eqs. (8)-(10):
-    // sigma_V = [2 F3 + m^2 F2] / (2 pi^2).
-    // The implementation below is the dimensionless q/T form at constant
-    // vector chemical potential.
-    const dimensionless =
-      (
-        2 * kernel.f3Dimensionless +
-        z * z * kernel.f2
-      ) /
-      (2 * Math.PI * Math.PI);
-
-    const sigmaV = dimensionless * T * T;
-    const masslessReference =
-      (
-        kernel.vectorMuGeV * kernel.vectorMuGeV /
-          (2 * Math.PI * Math.PI)
-      ) +
-      T * T / 6;
-    const suppression =
-      masslessReference > 0
-        ? sigmaV / masslessReference
-        : null;
-
-    return {
-      ...kernel,
-      sigmaV,
-      dimensionless,
-      masslessReference,
-      suppression
-    };
   }
 
-  function finiteMassVectorSusceptibility(
-    massGeV,
-    temperature,
-    vectorMuGeV = 0,
-    intervals = 700
-  ) {
-    const kernel = finiteMassFermiKernel(
-      massGeV,
-      temperature,
-      vectorMuGeV,
-      intervals
-    );
-    const T = kernel.temperatureGeV;
-    // g=2 spin states; derivative of n_e - n_pos with respect to vector mu.
-    const susceptibility =
-      T * T *
-      kernel.susceptibilityIntegral /
-      (Math.PI * Math.PI);
-    return {
-      ...kernel,
-      susceptibility,
-      masslessAtZeroMu: T * T / 3,
-      zeroMuSuppression:
-        (T * T / 3) > 0
-          ? susceptibility / (T * T / 3)
-          : null
-    };
-  }
-
-  function finiteMassCarrierDensities(
-    massGeV,
-    temperature,
-    vectorMuGeV = 0,
-    intervals = 700
-  ) {
-    const kernel = finiteMassFermiKernel(
-      massGeV,
-      temperature,
-      vectorMuGeV,
-      intervals
-    );
-    const T = kernel.temperatureGeV;
-    const prefactor = T * T * T / (Math.PI * Math.PI);
-    const electronGeV3 = prefactor * kernel.electronIntegral;
-    const positronGeV3 = prefactor * kernel.positronIntegral;
-    const toCm3 = Math.pow(CONSTANTS.CM_TO_GEV_INV, 3);
-
-    return {
-      ...kernel,
-      electronGeV3,
-      positronGeV3,
-      netGeV3: electronGeV3 - positronGeV3,
-      totalGeV3: electronGeV3 + positronGeV3,
-      electronCm3: electronGeV3 * toCm3,
-      positronCm3: positronGeV3 * toCm3,
-      netCm3: (electronGeV3 - positronGeV3) * toCm3,
-      totalCm3: (electronGeV3 + positronGeV3) * toCm3
-    };
-  }
-
-  function finiteMassPlasmaDiagnostics(
-    input,
-    {
-      carrierMassGeV = CONSTANTS.ELECTRON_MASS_GEV,
-      vectorMuOverMass = 0,
-      intervals = 700
-    } = {}
-  ) {
+  function finiteMassPlasmaDiagnostics(input) {
     const p = normalizeParams(input);
-    const mass = assertFinitePositive(
-      Number(carrierMassGeV),
-      "carrierMassGeV",
-      true
-    );
-    const ratio = Number(vectorMuOverMass);
-    if (!Number.isFinite(ratio)) {
-      throw new RangeError("vectorMuOverMass must be finite");
-    }
-    const vectorMuGeV = mass * ratio;
-
-    const result = cme(p);
-    const geometry = result.geometry;
-    const omegaGeV = angularFrequencyGeV(geometry.omegaH);
-    const cve = finiteMassAxialVorticalConductivity(
-      mass,
-      p.temperature,
-      vectorMuGeV,
-      intervals
-    );
-    const susceptibility = finiteMassVectorSusceptibility(
-      mass,
-      p.temperature,
-      vectorMuGeV,
-      intervals
-    );
-    const densities = finiteMassCarrierDensities(
-      mass,
-      p.temperature,
-      vectorMuGeV,
-      intervals
-    );
-
-    const finiteMassCurrent = cve.sigmaV * omegaGeV;
-    const masslessCurrent = cve.masslessReference * omegaGeV;
-    const coefficients = selfConsistencyCoefficients(p);
-    const finiteMassSourceProxy =
-      Math.abs(finiteMassCurrent) /
-      Math.max(coefficients.effectiveLengthGeVInv, 1e-300);
-    const masslessThermalSourceProxy =
-      Math.abs(masslessCurrent) /
-      Math.max(coefficients.effectiveLengthGeVInv, 1e-300);
+    const thermal = temperatureGeV(p.temperature);
+    const muVectorGeV = p.electronMuMeV * 1e-3;
+    const mass = CONSTANTS.ELECTRON_MASS_GEV;
+    const sigmaMassive =
+      massiveAxialVorticalConductivity(
+        p.temperature,
+        muVectorGeV,
+        mass
+      );
+    const sigmaMassless =
+      masslessAxialVorticalReference(
+        p.temperature,
+        muVectorGeV
+      );
+    const suppression =
+      sigmaMassless > 0
+        ? sigmaMassive / sigmaMassless
+        : null;
+    const pairSymmetricMassive =
+      massiveAxialVorticalConductivity(
+        p.temperature,
+        0,
+        mass
+      );
+    const pairSymmetricMassless =
+      masslessAxialVorticalReference(
+        p.temperature,
+        0
+      );
+    const pairSymmetricSuppression =
+      pairSymmetricMassless > 0
+        ? pairSymmetricMassive /
+          pairSymmetricMassless
+        : null;
+    const fermiMomentumGeV =
+      muVectorGeV > mass
+        ? Math.sqrt(
+            muVectorGeV * muVectorGeV -
+            mass * mass
+          )
+        : 0;
 
     return {
-      carrier: "Dirac fermion",
-      carrierMassGeV: mass,
-      vectorMuGeV,
-      vectorMuOverMass: ratio,
-      temperatureGeV: cve.temperatureGeV,
-      massOverT: cve.massOverT,
-      sigmaVFiniteGeV2: cve.sigmaV,
-      sigmaVMasslessReferenceGeV2: cve.masslessReference,
-      cveSuppression: cve.suppression,
-      finiteMassCurrentGeV3: finiteMassCurrent,
-      masslessReferenceCurrentGeV3: masslessCurrent,
-      finiteMassSourceProxyGeV4: finiteMassSourceProxy,
-      masslessReferenceSourceProxyGeV4: masslessThermalSourceProxy,
-      vectorSusceptibilityGeV2: susceptibility.susceptibility,
-      susceptibilityReferenceGeV2: susceptibility.masslessAtZeroMu,
-      susceptibilityZeroMuSuppression: susceptibility.zeroMuSuppression,
-      electronDensityCm3: densities.electronCm3,
-      positronDensityCm3: densities.positronCm3,
-      netDensityCm3: densities.netCm3,
-      totalDensityCm3: densities.totalCm3,
-      electronDensityGeV3: densities.electronGeV3,
-      positronDensityGeV3: densities.positronGeV3,
-      omegaGeV,
-      baselineMu5GeV: result.mu5,
-      assumptions: {
-        vectorChemicalPotential: true,
-        axialChemicalPotentialConserved: false,
-        finiteMassCmeImplemented: false,
-        acveFormula:
-          "Lin & Yang PRD 98 114022 eqs 8-10, constant T and vector mu",
-        densityModel:
-          "ideal free Dirac gas; no charge-neutrality or accretion-flow closure"
-      }
+      temperatureGeV: thermal,
+      massGeV: mass,
+      massOverT: mass / thermal,
+      vectorMuGeV: muVectorGeV,
+      vectorMuOverT: muVectorGeV / thermal,
+      sigmaMassive,
+      sigmaMassless,
+      suppression,
+      pairSymmetricMassive,
+      pairSymmetricMassless,
+      pairSymmetricSuppression,
+      fermiMomentumGeV,
+      degenerateAtZeroT: muVectorGeV > mass,
+      formula:
+        "free massive Dirac bulk axial CVE, linear in vorticity",
+      nonlinearMu5Term:
+        "legacy massless ansatz retained separately"
     };
   }
 
   function finiteMassPlasmaSweep(
     input,
     {
-      carrierMassGeV = CONSTANTS.ELECTRON_MASS_GEV,
-      muRatioMin = 0,
-      muRatioMax = 2,
-      points = 65,
-      intervals = 420
+      maxMuMeV = 2,
+      points = 100
     } = {}
   ) {
-    const count = Math.max(16, Math.min(160, Math.trunc(points)));
-    const ratios = linearSpace(muRatioMin, muRatioMax, count);
+    const p = normalizeParams(input);
+    const maxMu = assertFinitePositive(
+      Number(maxMuMeV),
+      "maxMuMeV"
+    );
+    const count = Math.max(
+      16,
+      Math.min(180, Math.trunc(points))
+    );
+    const values = Array.from(
+      { length: count },
+      (_, index) => maxMu * index / (count - 1)
+    );
+
     return {
-      carrierMassGeV,
-      points: ratios.map((vectorMuOverMass) => {
-        const d = finiteMassPlasmaDiagnostics(input, {
-          carrierMassGeV,
-          vectorMuOverMass,
-          intervals
+      points: values.map((electronMuMeV) => {
+        const plasma = finiteMassPlasmaDiagnostics({
+          ...p,
+          electronMuMeV
         });
         return {
-          vectorMuOverMass,
-          suppression: d.cveSuppression,
-          sigmaVFiniteGeV2: d.sigmaVFiniteGeV2,
-          electronDensityCm3: d.electronDensityCm3,
-          positronDensityCm3: d.positronDensityCm3,
-          netDensityCm3: d.netDensityCm3
+          electronMuMeV,
+          sigmaMassive: plasma.sigmaMassive,
+          sigmaMassless: plasma.sigmaMassless,
+          suppression: plasma.suppression,
+          massOverT: plasma.massOverT
         };
       })
     };
@@ -953,13 +850,30 @@
       p.faGev,
       p.betaTurb
     );
+    const electronMuGeV = p.electronMuMeV * 1e-3;
+    const cveBaseCoefficient =
+      massiveAxialVorticalConductivity(
+        p.temperature,
+        electronMuGeV,
+        CONSTANTS.ELECTRON_MASS_GEV
+      );
+    const cveMasslessReference =
+      masslessAxialVorticalReference(
+        p.temperature,
+        electronMuGeV
+      );
+    const finiteMassSuppression =
+      cveMasslessReference > 0
+        ? cveBaseCoefficient / cveMasslessReference
+        : null;
 
-    // In natural units J5 = sigma5 * omega with
-    // sigma5 = mu5^2/(2*pi^2) + T^2/6 and mu5 = qMu * a.
-    // Using div J5 ~ J5/L_eff gives RHS = c0 + c2*a^2.
+    // v7.9: the source term uses the exact free massive-Dirac
+    // bulk axial-CVE coefficient at vector chemical potential mu_V.
+    // The mu5^2 nonlinear term is retained from the legacy massless
+    // closure as an explicit phenomenological ansatz.
     const scale = omega /
       (p.faGev * mass * mass * effectiveLength + 1e-300);
-    const c0 = scale * temperature * temperature / 6;
+    const c0 = scale * cveBaseCoefficient;
     const c2 = scale * qMu * qMu / (2 * Math.PI * Math.PI);
     const discriminant = 1 - 4 * c0 * c2;
 
@@ -971,6 +885,10 @@
       omegaGeV: omega,
       effectiveLengthGeVInv: effectiveLength,
       qMu,
+      electronMuGeV,
+      cveBaseCoefficient,
+      cveMasslessReference,
+      finiteMassSuppression,
       c0,
       c2,
       discriminant
@@ -1397,7 +1315,8 @@
       faGev: Object.freeze({ min: 1e-30, max: 1e30, scale: "log" }),
       mEff: Object.freeze({ min: 1e-60, max: 1e2, scale: "log" }),
       mdot: Object.freeze({ min: 1e5, max: 1e90, scale: "log" }),
-      temperature: Object.freeze({ min: 1, max: 1e40, scale: "log" })
+      temperature: Object.freeze({ min: 1, max: 1e40, scale: "log" }),
+      electronMuMeV: Object.freeze({ min: 1e-9, max: 1e9, scale: "log" })
     })
   });
 
@@ -1808,7 +1727,15 @@
         ? 1 / Math.sqrt(discriminantFactor)
         : Number.POSITIVE_INFINITY;
 
-    const mu5Max = Math.PI * thermal / Math.sqrt(3);
+    const mu5Max = Math.sqrt(
+      Math.max(
+        0,
+        2 * Math.PI * Math.PI *
+        coefficients.cveBaseCoefficient
+      )
+    );
+    const masslessMu5Max =
+      Math.PI * thermal / Math.sqrt(3);
     const kappaMax = mu5Max / CONSTANTS.PROTON_MASS_GEV;
     const luminosityMax = kappaMax * p.mdot * CONSTANTS.C * CONSTANTS.C;
     const ratioMax = luminosityMax / CONSTANTS.L_OBS_511;
@@ -1823,6 +1750,11 @@
       currentDeficitOrders: deficitOrders(current.ratio511, goal),
       thermalGeV: thermal,
       mu5Max,
+      masslessMu5Max,
+      finiteMassSuppression:
+        coefficients.finiteMassSuppression,
+      electronMuGeV:
+        coefficients.electronMuGeV,
       kappaMax,
       luminosityMax,
       ratioMax,
@@ -1948,6 +1880,7 @@
       "mEff",
       "mdot",
       "temperature",
+      "electronMuMeV",
       "nProfile"
     ]),
     bosenova: Object.freeze([
@@ -2106,12 +2039,19 @@
 
       const thermalToElectronMass =
         temperatureGeV(p.temperature) / CONSTANTS.ELECTRON_MASS_GEV;
+      const plasma = finiteMassPlasmaDiagnostics(p);
+      add(
+        "info",
+        "finite_mass_cve",
+        "CVE source uses the free massive-Dirac bulk coefficient at the selected electron vector chemical potential μ_V.",
+        plasma.suppression
+      );
       add(
         thermalToElectronMass >= 1 ? "info" : "warning",
         "massless_fermion_regime",
         thermalToElectronMass >= 1
-          ? "Температура не ниже m_e; massless-fermion transport approximation хотя бы не находится в явно нерелятивистском режиме."
-          : "T << m_e: massless-fermion CVE/CME coefficients и susceptibility являются структурной диагностикой, а не физически надёжным electron-plasma расчётом.",
+          ? "T ≳ m_e: finite-mass correction is moderate; Chirality Lab massless susceptibility is still an approximation."
+          : "T << m_e: finite-mass CVE is applied in the closure, while the Chirality Lab susceptibility remains a massless structural diagnostic.",
         thermalToElectronMass
       );
 
@@ -2245,6 +2185,12 @@
     mu5FromA,
     chiralDegeneracy,
     chiralConductivity,
+    fermiDerivativeKernel,
+    massiveCveDimensionlessIntegral,
+    massiveAxialVorticalConductivity,
+    masslessAxialVorticalReference,
+    finiteMassPlasmaDiagnostics,
+    finiteMassPlasmaSweep,
     chiralMagneticConductivity,
     chiralMagneticCurrent,
     axialVorticalCurrent,
@@ -2259,15 +2205,6 @@
     evolveAxialDensity,
     chiralityDynamics,
     chiralityDynamicsSeries,
-    stableFermi,
-    stableSoftplus,
-    simpsonIntegral,
-    finiteMassFermiKernel,
-    finiteMassAxialVorticalConductivity,
-    finiteMassVectorSusceptibility,
-    finiteMassCarrierDensities,
-    finiteMassPlasmaDiagnostics,
-    finiteMassPlasmaSweep,
     averageMagneticField,
     selfConsistencyCoefficients,
     selfConsistencyRhs,
