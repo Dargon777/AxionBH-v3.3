@@ -787,3 +787,28 @@
   phenomenological; no full ISM kinetic transport equation is solved.
 </p>
 </section>
+
+
+<section id="v89-ism-transport">
+<h2>AxionBH v8.9: reduced multiphase ISM transport</h2>
+<p>
+  v8.9 derives the positron slowing time, propagation scale, in-flight survival
+  and competition between thermal annihilation and bulge escape instead of
+  requiring those quantities as manual efficiencies. Warm neutral, warm
+  ionized, hot ionized, cold neutral and diffuse molecular phase presets are
+  exposed explicitly.
+</p>
+<p>
+  The collisional timescale is anchored to the Jean et al. (2009)
+  order-of-magnitude result that a 1-MeV positron can travel up to about
+  $30\,\mathrm{kpc}/n_H$ along field lines when low-energy MHD scattering is
+  inefficient. A separate cosmic-ray-style diffusion+advection model is kept
+  exploratory because its extrapolation to MeV energies is uncertain.
+</p>
+<p>
+  Free-electron in-flight annihilation uses the exact two-photon cross section,
+  while post-thermal annihilation is still compressed into an effective phase
+  rate coefficient. Neutral charge exchange, dust and a full 3D Galactic
+  transport calculation remain future work.
+</p>
+</section>
