@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="AxionBH interactive browser simulator and parameter-analysis workbench.">
-  <title>AxionBH — Research Workbench v8.8.0</title>
+  <title>AxionBH — Research Workbench v8.9.0</title>
   <link rel="stylesheet" href="simulator.css">
   <script defer src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <script defer src="simulator-core.js"></script>
@@ -15,7 +15,7 @@
     <div class="topbar-inner">
       <a class="brand" href="index.html">
         <span class="brand-mark">A</span>
-        <span>AxionBH<small>research workbench · v8.8.0</small></span>
+        <span>AxionBH<small>research workbench · v8.9.0</small></span>
       </a>
       <nav class="nav">
         <a href="index.html">Теория</a>
@@ -39,14 +39,14 @@
     </section>
 
     <div class="notice">
-      <strong>Исследовательский калькулятор.</strong> AxionBH реализует текущие допущения модели и не является подтверждённым инструментом наблюдательной астрофизики. В v8.8.0 модель разбита на явные слои; CVE closure считается в natural units, порог a/M = 0.35 остаётся феноменологическим gate, а не выведенным результатом.
+      <strong>Исследовательский калькулятор.</strong> AxionBH реализует текущие допущения модели и не является подтверждённым инструментом наблюдательной астрофизики. В v8.9.0 модель разбита на явные слои; CVE closure считается в natural units, порог a/M = 0.35 остаётся феноменологическим gate, а не выведенным результатом.
     </div>
 
     <section class="workspace">
       <aside class="panel controls">
         <div class="panel-title">
           <h2>Параметры</h2>
-          <span class="muted">v8.8.0</span>
+          <span class="muted">v8.9.0</span>
         </div>
 
         <div class="field">
@@ -345,18 +345,35 @@
                 <option value="gap-schwinger">Schwinger @ solved gap</option>
               </select>
             </div>
+            <div class="explorer-field">
+              <label for="positronTransportModel">Transport model</label>
+              <select id="positronTransportModel" class="select compact-select">
+                <option value="ism-timescale">v8.9 ISM timescale</option>
+                <option value="legacy-factors">v8.8 manual factors</option>
+              </select>
+            </div>
+            <div class="explorer-field">
+              <label for="positronIsmPhase">ISM phase</label>
+              <select id="positronIsmPhase" class="select compact-select">
+                <option value="warm-neutral">warm neutral</option>
+                <option value="warm-ionized">warm ionized</option>
+                <option value="hot-ionized">hot ionized</option>
+                <option value="cold-neutral">cold neutral</option>
+                <option value="diffuse-molecular">diffuse molecular</option>
+              </select>
+            </div>
+            <div class="explorer-field">
+              <label for="positronPropagationMode">Propagation regime</label>
+              <select id="positronPropagationMode" class="select compact-select">
+                <option value="diffusion-advection">diffusion + advection</option>
+                <option value="collisional-ballistic">collisional / ballistic</option>
+              </select>
+            </div>
             <div class="explorer-field explorer-fa">
               <label for="positronEscape">source escape fraction</label>
               <div class="range-row">
                 <input id="positronEscape" type="range" min="0" max="1" step="0.01" value="1">
                 <span id="positronEscapeOut" class="range-value">1.00</span>
-              </div>
-            </div>
-            <div class="explorer-field explorer-fa">
-              <label for="positronSmearingPc">transport smearing, pc</label>
-              <div class="range-row">
-                <input id="positronSmearingPc" type="range" min="25" max="600" step="5" value="150">
-                <span id="positronSmearingOut" class="range-value">150</span>
               </div>
             </div>
             <div class="explorer-field explorer-fa">
@@ -367,17 +384,45 @@
               </div>
             </div>
             <div class="explorer-field explorer-fa">
-              <label for="positronThermalization">thermalisation survival</label>
+              <label for="positronInjectionExp">log₁₀ injection energy, MeV</label>
               <div class="range-row">
-                <input id="positronThermalization" type="range" min="0" max="1" step="0.01" value="1">
-                <span id="positronThermalizationOut" class="range-value">1.00</span>
+                <input id="positronInjectionExp" type="range" min="-2" max="2" step="0.05" value="0">
+                <span id="positronInjectionOut" class="range-value">1.00 MeV</span>
               </div>
             </div>
             <div class="explorer-field explorer-fa">
-              <label for="positronAnnihilation">annihilation fraction</label>
+              <label for="positronLogD10">log₁₀ D(10 GeV), cm²/s</label>
               <div class="range-row">
-                <input id="positronAnnihilation" type="range" min="0" max="1" step="0.01" value="1">
-                <span id="positronAnnihilationOut" class="range-value">1.00</span>
+                <input id="positronLogD10" type="range" min="24" max="30" step="0.1" value="28">
+                <span id="positronLogD10Out" class="range-value">1.00e+28</span>
+              </div>
+            </div>
+            <div class="explorer-field explorer-fa">
+              <label for="positronDiffusionDelta">diffusion index δ</label>
+              <div class="range-row">
+                <input id="positronDiffusionDelta" type="range" min="0" max="1" step="0.02" value="0.5">
+                <span id="positronDiffusionDeltaOut" class="range-value">0.50</span>
+              </div>
+            </div>
+            <div class="explorer-field explorer-fa">
+              <label for="positronAdvectionKms">advection, km/s</label>
+              <div class="range-row">
+                <input id="positronAdvectionKms" type="range" min="0" max="300" step="5" value="20">
+                <span id="positronAdvectionKmsOut" class="range-value">20</span>
+              </div>
+            </div>
+            <div class="explorer-field explorer-fa">
+              <label for="positronFieldLineExp">log₁₀ field-line displacement fraction</label>
+              <div class="range-row">
+                <input id="positronFieldLineExp" type="range" min="-4" max="0" step="0.1" value="-2">
+                <span id="positronFieldLineOut" class="range-value">1.00e-2</span>
+              </div>
+            </div>
+            <div class="explorer-field explorer-fa">
+              <label for="positronAnnCoeffExp">log₁₀ effective thermal annihilation k, cm³/s</label>
+              <div class="range-row">
+                <input id="positronAnnCoeffExp" type="range" min="-15" max="-10" step="0.1" value="-12">
+                <span id="positronAnnCoeffOut" class="range-value">1.00e-12</span>
               </div>
             </div>
             <div class="explorer-field explorer-fa">
@@ -388,10 +433,24 @@
               </div>
             </div>
             <div class="explorer-field explorer-fa">
-              <label for="positronInjectionExp">log₁₀ injection energy, MeV</label>
+              <label for="positronSmearingPc">legacy smearing, pc</label>
               <div class="range-row">
-                <input id="positronInjectionExp" type="range" min="-2" max="2" step="0.05" value="0">
-                <span id="positronInjectionOut" class="range-value">1.00 MeV</span>
+                <input id="positronSmearingPc" type="range" min="25" max="600" step="5" value="150">
+                <span id="positronSmearingOut" class="range-value">150</span>
+              </div>
+            </div>
+            <div class="explorer-field explorer-fa">
+              <label for="positronThermalization">legacy thermalisation survival</label>
+              <div class="range-row">
+                <input id="positronThermalization" type="range" min="0" max="1" step="0.01" value="1">
+                <span id="positronThermalizationOut" class="range-value">1.00</span>
+              </div>
+            </div>
+            <div class="explorer-field explorer-fa">
+              <label for="positronAnnihilation">legacy annihilation fraction</label>
+              <div class="range-row">
+                <input id="positronAnnihilation" type="range" min="0" max="1" step="0.01" value="1">
+                <span id="positronAnnihilationOut" class="range-value">1.00</span>
               </div>
             </div>
           </div>
