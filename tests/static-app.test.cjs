@@ -123,8 +123,8 @@ for (const feature of [
   );
 }
 
-assert.ok(html.includes("v8.0"));
-assert.ok(app.includes("AxionBH research workbench v8.0"));
+assert.ok(html.includes("v8.1"));
+assert.ok(app.includes("AxionBH research workbench v8.1"));
 
 
 for (const feature of [
@@ -300,3 +300,21 @@ for (const feature of [
 
 assert.ok(html.includes('data-analysis="validity"'));
 assert.ok(html.includes('<option value="2">Ṁ → nₑ,net → μ_V</option>'));
+
+
+for (const feature of [
+  "ACCRETION_CALIBRATIONS",
+  "mdotGsFromMsunPerYear",
+  "mdotMsunPerYearFromGs",
+  "classifyAccretionRate",
+  "accretionCalibrationPoint",
+  "accretionCalibrationAnalysis",
+  "renderAccretionCalibration"
+]) {
+  assert.ok(
+    core.includes(feature) || app.includes(feature),
+    "missing v8.1 calibration feature: " + feature
+  );
+}
+
+assert.ok(html.includes('data-analysis="calibration"'));

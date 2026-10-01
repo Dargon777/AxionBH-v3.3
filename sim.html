@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="AxionBH interactive browser simulator and parameter-analysis workbench.">
-  <title>AxionBH — Research Workbench v8.0</title>
+  <title>AxionBH — Research Workbench v8.1</title>
   <link rel="stylesheet" href="simulator.css">
   <script defer src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <script defer src="simulator-core.js"></script>
@@ -15,7 +15,7 @@
     <div class="topbar-inner">
       <a class="brand" href="index.html">
         <span class="brand-mark">A</span>
-        <span>AxionBH<small>research workbench · v8.0</small></span>
+        <span>AxionBH<small>research workbench · v8.1</small></span>
       </a>
       <nav class="nav">
         <a href="index.html">Теория</a>
@@ -30,7 +30,7 @@
       <div>
         <div class="eyebrow">AxionBH · research workbench</div>
         <h1>Аксионное облако вокруг вращающейся чёрной дыры</h1>
-        <p>Локальный интерактивный расчёт CVE closure, Bosenova, суперрадиантного и гибридного режимов — теперь со сравнением сценариев, картой параметров, анализом чувствительности, inverse inference, картой дефицита и accretion→plasma closure, finite-mass transport, Chirality, Missing Physics и явной картой validity слоёв.</p>
+        <p>Локальный интерактивный расчёт CVE closure, Bosenova, суперрадиантного и гибридного режимов — теперь со сравнением сценариев, картой параметров, анализом чувствительности, inverse inference, картой дефицита и accretion→plasma closure, Sgr A* accretion calibration, finite-mass transport, Chirality, Missing Physics и явной картой validity слоёв.</p>
       </div>
       <div class="status-stack">
         <span class="badge"><span id="runStatusDot" class="dot"></span><span id="runStatus">Движок готов</span></span>
@@ -39,14 +39,14 @@
     </section>
 
     <div class="notice">
-      <strong>Исследовательский калькулятор.</strong> AxionBH реализует текущие допущения модели и не является подтверждённым инструментом наблюдательной астрофизики. В v8.0 модель разбита на явные слои; CVE closure считается в natural units, порог a/M = 0.35 остаётся феноменологическим gate, а не выведенным результатом.
+      <strong>Исследовательский калькулятор.</strong> AxionBH реализует текущие допущения модели и не является подтверждённым инструментом наблюдательной астрофизики. В v8.1 модель разбита на явные слои; CVE closure считается в natural units, порог a/M = 0.35 остаётся феноменологическим gate, а не выведенным результатом.
     </div>
 
     <section class="workspace">
       <aside class="panel controls">
         <div class="panel-title">
           <h2>Параметры</h2>
-          <span class="muted">v8.0</span>
+          <span class="muted">v8.1</span>
         </div>
 
         <div class="field">
@@ -172,6 +172,7 @@
               <button class="analysis-tab" data-analysis="inference" type="button">Inference</button>
               <button class="analysis-tab" data-analysis="transport" type="button">Transport</button>
               <button class="analysis-tab" data-analysis="plasma" type="button">Plasma</button>
+              <button class="analysis-tab" data-analysis="calibration" type="button">Calibration</button>
               <button class="analysis-tab" data-analysis="validity" type="button">Validity</button>
               <button class="analysis-tab" data-analysis="chirality" type="button">Chirality</button>
               <button class="analysis-tab" data-analysis="missing" type="button">New Physics</button>
