@@ -86,3 +86,28 @@ for (const feature of [
 
 assert.ok(html.includes('data-analysis="explorer"'));
 assert.ok(!html.includes('data-analysis="map"'));
+
+
+for (const id of [
+  "reportBtn",
+  "diagnostics",
+  "explorerCsvBtn"
+]) {
+  assert.ok(html.includes('id="' + id + '"'), "missing v7.3 UI id: " + id);
+}
+
+for (const feature of [
+  "diagnoseRun",
+  "runStateId",
+  "downloadReport",
+  "downloadExplorerCsv",
+  "root_residual"
+]) {
+  assert.ok(
+    core.includes(feature) || app.includes(feature),
+    "missing v7.3 reproducibility feature: " + feature
+  );
+}
+
+assert.ok(html.includes("v7.3"));
+assert.ok(app.includes("AxionBH research workbench v7.3"));

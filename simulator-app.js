@@ -311,6 +311,68 @@
     return rows;
   }
 
+
+  function runStateId(mode, p) {
+    const ordered = {};
+    parameterIds.forEach((key) => {
+      ordered[key] = Number(p[key]);
+    });
+    const source = JSON.stringify({
+      model: "AxionBH-v7.3",
+      mode,
+      parameters: ordered
+    });
+    let hash = 2166136261;
+    for (let i = 0; i < source.length; i += 1) {
+      hash ^= source.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return "ax7-" + (hash >>> 0).toString(16).padStart(8, "0");
+  }
+
+  function currentDiagnostics() {
+    if (!state.lastResult || !state.lastParams) return null;
+    return A.diagnoseRun(
+      state.lastMode,
+      state.lastParams,
+      state.lastResult
+    );
+  }
+
+  function renderDiagnostics(result) {
+    const p = state.lastParams || params();
+    const diagnostics = A.diagnoseRun(result.mode, p, result);
+    const stateId = runStateId(result.mode, p);
+    const labels = {
+      ok: "OK",
+      warning: "WARN",
+      error: "ERROR",
+      info: "INFO"
+    };
+
+    const items = diagnostics.checks.map((item) => {
+      const value =
+        item.value !== null && Number.isFinite(Number(item.value))
+          ? '<span class="diag-value">' +
+            A.formatScientific(Number(item.value), 2) +
+            '</span>'
+          : "";
+      return '<div class="diag-item diag-' + item.level + '">' +
+        '<span class="diag-level">' + (labels[item.level] || item.level) + '</span>' +
+        '<span class="diag-message">' + item.message + '</span>' +
+        value +
+        '</div>';
+    }).join("");
+
+    $("diagnostics").innerHTML =
+      '<div class="diagnostics-head">' +
+      '<strong>Диагностика</strong>' +
+      '<span class="state-id" title="Детерминированный идентификатор режима и параметров">' +
+      stateId + '</span>' +
+      '</div>' +
+      '<div class="diagnostics-list">' + items + '</div>';
+  }
+
   function render(result) {
     $("emptyState").classList.add("hidden");
     $("resultArea").classList.remove("hidden");
@@ -334,6 +396,7 @@
     $("interpretation").textContent = ratio >= 1
       ? "В этой точке реализация модели достигает или превышает выбранную опорную светимость."
       : "В этой точке реализация модели остаётся ниже выбранной опорной светимости.";
+    renderDiagnostics(result);
   }
 
   function themeColors() {
@@ -905,26 +968,146 @@
     }
   }
 
-  function downloadJson() {
-    if (!state.lastResult) return toast("Сначала выполни расчёт.");
-    const payload = {
-      generatedAt: new Date().toISOString(),
-      model: "AxionBH research workbench v7.2",
-      mode: state.lastMode,
-      parameters: state.lastParams,
-      result: state.lastResult,
-      note: "Exploratory model output; not a validated astrophysical inference."
-    };
-    const blob = new Blob(
-      [JSON.stringify(payload, null, 2)],
-      { type: "application/json" }
-    );
+
+  function downloadTextFile(filename, text, type) {
+    const blob = new Blob([text], { type });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = "axionbh-result-" + Date.now() + ".json";
+    anchor.download = filename;
     anchor.click();
     URL.revokeObjectURL(url);
+  }
+
+  function downloadJson() {
+    if (!state.lastResult) return toast("Сначала выполни расчёт.");
+    const diagnostics = currentDiagnostics();
+    const payload = {
+      generatedAt: new Date().toISOString(),
+      model: "AxionBH research workbench v7.3",
+      stateId: runStateId(state.lastMode, state.lastParams),
+      mode: state.lastMode,
+      parameters: state.lastParams,
+      result: state.lastResult,
+      diagnostics,
+      explorer: {
+        view: $("explorerView").value,
+        reference: $("explorerReference").value,
+        faExp: Number($("explorerFaExp").value),
+        resolution: $("explorerResolution").value
+      },
+      note: "Exploratory model output; not a validated astrophysical inference."
+    };
+    downloadTextFile(
+      "axionbh-result-" + payload.stateId + ".json",
+      JSON.stringify(payload, null, 2),
+      "application/json"
+    );
+  }
+
+  function downloadReport() {
+    if (!state.lastResult) return toast("Сначала выполни расчёт.");
+    const diagnostics = currentDiagnostics();
+    const stateId = runStateId(state.lastMode, state.lastParams);
+    const lines = [
+      "# AxionBH reproducibility report",
+      "",
+      "- Model: AxionBH Research Workbench v7.3",
+      "- Generated: " + new Date().toISOString(),
+      "- State ID: " + stateId,
+      "- Mode: " + modeNames[state.lastMode],
+      "",
+      "## Parameters",
+      "",
+      "| Parameter | Value |",
+      "| --- | ---: |"
+    ];
+
+    parameterIds.forEach((key) => {
+      lines.push("| " + (parameterLabels[key] || key) + " | " +
+        A.formatScientific(Number(state.lastParams[key]), 6) + " |");
+    });
+
+    lines.push("", "## Result", "", "| Metric | Value |", "| --- | --- |");
+    detailedRows(state.lastResult).forEach(([key, value]) => {
+      lines.push("| " + key + " | " + String(value).replace(/\|/g, "\\|") + " |");
+    });
+
+    lines.push("", "## Diagnostics", "");
+    diagnostics.checks.forEach((item) => {
+      const value =
+        item.value !== null && Number.isFinite(Number(item.value))
+          ? " (" + A.formatScientific(Number(item.value), 6) + ")"
+          : "";
+      lines.push("- [" + item.level.toUpperCase() + "] " + item.message + value);
+    });
+
+    lines.push(
+      "",
+      "## Explorer state",
+      "",
+      "- View: " + $("explorerView").value,
+      "- Reference B: " + (referenceNames[$("explorerReference").value] || $("explorerReference").value),
+      "- f_a slice: " + A.formatScientific(explorerFaValue(), 6) + " GeV",
+      "- Resolution: " + explorerResolution().join("×"),
+      "",
+      "> Exploratory model output; not a validated astrophysical inference."
+    );
+
+    downloadTextFile(
+      "axionbh-report-" + stateId + ".md",
+      lines.join("\n"),
+      "text/markdown;charset=utf-8"
+    );
+  }
+
+  function csvCell(value) {
+    if (value === null || value === undefined) return "";
+    if (typeof value === "number" && !Number.isFinite(value)) return "";
+    const text = String(value);
+    if (!/[,"\n]/.test(text)) return text;
+    return '"' + text.replace(/"/g, '""') + '"';
+  }
+
+  function downloadExplorerCsv() {
+    let data;
+    try {
+      data = getExplorerComparison();
+    } catch (error) {
+      return toast(error.message || String(error));
+    }
+
+    const rows = [[
+      "spin_a_over_M",
+      "B0_G",
+      "fa_GeV",
+      "reference_B",
+      "ratio511_A",
+      "ratio511_B",
+      "delta_percent"
+    ]];
+
+    data.comparison.yValues.forEach((b0, rowIndex) => {
+      data.comparison.xValues.forEach((spin, columnIndex) => {
+        rows.push([
+          spin,
+          b0,
+          data.faGev,
+          referenceNames[data.referenceKey] || data.referenceKey,
+          data.comparison.mapA.z[rowIndex][columnIndex],
+          data.comparison.mapB.z[rowIndex][columnIndex],
+          data.comparison.differencePercent[rowIndex][columnIndex]
+        ]);
+      });
+    });
+
+    const csv = rows.map((row) => row.map(csvCell).join(",")).join("\n");
+    const stateId = runStateId("cme", { ...params(), faGev: data.faGev });
+    downloadTextFile(
+      "axionbh-explorer-" + stateId + ".csv",
+      csv,
+      "text/csv;charset=utf-8"
+    );
   }
 
   async function copyResult() {
@@ -1088,6 +1271,8 @@
     $("shareBtn").addEventListener("click", shareCurrentState);
     $("copyBtn").addEventListener("click", copyResult);
     $("exportBtn").addEventListener("click", downloadJson);
+    $("reportBtn").addEventListener("click", downloadReport);
+    $("explorerCsvBtn").addEventListener("click", downloadExplorerCsv);
     $("themeBtn").addEventListener("click", toggleTheme);
 
     document.querySelectorAll(".analysis-tab").forEach((button) => {

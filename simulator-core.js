@@ -686,6 +686,107 @@
     });
   }
 
+
+  function diagnoseRun(mode, input, result = null) {
+    const p = normalizeParams(input);
+    const r = result || simulate(mode, p);
+    const checks = [];
+
+    function add(level, code, message, value = null) {
+      checks.push({ level, code, message, value });
+    }
+
+    const ratio = Number(r && r.ratio511);
+    if (Number.isFinite(ratio) && ratio >= 0) {
+      add("ok", "finite_ratio", "Основная метрика L/L₅₁₁ конечна.", ratio);
+    } else {
+      add("error", "finite_ratio", "Основная метрика L/L₅₁₁ не является конечным неотрицательным числом.", ratio);
+    }
+
+    if (mode === "cme") {
+      if (p.spin < CONSTANTS.SPIN_THRESHOLD) {
+        add(
+          "info",
+          "spin_threshold",
+          "Спин ниже порога CME в текущей реализации; стационарная ветка принудительно даёт нулевой выход.",
+          p.spin
+        );
+      } else if (!(Number(r.aBar) > 0)) {
+        add(
+          "warning",
+          "cloud_root",
+          "Выше спинового порога не найден положительный самосогласованный корень поля ā.",
+          Number(r.aBar)
+        );
+      } else {
+        const residual = selfConsistencyResidual(Number(r.aBar), p);
+        const relativeResidual =
+          Math.abs(residual) / Math.max(Math.abs(Number(r.aBar)), 1e-300);
+        add(
+          relativeResidual <= 1e-8 ? "ok" : "warning",
+          "root_residual",
+          relativeResidual <= 1e-8
+            ? "Самосогласованный корень CME сошёлся по относительному residual."
+            : "Относительный residual самосогласованного корня выше диагностического порога 1e-8.",
+          relativeResidual
+        );
+      }
+
+      if (p.spin > 0.98) {
+        add(
+          "info",
+          "near_extremal",
+          "Спин близок к верхней численной границе a/M < 1; интерпретируй результат как пограничный режим реализации.",
+          p.spin
+        );
+      }
+    }
+
+    if (mode === "superradiant" || mode === "hybrid") {
+      if (!r.active) {
+        const reasons = [];
+        if (p.spin < 0.4) reasons.push("a/M < 0.4");
+        if (Number(r.alpha) < 0.05) reasons.push("α < 0.05");
+        add(
+          "info",
+          "superradiance_inactive",
+          "В текущей реализации Γ = 0" +
+            (reasons.length ? " (" + reasons.join(", ") + ")." : "."),
+          Number(r.alpha)
+        );
+      } else {
+        add(
+          "ok",
+          "superradiance_active",
+          "Суперрадиантная ветка активна по внутренним порогам текущей реализации.",
+          Number(r.gamma)
+        );
+      }
+    }
+
+    if (
+      mode === "bosenova" &&
+      Number.isFinite(r.intervalSeconds) &&
+      p.burstDuration >= r.intervalSeconds
+    ) {
+      add(
+        "warning",
+        "overlapping_bursts",
+        "Длительность вспышки не меньше интервала между вспышками; усреднённая интерпретация циклов перекрывается.",
+        p.burstDuration / r.intervalSeconds
+      );
+    }
+
+    const hasError = checks.some((item) => item.level === "error");
+    const hasWarning = checks.some((item) => item.level === "warning");
+
+    return {
+      mode,
+      status: hasError ? "error" : hasWarning ? "warning" : "ok",
+      checks
+    };
+  }
+
   function formatScientific(value, digits = 3) {
     if (value === Number.POSITIVE_INFINITY) return "∞";
     if (!Number.isFinite(value)) return "—";
@@ -729,6 +830,7 @@
     parameterSlices,
     sensitivityAnalysis,
     comparePresets,
+    diagnoseRun,
     SENSITIVITY_KEYS,
     formatScientific,
     formatDuration
