@@ -1317,6 +1317,7 @@ console.log("AxionBH simulator-core tests passed");
   const sweep=A.positronTransportSweep(A.DEFAULTS,{
     mode:"cme",
     sourceKind:"mode-proxy",
+    transportModel:"legacy-factors",
     smearingValuesPc:[50,150,500]
   });
   assert.equal(sweep.points.length,3);
