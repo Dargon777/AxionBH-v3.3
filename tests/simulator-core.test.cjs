@@ -677,7 +677,7 @@ console.log("AxionBH simulator-core tests passed");
 
 
 {
-  assert.equal(A.MODEL_VERSION, "8.4.0");
+  assert.equal(A.MODEL_VERSION, "8.5.0");
   assert.equal(A.STATE_SCHEMA_VERSION, 8);
 }
 
@@ -745,7 +745,7 @@ console.log("AxionBH simulator-core tests passed");
     },
     "cme"
   );
-  assert.equal(report.modelVersion, "8.4.0");
+  assert.equal(report.modelVersion, "8.5.0");
   assert.equal(report.stateSchemaVersion, 8);
   assert.equal(report.layers.length, A.MODEL_LAYERS.length);
   assert.ok(report.accretion);
@@ -884,3 +884,7 @@ console.log("AxionBH simulator-core tests passed");
 {const ec=A.CONSTANTS.SCHWINGER_ECRIT_V_CM;assert.equal(A.schwingerPairRateDensity(0),0);assert.ok(A.schwingerPairRateDensity(ec)>A.schwingerPairRateDensity(.1*ec));}
 {const inf=A.inferSchwingerFieldForObservedRate(A.DEFAULTS);assert.ok(inf.electricFieldOverCritical>0&&inf.electricFieldOverCritical<10);const got=A.schwingerPairProduction(A.DEFAULTS,{electricFieldVcm:inf.electricFieldVcm});assert.ok(Math.abs(Math.log10(got.rawRatio511))<1e-6);}
 {const a=A.pairProductionAudit(A.DEFAULTS);assert.equal(a.status,"explicit-idealized");assert.ok(a.minimumObservedPairPowerErgS>0);}
+
+{assert.ok(Math.abs(A.statvoltPerCmToVoltPerCm(1)-299.792458)<1e-12);}
+{const f=A.blackHoleRotationalField(A.DEFAULTS,{radiusRg:1,fieldLineOmegaFraction:.5});assert.ok(f.electricFieldVcm>0);const s=A.gapParallelElectricField(A.DEFAULTS,{screeningFraction:.1});assert.ok(s.parallelElectricFieldVcm<s.electricFieldVcm);}
+{const a=A.gapElectrodynamicsAudit(A.DEFAULTS);assert.equal(a.status,"upper-bound-scale");assert.ok(a.fieldToRequiredRatio>0);assert.ok(a.fieldDeficitDex>0);}

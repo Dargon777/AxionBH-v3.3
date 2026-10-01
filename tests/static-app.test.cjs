@@ -123,8 +123,8 @@ for (const feature of [
   );
 }
 
-assert.ok(html.includes("v8.4"));
-assert.ok(app.includes("AxionBH research workbench v8.4"));
+assert.ok(html.includes("v8.5"));
+assert.ok(app.includes("AxionBH research workbench v8.5"));
 
 
 for (const feature of [
@@ -313,7 +313,7 @@ for (const feature of [
 ]) {
   assert.ok(
     core.includes(feature) || app.includes(feature),
-    "missing v8.4 calibration feature: " + feature
+    "missing v8.5 calibration feature: " + feature
   );
 }
 
@@ -329,14 +329,14 @@ for (const feature of [
 ]) {
   assert.ok(
     core.includes(feature) || app.includes(feature),
-    "missing v8.4 flow feature: " + feature
+    "missing v8.5 flow feature: " + feature
   );
 }
 
 assert.ok(html.includes('data-analysis="flow"'));
 
 for(const feature of ["POSITRON_RATE_OBS_511","positronObservableFromPower","microphysicsAudit","renderMicrophysicsAudit"]){
-  assert.ok(core.includes(feature)||app.includes(feature),"missing v8.4 feature: "+feature);
+  assert.ok(core.includes(feature)||app.includes(feature),"missing v8.5 feature: "+feature);
 }
 assert.ok(html.includes('data-analysis="micro"'));
-for(const feature of ["SCHWINGER_ECRIT_V_CM","schwingerPairRateDensity","inferSchwingerFieldForObservedRate","pairProductionAudit","renderPairProduction"]){assert.ok(core.includes(feature)||app.includes(feature),"missing v8.4 feature: "+feature);}assert.ok(html.includes('data-analysis="pairs"'));
+for(const feature of ["SCHWINGER_ECRIT_V_CM","schwingerPairRateDensity","inferSchwingerFieldForObservedRate","pairProductionAudit","renderPairProduction"]){assert.ok(core.includes(feature)||app.includes(feature),"missing v8.5 feature: "+feature);}assert.ok(html.includes('data-analysis="pairs"'));for(const feature of ["blackHoleRotationalField","gapParallelElectricField","gapElectrodynamicsAudit","renderGapElectrodynamics"]){assert.ok(core.includes(feature)||app.includes(feature),"missing v8.5 feature: "+feature);}assert.ok(html.includes('data-analysis="gap"'));

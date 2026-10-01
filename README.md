@@ -3,7 +3,7 @@
 
 AxionBH is an exploratory browser simulator for the black-hole / axion model documented in `index.html`.
 
-## Research Workbench v8.4
+## Research Workbench v8.5
 
 Open `sim.html` in a modern browser.
 
@@ -53,7 +53,7 @@ GitHub Actions runs both checks on pull requests and pushes to `main`.
 
 ## Research analysis
 
-The v8.4 analysis tools are deterministic transformations of the current AxionBH implementation:
+The v8.5 analysis tools are deterministic transformations of the current AxionBH implementation:
 
 - **κ(spin)**: one-dimensional CME sweep with the model's spin threshold shown.
 - **3D Explorer**: CME surfaces/contours over `spin × B₀`, with `fₐ` selected as a logarithmic slice from `10^14` to `10^18 GeV`.
@@ -62,9 +62,9 @@ The v8.4 analysis tools are deterministic transformations of the current AxionBH
 - **A/B parameter comparison**: current parameters and a selected reference scenario rendered as matched surfaces/contours.
 - **Relative-difference map**: signed `Δ% = (A - B) / |B| × 100`; cells with zero reference output are left undefined rather than divided by zero.
 - **Diagnostics**: each run records a deterministic state ID, finite-output checks and model-branch diagnostics; CME reports the quadratic discriminant, fixed-point slope and relative residual.
-- **CME closure v8.4**: `B`, `T`, `Ω_H`, `m_eff` and `L_eff` are converted to `ℏ=c=k_B=1`; `∇·J₅ ≈ J₅/L_eff` is used, and the smaller positive quadratic root is selected as the stable branch.
+- **CME closure v8.5**: `B`, `T`, `Ω_H`, `m_eff` and `L_eff` are converted to `ℏ=c=k_B=1`; `∇·J₅ ≈ J₅/L_eff` is used, and the smaller positive quadratic root is selected as the stable branch.
 - **Reproducibility export**: the current run can be exported as enriched JSON or Markdown, while the Explorer grid can be exported row-by-row as CSV.
-- **Parameter Inference**: for each configured CME parameter, v8.4 scans a deliberately broad diagnostic range and either solves `L/L511 = 1` or reports the best reachable value and the remaining logarithmic deficit.
+- **Parameter Inference**: for each configured CME parameter, v8.5 scans a deliberately broad diagnostic range and either solves `L/L511 = 1` or reports the best reachable value and the remaining logarithmic deficit.
 - **Deficit map**: Explorer can render `log10(L511/L)` directly; positive values are the number of decimal orders still missing from the target.
 - **Missing Physics Lab**: compares a gain in the closure source, a gain in the effective axion→chiral coupling, and a downstream positron-conversion gain. Upstream gains are stopped when the quadratic discriminant becomes negative.
 - **Anomalous Transport**: explicitly distinguishes the axial CVE current `J5 = sigmaV * omega` from the magnetic CME vector current `j = (e^2 mu5 / 2 pi^2) B`. The two are reported separately and are not added into a positron luminosity.
@@ -75,23 +75,23 @@ The explorer uses a single `fₐ` slice for both A and B so the comparison isola
 These tools are for exploring the implementation. They are not statistical confidence intervals and do not establish observational validity.
 
 
-## CME v8.4 unit audit
+## CME v8.5 unit audit
 
-The previous implementation mixed cgs quantities with natural-unit transport coefficients and multiplied the self-consistency source by `L_eff`. The v8.4 closure instead converts all CME quantities to a single natural-unit system and uses the gradient estimate `div J5 ~ J5/L_eff`.
+The previous implementation mixed cgs quantities with natural-unit transport coefficients and multiplied the self-consistency source by `L_eff`. The v8.5 closure instead converts all CME quantities to a single natural-unit system and uses the gradient estimate `div J5 ~ J5/L_eff`.
 
-The axial vortical coefficient is implemented as `sigma5 = mu5^2/(2*pi^2) + T^2/6` for zero vector chemical potential. The model's dimensionless relation is interpreted as `eta5 = mu5/T`, so the physical `mu5` is an energy. Because `mu5` is linear in `a`, the closure is exactly quadratic: `a = c0 + c2*a^2`. v8.4 computes both mathematical branches analytically and uses the smaller branch, for which the fixed-point slope is the stable one when below unity.
+The axial vortical coefficient is implemented as `sigma5 = mu5^2/(2*pi^2) + T^2/6` for zero vector chemical potential. The model's dimensionless relation is interpreted as `eta5 = mu5/T`, so the physical `mu5` is an energy. Because `mu5` is linear in `a`, the closure is exactly quadratic: `a = c0 + c2*a^2`. v8.5 computes both mathematical branches analytically and uses the smaller branch, for which the fixed-point slope is the stable one when below unity.
 
 The explicit `a/M = 0.35` switch remains a phenomenological model assumption. It is not produced by the quadratic closure itself.
 
 
-## v8.4 inverse inference
+## v8.5 inverse inference
 
 The inference panel is not a fit, posterior, confidence interval, or physical prior. It is a deterministic one-parameter-at-a-time diagnostic of the current closure. All other parameters are held fixed while one parameter is scanned over an intentionally broad range.
 
 A TARGET row means a numerical crossing of L/L511 = 1 exists inside that scan. UNREACHED means no crossing was found; the table reports the best point discovered and how many decimal orders of luminosity remain missing. This distinction is important because some CME parameters hit the quadratic-closure boundary before reaching the observational target.
 
 
-## v8.4 closure ceiling
+## v8.5 closure ceiling
 
 For the present quadratic CVE closure, `a = c0 + c2 a^2` with `mu5 = q_mu a`, the requirement of a real stable branch gives `D = 1 - 4 c0 c2 >= 0`.
 
@@ -101,25 +101,25 @@ This is an internal mathematical ceiling of the chosen quadratic closure, not an
 
 The `g_extra` controls are diagnostic only. They do not alter the default CME run, presets, or exported baseline parameters.
 
-## v8.4 terminology and transport decomposition
+## v8.5 terminology and transport decomposition
 
-The stationary branch historically used the internal mode key `cme`. v8.4 keeps that key for saved URLs and API compatibility, but the self-consistency source implemented by the code is an axial chiral vortical effect (CVE): an axial current parallel to vorticity.
+The stationary branch historically used the internal mode key `cme`. v8.5 keeps that key for saved URLs and API compatibility, but the self-consistency source implemented by the code is an axial chiral vortical effect (CVE): an axial current parallel to vorticity.
 
 The magnetic chiral magnetic effect (CME) is now computed separately as a vector/electric current parallel to the magnetic field, with `sigma_CME = e^2 mu5 / (2 pi^2) = 2 alpha mu5 / pi` for a single unit-charge Dirac species.
 
 Both current magnitudes have natural-unit dimension GeV^3, so their scales can be compared. They are nevertheless different currents and generally different directions; the simulator therefore does not sum them or infer an `L511` contribution from the CME current without an additional kinetic/geometric conversion model.
 
-## v8.4 chirality dynamics
+## v8.5 chirality dynamics
 
 The dynamics panel uses `dn5/dt = S_proxy + C_A E·B - Gamma_flip n5`, with `C_A = e^2/(2 pi^2) = 2 alpha/pi` in the convention used by the magnetic-CME diagnostic. `S_proxy = |J5,CVE|/L_eff` is deliberately labeled a proxy; it is not claimed to be a microscopic derivation of axion-to-chirality conversion.
 
 For a free massless Dirac gas at zero vector chemical potential the panel uses `n5(mu5,T) = mu5 T^2/3 + mu5^3/(3 pi^2)` and `chi5 = T^2/3 + mu5^2/pi^2`. With constant coefficients the axial-density equation is solved analytically rather than by a time-step integrator.
 
-Important regime warning: the baseline temperature `1e7 K` corresponds to `T/m_e ~ 1.7e-3`. Therefore the massless-fermion susceptibility and transport formulas are not a quantitatively reliable electron-plasma model at the baseline point. v8.4 exposes this explicitly instead of hiding it.
+Important regime warning: the baseline temperature `1e7 K` corresponds to `T/m_e ~ 1.7e-3`. Therefore the massless-fermion susceptibility and transport formulas are not a quantitatively reliable electron-plasma model at the baseline point. v8.5 exposes this explicitly instead of hiding it.
 
-## v8.4 finite-mass electron plasma
+## v8.5 finite-mass electron plasma
 
-The stationary CVE source no longer assumes the massless thermal coefficient at the baseline electron temperature. v8.4 evaluates the free massive-Dirac bulk axial vortical conductivity in linear response using a direct Fermi-Dirac integral. The new input `electronMuMeV` is the magnitude of the electron vector chemical potential.
+The stationary CVE source no longer assumes the massless thermal coefficient at the baseline electron temperature. v8.5 evaluates the free massive-Dirac bulk axial vortical conductivity in linear response using a direct Fermi-Dirac integral. The new input `electronMuMeV` is the magnitude of the electron vector chemical potential.
 
 At `m -> 0` the numerical integral reproduces `T^2/6 + mu_V^2/(2 pi^2)`. At the default `T = 1e7 K` and `mu_V = 0`, `m_e/T ~ 593` and the finite-mass coefficient is suppressed by about `3.2e-254` relative to the massless `T^2/6` reference.
 
@@ -127,7 +127,7 @@ This does not imply that a real Sgr A* accretion plasma has `mu_V = 0`. A charge
 
 The nonlinear `mu5^2/(2 pi^2)` piece in the AxionBH quadratic closure is retained for continuity but is explicitly labeled a legacy massless ansatz: for massive fermions axial charge is not exactly conserved, so a true equilibrium axial chemical potential requires extra care.
 
-## v8.4 electron density closure
+## v8.5 electron density closure
 
 The plasma layer can now determine the electron vector chemical potential from the net electron density rather than treating `mu_V` as an independent knob. The ideal massive Fermi gas uses
 
@@ -141,9 +141,9 @@ The density is the net conserved electron number `n(e-) - n(e+)`, appropriate fo
 
 No Sgr A* density is hard-coded: the default simulator remains in manual mode. The example density field is exploratory and must be supplied or constrained by an accretion-flow model before astrophysical interpretation.
 
-## v8.4 accretion plasma architecture
+## v8.5 accretion plasma architecture
 
-v8.4 introduces a third electron-plasma mode: `electronDensityMode = 2`. It estimates net electron density from a steady thick-disk continuity proxy
+v8.5 introduces a third electron-plasma mode: `electronDensityMode = 2`. It estimates net electron density from a steady thick-disk continuity proxy
 
 `mdot = 4 pi r H rho |v_r|`,  `n_e,net = Y_e rho / m_p`,
 
@@ -155,9 +155,9 @@ The default remains manual `mu_V` so existing v7.x states reproduce their previo
 
 The Validity tab is a model-dependency map, not a score. It records which layers are algebraic/analytic, literature-based free-field transport, ideal-gas closures, phenomenological AxionBH assumptions, or diagnostic proxies.
 
-## v8.4 Sgr A* accretion calibration
+## v8.5 Sgr A* accretion calibration
 
-v8.4 does not silently replace the historical AxionBH accretion rate. Instead it evaluates the same v8.0 accretion-plasma geometry at several literature-context rates so that the effect of `mdot` can be isolated from the other phenomenological flow parameters.
+v8.5 does not silently replace the historical AxionBH accretion rate. Instead it evaluates the same v8.0 accretion-plasma geometry at several literature-context rates so that the effect of `mdot` can be isolated from the other phenomenological flow parameters.
 
 Two ranges are included:
 
@@ -168,9 +168,9 @@ The historical AxionBH default `6.3e22 g/s` is approximately `1.0e-3 M_sun/yr`, 
 
 These ranges are literature context, not a statistical combination or a new posterior.
 
-## v8.4 flow geometry calibration
+## v8.5 flow geometry calibration
 
-v8.4 asks how much freedom remains in the v8.0 continuity bridge once `mdot` is fixed to the geometric midpoint of the EHT 2023 promising-model cluster.
+v8.5 asks how much freedom remains in the v8.0 continuity bridge once `mdot` is fixed to the geometric midpoint of the EHT 2023 promising-model cluster.
 
 The literature anchor is the ADAF/RIAF review by Narayan & McClintock (`arXiv:0803.0322`): radiatively inefficient flows are geometrically thick (`H` of order `R`) and have radial speed approximately `v_r ~ alpha v_K (H/R)^2`, with the review quoting `alpha ~ 0.1-0.3`. In `r/r_g` units the workbench uses the transparent Newtonian proxy `v_r/c = alpha (H/R)^2 / sqrt(r/r_g)`.
 
@@ -178,9 +178,9 @@ The scan envelope is deliberately broader than the directly quoted statements: `
 
 The Flow tab evaluates all 16 envelope corners and a 2D `r/r_g x H/R` map at geometric-mean alpha and `Y_e=0.85`. It reports the maximum luminosity leverage in dex and the best remaining `L/L511` deficit. This is a structural stress test of the continuity closure, not a parameter fit.
 
-## v8.4 microphysics audit
+## v8.5 microphysics audit
 
-v8.4 identifies and isolates a dimensional error in the historical 511-keV comparison. The observational quantity of order 1e43 is a Galactic positron annihilation/injection **rate** in e+/s, not an energy luminosity in erg/s. The legacy `L_OBS_511=1.07e43` numerical field is retained only as a deprecated reproducibility alias; new audit code uses `POSITRON_RATE_OBS_511`.
+v8.5 identifies and isolates a dimensional error in the historical 511-keV comparison. The observational quantity of order 1e43 is a Galactic positron annihilation/injection **rate** in e+/s, not an energy luminosity in erg/s. The legacy `L_OBS_511=1.07e43` numerical field is retained only as a deprecated reproducibility alias; new audit code uses `POSITRON_RATE_OBS_511`.
 
 The workbench now reports a rate-corrected phenomenological proxy
 
@@ -188,7 +188,10 @@ The workbench now reports a rate-corrected phenomenological proxy
 
 with the existing `E_cost=1.6e-6 erg` kept explicit. This conversion is **not** a microscopic pair-production calculation. Likewise, the stationary local `axion -> mu5` relation remains explicitly phenomenological: derivative axion-current interactions motivate charge-bias mechanisms in suitable non-equilibrium systems, but do not derive the specific AxionBH closure ansatz.
 
-The Microphysics tab shows the historical dimensional mismatch and the corrected positron-rate proxy side by side. Legacy result fields are not silently rewritten in v8.4 so old shared states remain numerically reproducible.
+The Microphysics tab shows the historical dimensional mismatch and the corrected positron-rate proxy side by side. Legacy result fields are not silently rewritten in v8.5 so old shared states remain numerically reproducible.
 
-## v8.4 explicit pair production
+## v8.5 explicit pair production
 Adds an idealized constant-field Schwinger e+e- diagnostic. The QED rate is explicit; the local E field, screening, backreaction and active filling factor are not derived. The Pairs tab inverts the rate for a fiducial one-r_g shell and separately checks the necessary mdot c^2 energy ceiling.
+
+## v8.5 black-hole gap electrodynamics
+Connects the v8.4 Schwinger requirement to an optimistic Kerr rotational field scale E~(Omega_F r/c)B, with Omega_F=0.5 Omega_H by default and explicit screening. This is an upper-bound scale rather than a self-consistent GR gap solution. Pair-loaded magnetospheres screen E_parallel; kinetic gap models include pair cascades and radiation feedback.
