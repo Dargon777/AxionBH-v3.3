@@ -123,8 +123,8 @@ for (const feature of [
   );
 }
 
-assert.ok(html.includes("v8.6.0"));
-assert.ok(app.includes("AxionBH research workbench v8.6.0"));
+assert.ok(html.includes("v8.7.0"));
+assert.ok(app.includes("AxionBH research workbench v8.7.0"));
 
 
 for (const feature of [
@@ -399,3 +399,28 @@ for (const id of [
 ]) {
   assert.ok(html.includes(id), "missing v8.6 gap control: " + id);
 }
+
+
+for (const feature of [
+  "powerLawSoftPhotonSpectrum",
+  "spectralGammaGammaAudit",
+  "inverseComptonCoolingAudit",
+  "gapRadiationBalanceAudit",
+  "radiativeGapCascadeAudit",
+  "solveGapClosure"
+]) {
+  assert.ok(
+    core.includes(feature) || app.includes(feature),
+    "missing v8.7 spectral-gap feature: " + feature
+  );
+}
+for (const id of [
+  'id="gapClosureMode"',
+  'id="gapSoftMinExp"',
+  'id="gapSoftMaxExp"',
+  'id="gapPhotonIndex"'
+]) {
+  assert.ok(html.includes(id), "missing v8.7 gap control: " + id);
+}
+assert.ok(app.includes("dominant cooling"));
+assert.ok(app.includes("GJ refill"));
