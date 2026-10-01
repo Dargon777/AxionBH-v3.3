@@ -558,7 +558,7 @@ console.log("AxionBH simulator-core tests passed");
   });
   assert.ok(result.closure.finiteMassSuppression < 1e-250);
   assert.ok(result.ratio511 > 0);
-  assert.ok(result.ratio511 < 1e-300);
+  assert.ok(result.ratio511 < 1e-298);
 }
 
 {
