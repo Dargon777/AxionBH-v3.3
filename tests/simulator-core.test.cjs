@@ -322,9 +322,13 @@ console.log("AxionBH simulator-core tests passed");
 
 {
   const ceiling = A.cmeClosureCeiling(A.DEFAULTS);
-  const t = A.temperatureGeV(A.DEFAULTS.temperature);
-  const expectedMu = Math.PI * t / Math.sqrt(3);
+  const coefficients = A.selfConsistencyCoefficients(A.DEFAULTS);
+  const expectedMu = Math.sqrt(
+    2 * Math.PI * Math.PI *
+    coefficients.cveBaseCoefficient
+  );
   assert.ok(Math.abs(ceiling.mu5Max / expectedMu - 1) < 1e-12);
+  assert.ok(ceiling.mu5Max < ceiling.masslessMu5Max);
   assert.ok(ceiling.ratioMax > A.cme(A.DEFAULTS).ratio511);
   assert.ok(ceiling.ratioMax > 0);
   assert.ok(ceiling.ratioMax < 1e-120);
