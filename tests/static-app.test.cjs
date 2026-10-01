@@ -55,3 +55,34 @@ for (const feature of [
 
 assert.ok(!app.includes("fetch("));
 assert.ok(!app.includes("XMLHttpRequest"));
+
+
+for (const id of [
+  "explorerControls",
+  "explorerView",
+  "explorerReference",
+  "explorerFaExp",
+  "explorerFaOut",
+  "explorerResolution"
+]) {
+  assert.ok(html.includes('id="' + id + '"'), "missing explorer UI id: " + id);
+}
+
+for (const feature of [
+  "compareParameterMaps",
+  "parameterSlices",
+  "relativeDifferencePercent",
+  "renderParameterExplorer",
+  "renderExplorerSurface",
+  "renderExplorerContour",
+  "renderExplorerDifference",
+  "scheduleExplorerRender"
+]) {
+  assert.ok(
+    core.includes(feature) || app.includes(feature),
+    "missing v7.2 explorer feature: " + feature
+  );
+}
+
+assert.ok(html.includes('data-analysis="explorer"'));
+assert.ok(!html.includes('data-analysis="map"'));

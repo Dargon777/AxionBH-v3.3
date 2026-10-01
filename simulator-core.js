@@ -453,6 +453,97 @@
     };
   }
 
+  function relativeDifferencePercent(valueA, valueB) {
+    const a = Number(valueA);
+    const b = Number(valueB);
+    if (!Number.isFinite(a) || !Number.isFinite(b) || b === 0) return null;
+    const result = ((a - b) / Math.abs(b)) * 100;
+    return Number.isFinite(result) ? result : null;
+  }
+
+  function compareParameterMaps(
+    inputA,
+    inputB,
+    {
+      mode = "cme",
+      xKey = "spin",
+      yKey = "B0",
+      xValues = linearSpace(0.05, 0.998, 24),
+      yValues = logSpace(1, 2e5, 18),
+      metric = "ratio511"
+    } = {}
+  ) {
+    const mapA = parameterMap(inputA, {
+      mode,
+      xKey,
+      yKey,
+      xValues,
+      yValues,
+      metric
+    });
+    const mapB = parameterMap(inputB, {
+      mode,
+      xKey,
+      yKey,
+      xValues,
+      yValues,
+      metric
+    });
+
+    const differencePercent = mapA.z.map((row, rowIndex) =>
+      row.map((value, columnIndex) =>
+        relativeDifferencePercent(
+          value,
+          mapB.z[rowIndex][columnIndex]
+        )
+      )
+    );
+
+    return {
+      mode,
+      metric,
+      xKey,
+      yKey,
+      xValues: [...xValues],
+      yValues: [...yValues],
+      mapA,
+      mapB,
+      differencePercent
+    };
+  }
+
+  function parameterSlices(
+    input,
+    {
+      mode = "cme",
+      sliceKey = "faGev",
+      sliceValues = logSpace(1e14, 1e18, 5),
+      xKey = "spin",
+      yKey = "B0",
+      xValues = linearSpace(0.05, 0.998, 18),
+      yValues = logSpace(1, 2e5, 14),
+      metric = "ratio511"
+    } = {}
+  ) {
+    if (!Array.isArray(sliceValues) || sliceValues.length < 1) {
+      throw new RangeError("sliceValues must contain at least one value");
+    }
+
+    const base = normalizeParams(input);
+    return {
+      mode,
+      metric,
+      sliceKey,
+      slices: sliceValues.map((sliceValue) => ({
+        sliceValue,
+        map: parameterMap(
+          { ...base, [sliceKey]: sliceValue },
+          { mode, xKey, yKey, xValues, yValues, metric }
+        )
+      }))
+    };
+  }
+
   const SENSITIVITY_KEYS = Object.freeze({
     cme: Object.freeze([
       "massSolar",
@@ -633,6 +724,9 @@
     linearSpace,
     logSpace,
     parameterMap,
+    relativeDifferencePercent,
+    compareParameterMaps,
+    parameterSlices,
     sensitivityAnalysis,
     comparePresets,
     SENSITIVITY_KEYS,

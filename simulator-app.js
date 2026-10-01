@@ -10,7 +10,8 @@
     lastParams: null,
     lastMode: "cme",
     analysis: "spin",
-    userPresets: []
+    userPresets: [],
+    explorerCache: new Map()
   };
 
   const modeNames = {
@@ -397,41 +398,382 @@
     }], layout, { responsive: true, displaylogo: false });
   }
 
-  function renderParameterMap() {
-    const p = params();
-    setAnalysisMeta(
-      "Карта spin × B₀",
-      "CME · цвет = log₁₀(L/L₅₁₁) · карта модели, не статистическая вероятность"
-    );
-    setAnalysisTable("");
+  const referenceNames = {
+    baseline: "Sgr A* baseline",
+    breakthrough: "High-B breakthrough",
+    optimistic: "Optimistic"
+  };
 
-    const map = A.parameterMap(p, {
+  const explorerResolutions = {
+    low: [14, 10],
+    medium: [20, 15],
+    high: [28, 20]
+  };
+
+  function explorerFaValue() {
+    return Math.pow(10, Number($("explorerFaExp").value));
+  }
+
+  function updateExplorerFaLabel() {
+    $("explorerFaOut").textContent =
+      A.formatScientific(explorerFaValue(), 2);
+  }
+
+  function explorerResolution() {
+    return explorerResolutions[$("explorerResolution").value] ||
+      explorerResolutions.medium;
+  }
+
+  function logMetricMatrix(matrix) {
+    return matrix.map((row) =>
+      row.map((value) =>
+        value !== null && value > 0 ? Math.log10(value) : null
+      )
+    );
+  }
+
+  function finiteValues(matrix) {
+    return matrix.flat().filter((value) => Number.isFinite(value));
+  }
+
+  function finiteRange(...matrices) {
+    const values = matrices.flatMap((matrix) => finiteValues(matrix));
+    if (!values.length) return [-1, 1];
+    const minimum = Math.min(...values);
+    const maximum = Math.max(...values);
+    if (minimum === maximum) {
+      const padding = Math.max(0.5, Math.abs(minimum) * 0.05);
+      return [minimum - padding, maximum + padding];
+    }
+    return [minimum, maximum];
+  }
+
+  function robustSymmetricRange(matrix) {
+    const values = finiteValues(matrix)
+      .map((value) => Math.abs(value))
+      .sort((a, b) => a - b);
+    if (!values.length) return 1;
+    const index = Math.min(
+      values.length - 1,
+      Math.max(0, Math.floor(values.length * 0.95))
+    );
+    return Math.max(1, values[index]);
+  }
+
+  function explorerCacheKey(base, reference, faGev, resolution) {
+    return JSON.stringify({
+      base,
+      reference,
+      faGev,
+      resolution
+    });
+  }
+
+  function getExplorerComparison() {
+    const current = params();
+    const referenceKey = $("explorerReference").value;
+    const reference = A.PRESETS[referenceKey] || A.PRESETS.baseline;
+    const faGev = explorerFaValue();
+    const [xCount, yCount] = explorerResolution();
+
+    const modelA = { ...current, faGev };
+    const modelB = { ...reference, faGev };
+    const key = explorerCacheKey(
+      modelA,
+      referenceKey,
+      faGev,
+      [xCount, yCount]
+    );
+
+    if (state.explorerCache.has(key)) {
+      return {
+        referenceKey,
+        faGev,
+        resolution: [xCount, yCount],
+        comparison: state.explorerCache.get(key)
+      };
+    }
+
+    const comparison = A.compareParameterMaps(modelA, modelB, {
       mode: "cme",
-      xValues: A.linearSpace(0.05, 0.998, 34),
-      yValues: A.logSpace(1, 2e5, 26),
+      xValues: A.linearSpace(0.05, 0.998, xCount),
+      yValues: A.logSpace(1, 2e5, yCount),
       metric: "ratio511"
     });
 
-    if (!window.Plotly) return toast("Plotly не загрузился; карта рассчитана, но не может быть нарисована.");
+    state.explorerCache.set(key, comparison);
+    while (state.explorerCache.size > 6) {
+      state.explorerCache.delete(state.explorerCache.keys().next().value);
+    }
 
-    const zLog = map.z.map((row) =>
-      row.map((value) => value !== null && value > 0 ? Math.log10(value) : null)
-    );
+    return {
+      referenceKey,
+      faGev,
+      resolution: [xCount, yCount],
+      comparison
+    };
+  }
 
+  function explorerSummary(referenceKey, faGev, resolution, difference) {
+    const finiteDiff = finiteValues(difference);
+    const absolute = finiteDiff
+      .map((value) => Math.abs(value))
+      .sort((a, b) => a - b);
+    const median = absolute.length
+      ? absolute[Math.floor(absolute.length / 2)]
+      : null;
+    const maximum = absolute.length ? absolute[absolute.length - 1] : null;
+
+    return [
+      '<div class="explorer-summary">',
+      '<div><span>Модель A</span><strong>Текущие параметры</strong></div>',
+      '<div><span>Модель B</span><strong>' +
+        (referenceNames[referenceKey] || referenceKey) + '</strong></div>',
+      '<div><span>fₐ slice</span><strong>' +
+        A.formatScientific(faGev, 2) + ' GeV</strong></div>',
+      '<div><span>Сетка</span><strong>' +
+        resolution[0] + '×' + resolution[1] + '</strong></div>',
+      '<div><span>Median |Δ|</span><strong>' +
+        (median === null ? "—" : median.toFixed(2) + "%") + '</strong></div>',
+      '<div><span>Max |Δ|</span><strong>' +
+        (maximum === null ? "—" : maximum.toFixed(2) + "%") + '</strong></div>',
+      '</div>'
+    ].join("");
+  }
+
+  function surfaceLayout(colors, cmin, cmax) {
+    const sceneBase = {
+      bgcolor: "transparent",
+      xaxis: {
+        title: "spin a/M",
+        color: colors.text,
+        gridcolor: colors.grid
+      },
+      yaxis: {
+        title: "B₀, G",
+        type: "log",
+        color: colors.text,
+        gridcolor: colors.grid
+      },
+      zaxis: {
+        title: "log₁₀ L/L₅₁₁",
+        color: colors.text,
+        gridcolor: colors.grid
+      },
+      aspectmode: "cube"
+    };
+
+    return {
+      paper_bgcolor: "transparent",
+      font: { color: colors.text },
+      margin: { l: 0, r: 0, t: 44, b: 0 },
+      scene: {
+        ...sceneBase,
+        domain: { x: [0, 0.48], y: [0, 1] }
+      },
+      scene2: {
+        ...sceneBase,
+        domain: { x: [0.52, 1], y: [0, 1] }
+      },
+      annotations: [
+        {
+          text: "A · current",
+          x: 0.24, y: 1.02, xref: "paper", yref: "paper",
+          showarrow: false, font: { color: colors.text, size: 12 }
+        },
+        {
+          text: "B · reference",
+          x: 0.76, y: 1.02, xref: "paper", yref: "paper",
+          showarrow: false, font: { color: colors.text, size: 12 }
+        }
+      ],
+      showlegend: false,
+      _cmin: cmin,
+      _cmax: cmax
+    };
+  }
+
+  function renderExplorerSurface(data) {
+    const { comparison } = data;
+    const zA = logMetricMatrix(comparison.mapA.z);
+    const zB = logMetricMatrix(comparison.mapB.z);
+    const [cmin, cmax] = finiteRange(zA, zB);
+    const colors = themeColors();
+    const layout = surfaceLayout(colors, cmin, cmax);
+    delete layout._cmin;
+    delete layout._cmax;
+
+    Plotly.react("plot", [
+      {
+        type: "surface",
+        scene: "scene",
+        x: comparison.xValues,
+        y: comparison.yValues,
+        z: zA,
+        customdata: comparison.mapA.z,
+        cmin,
+        cmax,
+        colorscale: "Viridis",
+        showscale: false,
+        hovertemplate:
+          "A<br>a/M=%{x:.3f}<br>B₀=%{y:.3e} G" +
+          "<br>L/L₅₁₁=%{customdata:.3e}<extra></extra>"
+      },
+      {
+        type: "surface",
+        scene: "scene2",
+        x: comparison.xValues,
+        y: comparison.yValues,
+        z: zB,
+        customdata: comparison.mapB.z,
+        cmin,
+        cmax,
+        colorscale: "Viridis",
+        showscale: true,
+        colorbar: { title: "log₁₀ L/L₅₁₁", len: 0.72 },
+        hovertemplate:
+          "B<br>a/M=%{x:.3f}<br>B₀=%{y:.3e} G" +
+          "<br>L/L₅₁₁=%{customdata:.3e}<extra></extra>"
+      }
+    ], layout, { responsive: true, displaylogo: false });
+  }
+
+  function renderExplorerContour(data) {
+    const { comparison } = data;
+    const zA = logMetricMatrix(comparison.mapA.z);
+    const zB = logMetricMatrix(comparison.mapB.z);
+    const [cmin, cmax] = finiteRange(zA, zB);
+    const colors = themeColors();
+
+    Plotly.react("plot", [
+      {
+        type: "contour",
+        x: comparison.xValues,
+        y: comparison.yValues,
+        z: zA,
+        customdata: comparison.mapA.z,
+        xaxis: "x",
+        yaxis: "y",
+        zmin: cmin,
+        zmax: cmax,
+        colorscale: "Viridis",
+        showscale: false,
+        contours: { coloring: "heatmap", showlabels: false },
+        hovertemplate:
+          "A<br>a/M=%{x:.3f}<br>B₀=%{y:.3e} G" +
+          "<br>L/L₅₁₁=%{customdata:.3e}<extra></extra>"
+      },
+      {
+        type: "contour",
+        x: comparison.xValues,
+        y: comparison.yValues,
+        z: zB,
+        customdata: comparison.mapB.z,
+        xaxis: "x2",
+        yaxis: "y2",
+        zmin: cmin,
+        zmax: cmax,
+        colorscale: "Viridis",
+        showscale: true,
+        colorbar: { title: "log₁₀ L/L₅₁₁", len: 0.75 },
+        contours: { coloring: "heatmap", showlabels: false },
+        hovertemplate:
+          "B<br>a/M=%{x:.3f}<br>B₀=%{y:.3e} G" +
+          "<br>L/L₅₁₁=%{customdata:.3e}<extra></extra>"
+      }
+    ], {
+      paper_bgcolor: "transparent",
+      plot_bgcolor: "transparent",
+      font: { color: colors.text },
+      margin: { l: 68, r: 68, t: 42, b: 58 },
+      xaxis: {
+        domain: [0, 0.46],
+        title: "spin a/M",
+        gridcolor: colors.grid
+      },
+      yaxis: {
+        title: "B₀, G",
+        type: "log",
+        gridcolor: colors.grid
+      },
+      xaxis2: {
+        domain: [0.54, 1],
+        title: "spin a/M",
+        gridcolor: colors.grid
+      },
+      yaxis2: {
+        anchor: "x2",
+        title: "B₀, G",
+        type: "log",
+        gridcolor: colors.grid
+      },
+      annotations: [
+        {
+          text: "A · current",
+          x: 0.23, y: 1.08, xref: "paper", yref: "paper",
+          showarrow: false
+        },
+        {
+          text: "B · reference",
+          x: 0.77, y: 1.08, xref: "paper", yref: "paper",
+          showarrow: false
+        }
+      ]
+    }, { responsive: true, displaylogo: false });
+  }
+
+  function renderExplorerDifference(data) {
+    const { comparison } = data;
+    const difference = comparison.differencePercent;
+    const cap = robustSymmetricRange(difference);
+    const colors = themeColors();
     const layout = plotLayout("spin a/M", "B₀, G");
     layout.yaxis.type = "log";
     layout.margin.l = 78;
 
     Plotly.react("plot", [{
       type: "heatmap",
-      x: map.xValues,
-      y: map.yValues,
-      z: zLog,
-      customdata: map.z,
-      colorbar: { title: "log₁₀ L/L₅₁₁" },
+      x: comparison.xValues,
+      y: comparison.yValues,
+      z: difference,
+      zmid: 0,
+      zmin: -cap,
+      zmax: cap,
+      colorscale: "RdBu",
+      reversescale: true,
+      colorbar: { title: "Δ%, A vs B" },
       hovertemplate:
-        "a/M=%{x:.3f}<br>B₀=%{y:.3e} G<br>L/L₅₁₁=%{customdata:.3e}<extra></extra>"
-    }], layout, { responsive: true, displaylogo: false });
+        "a/M=%{x:.3f}<br>B₀=%{y:.3e} G<br>Δ=%{z:.2f}%<extra></extra>"
+    }], {
+      ...layout,
+      font: { color: colors.text }
+    }, { responsive: true, displaylogo: false });
+  }
+
+  function renderParameterExplorer() {
+    setAnalysisMeta(
+      "3D Parameter Explorer",
+      "CME · spin × B₀ · fₐ задаёт логарифмический срез; A и B используют один fₐ"
+    );
+
+    const data = getExplorerComparison();
+    setAnalysisTable(
+      explorerSummary(
+        data.referenceKey,
+        data.faGev,
+        data.resolution,
+        data.comparison.differencePercent
+      )
+    );
+
+    if (!window.Plotly) {
+      return toast("Plotly не загрузился; сетка рассчитана, но не может быть нарисована.");
+    }
+
+    const view = $("explorerView").value;
+    if (view === "difference") renderExplorerDifference(data);
+    else if (view === "contour") renderExplorerContour(data);
+    else renderExplorerSurface(data);
   }
 
   function renderSensitivity() {
@@ -526,10 +868,13 @@
       button.classList.toggle("active", button.dataset.analysis === kind);
     });
 
+    $("explorerControls").classList.toggle("hidden", kind !== "explorer");
+    $("plot").classList.toggle("plot-tall", kind === "explorer");
+
     setAnalysisBusy(true);
     window.requestAnimationFrame(() => {
       try {
-        if (kind === "map") renderParameterMap();
+        if (kind === "explorer") renderParameterExplorer();
         else if (kind === "sensitivity") renderSensitivity();
         else if (kind === "compare") renderComparison();
         else renderSpinAnalysis();
@@ -564,7 +909,7 @@
     if (!state.lastResult) return toast("Сначала выполни расчёт.");
     const payload = {
       generatedAt: new Date().toISOString(),
-      model: "AxionBH research workbench v7.1",
+      model: "AxionBH research workbench v7.2",
       mode: state.lastMode,
       parameters: state.lastParams,
       result: state.lastResult,
@@ -619,7 +964,14 @@
     url.search = "";
     url.searchParams.set("state", encodeState({
       mode: $("mode").value,
-      params: p
+      params: p,
+      analysis: state.analysis,
+      explorer: {
+        view: $("explorerView").value,
+        reference: $("explorerReference").value,
+        faExp: Number($("explorerFaExp").value),
+        resolution: $("explorerResolution").value
+      }
     }));
 
     try {
@@ -638,6 +990,28 @@
       const restored = A.normalizeParams(payload.params || {});
       applyParameters(restored);
       if (modeNames[payload.mode]) $("mode").value = payload.mode;
+
+      if (["spin", "explorer", "sensitivity", "compare"].includes(payload.analysis)) {
+        state.analysis = payload.analysis;
+      }
+
+      if (payload.explorer && typeof payload.explorer === "object") {
+        if (["surface", "contour", "difference"].includes(payload.explorer.view)) {
+          $("explorerView").value = payload.explorer.view;
+        }
+        if (referenceNames[payload.explorer.reference]) {
+          $("explorerReference").value = payload.explorer.reference;
+        }
+        const faExp = Number(payload.explorer.faExp);
+        if (Number.isFinite(faExp) && faExp >= 14 && faExp <= 18) {
+          $("explorerFaExp").value = faExp;
+        }
+        if (explorerResolutions[payload.explorer.resolution]) {
+          $("explorerResolution").value = payload.explorer.resolution;
+        }
+      }
+
+      updateExplorerFaLabel();
       $("preset").value = "custom";
       updateConditionalFields();
       updatePresetButtons();
@@ -654,6 +1028,16 @@
     document.documentElement.dataset.theme = next;
     localStorage.setItem("axionbh-theme", next);
     if (state.lastResult) renderAnalysis(state.analysis);
+  }
+
+  let explorerRenderTimer;
+  function scheduleExplorerRender(delay = 180) {
+    clearTimeout(explorerRenderTimer);
+    explorerRenderTimer = setTimeout(() => {
+      if (state.analysis === "explorer" && state.lastResult) {
+        renderAnalysis("explorer");
+      }
+    }, delay);
   }
 
   let toastTimer;
@@ -676,7 +1060,8 @@
       if ($(key)) setValue(key, value);
     });
 
-    document.querySelectorAll('input[type="range"]').forEach((input) => {
+    ["spin", "B0", "betaTurb"].forEach((id) => {
+      const input = $(id);
       input.addEventListener("input", () => {
         const output = $(input.id + "Out");
         if (output) output.textContent = displayInput(input.value);
@@ -709,7 +1094,16 @@
       button.addEventListener("click", () => renderAnalysis(button.dataset.analysis));
     });
 
+    $("explorerFaExp").addEventListener("input", () => {
+      updateExplorerFaLabel();
+      scheduleExplorerRender();
+    });
+    $("explorerView").addEventListener("change", () => scheduleExplorerRender(0));
+    $("explorerReference").addEventListener("change", () => scheduleExplorerRender(0));
+    $("explorerResolution").addEventListener("change", () => scheduleExplorerRender(0));
+
     updateConditionalFields();
+    updateExplorerFaLabel();
     restoreSharedState();
     run();
   }

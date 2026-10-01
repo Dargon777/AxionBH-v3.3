@@ -3,7 +3,7 @@
 
 AxionBH is an exploratory browser simulator for the black-hole / axion model documented in `index.html`.
 
-## Research Workbench v7.1
+## Research Workbench v7.2
 
 Open `sim.html` in a modern browser.
 
@@ -18,7 +18,7 @@ The v7 simulator:
 - exports the current run as JSON;
 - has dark/light themes and a responsive UI;
 - compares built-in scenarios in one view;
-- generates a `spin × B₀` heatmap for `L/L₅₁₁`;
+- provides a 3D/contour `spin × B₀` parameter explorer with logarithmic `fₐ` slices;
 - runs ±10% sensitivity analysis over the parameters relevant to each mode;
 - stores up to 20 user presets locally;
 - creates shareable URLs that reproduce the current parameter state.
@@ -39,11 +39,15 @@ GitHub Actions runs both checks on pull requests and pushes to `main`.
 
 ## Research analysis
 
-The v7.1 analysis tools are deterministic transformations of the current AxionBH implementation:
+The v7.2 analysis tools are deterministic transformations of the current AxionBH implementation:
 
 - **κ(spin)**: one-dimensional CME sweep with the model's spin threshold shown.
-- **spin × B₀**: two-dimensional CME map colored by `log10(L/L511)`.
+- **3D Explorer**: CME surfaces/contours over `spin × B₀`, with `fₐ` selected as a logarithmic slice from `10^14` to `10^18 GeV`.
 - **Sensitivity**: one-at-a-time ±10% perturbation ranked by the largest relative change in `L/L511`.
 - **Scenario comparison**: baseline, high-B, optimistic and the current parameter set side-by-side.
+- **A/B parameter comparison**: current parameters and a selected reference scenario rendered as matched surfaces/contours.
+- **Relative-difference map**: signed `Δ% = (A - B) / |B| × 100`; cells with zero reference output are left undefined rather than divided by zero.
+
+The explorer uses a single `fₐ` slice for both A and B so the comparison isolates the remaining scenario assumptions. Grid resolution is user-selectable and calculations are cached locally for responsive switching between surface, contour and difference views.
 
 These tools are for exploring the implementation. They are not statistical confidence intervals and do not establish observational validity.
