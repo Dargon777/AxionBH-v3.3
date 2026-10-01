@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="AxionBH interactive browser simulator and parameter-analysis workbench.">
-  <title>AxionBH — Research Workbench v7.1</title>
+  <title>AxionBH — Research Workbench v7.2</title>
   <link rel="stylesheet" href="simulator.css">
   <script defer src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <script defer src="simulator-core.js"></script>
@@ -15,7 +15,7 @@
     <div class="topbar-inner">
       <a class="brand" href="index.html">
         <span class="brand-mark">A</span>
-        <span>AxionBH<small>research workbench · v7.1</small></span>
+        <span>AxionBH<small>research workbench · v7.2</small></span>
       </a>
       <nav class="nav">
         <a href="index.html">Теория</a>
@@ -46,7 +46,7 @@
       <aside class="panel controls">
         <div class="panel-title">
           <h2>Параметры</h2>
-          <span class="muted">v7.1</span>
+          <span class="muted">v7.2</span>
         </div>
 
         <div class="field">
@@ -151,11 +151,46 @@
             </div>
             <div class="analysis-tabs" role="tablist" aria-label="Анализ">
               <button class="analysis-tab active" data-analysis="spin" type="button">κ(spin)</button>
-              <button class="analysis-tab" data-analysis="map" type="button">spin × B</button>
+              <button class="analysis-tab" data-analysis="explorer" type="button">3D Explorer</button>
               <button class="analysis-tab" data-analysis="sensitivity" type="button">Sensitivity</button>
               <button class="analysis-tab" data-analysis="compare" type="button">Сценарии</button>
             </div>
           </div>
+
+          <div id="explorerControls" class="explorer-controls hidden">
+            <div class="explorer-field">
+              <label for="explorerView">Вид</label>
+              <select id="explorerView" class="select compact-select">
+                <option value="surface">Surface A / B</option>
+                <option value="contour">Contour A / B</option>
+                <option value="difference">Δ% A vs B</option>
+              </select>
+            </div>
+            <div class="explorer-field">
+              <label for="explorerReference">Модель B</label>
+              <select id="explorerReference" class="select compact-select">
+                <option value="baseline">Sgr A* baseline</option>
+                <option value="breakthrough">High-B breakthrough</option>
+                <option value="optimistic">Optimistic</option>
+              </select>
+            </div>
+            <div class="explorer-field explorer-fa">
+              <label for="explorerFaExp">fₐ slice, GeV</label>
+              <div class="range-row">
+                <input id="explorerFaExp" type="range" min="14" max="18" step="0.1" value="16">
+                <span id="explorerFaOut" class="range-value">1.00e+16</span>
+              </div>
+            </div>
+            <div class="explorer-field">
+              <label for="explorerResolution">Сетка</label>
+              <select id="explorerResolution" class="select compact-select">
+                <option value="low">Low · 14×10</option>
+                <option value="medium" selected>Medium · 20×15</option>
+                <option value="high">High · 28×20</option>
+              </select>
+            </div>
+          </div>
+
           <div id="analysisBusy" class="analysis-busy hidden">Считаю сетку…</div>
           <div id="plot"></div>
           <div id="analysisTable" class="analysis-table hidden"></div>
