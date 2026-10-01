@@ -5,7 +5,7 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  const MODEL_VERSION = "8.3.0";
+  const MODEL_VERSION = "8.4.0";
   const STATE_SCHEMA_VERSION = 8;
 
   const CONSTANTS = Object.freeze({
@@ -20,6 +20,8 @@
     ERG_PER_EV: 1.602176634e-12,
     YEAR: 365.25 * 86400,
     POSITRON_RATE_OBS_511: 1.07e43,
+    SCHWINGER_ECRIT_V_CM: 1.323285474e16,
+    ELECTRON_COMPTON_REDUCED_CM: 3.8615926796e-11,
     L_OBS_511: 1.07e43, // deprecated numeric alias; historical v7/v8.2 code treated this as erg/s
     POSITRON_ENERGY: 1.6e-6,
     SPIN_THRESHOLD: 0.35,
@@ -1916,6 +1918,36 @@
     };
   }
 
+
+  function schwingerPairRateDensity(electricFieldVcm, terms = 8) {
+    const eField=Number(electricFieldVcm);if(!Number.isFinite(eField)||eField<0)throw new RangeError("electricFieldVcm must be non-negative");if(eField===0)return 0;
+    const nTerms=Math.max(1,Math.min(100,Math.trunc(terms))),x=eField/CONSTANTS.SCHWINGER_ECRIT_V_CM;let series=0;
+    for(let n=1;n<=nTerms;n+=1)series+=Math.exp(-Math.PI*n/x)/(n*n);
+    const lambda=CONSTANTS.ELECTRON_COMPTON_REDUCED_CM;
+    return CONSTANTS.C/(4*Math.PI**3*lambda**4)*x*x*series;
+  }
+  function pairProductionVolume(input,radiusRg=1,thicknessRg=1,fillingFactor=1){
+    const p=normalizeParams(input),r=assertFinitePositive(Number(radiusRg),"radiusRg"),dr=assertFinitePositive(Number(thicknessRg),"thicknessRg"),f=Number(fillingFactor);
+    if(!(f>0&&f<=1))throw new RangeError("fillingFactor must satisfy 0 < f <= 1");
+    const rg=kerrGeometry(p.massSolar*CONSTANTS.MSUN,p.spin).rg;
+    return {rgCm:rg,radiusCm:r*rg,thicknessCm:dr*rg,fillingFactor:f,volumeCm3:4*Math.PI*(r*rg)**2*(dr*rg)*f};
+  }
+  function schwingerPairProduction(input,options={}){
+    const p=normalizeParams(input),E=Number(options.electricFieldVcm||0),volume=pairProductionVolume(p,options.radiusRg||1,options.thicknessRg||1,options.fillingFactor||1),density=schwingerPairRateDensity(E),raw=density*volume.volumeCm3;
+    const power=options.availablePowerErgS==null?p.mdot*CONSTANTS.C**2:Number(options.availablePowerErgS);if(!Number.isFinite(power)||power<0)throw new RangeError("availablePowerErgS must be non-negative");
+    const pairRestEnergy=2*0.511*CONSTANTS.POSITRON_ENERGY,energyRate=power/pairRestEnergy,capped=Math.min(raw,energyRate);
+    return {electricFieldVcm:E,electricFieldOverCritical:E/CONSTANTS.SCHWINGER_ECRIT_V_CM,rateDensityCm3S:density,volume,rawPairRatePerSecond:raw,availablePowerErgS:power,minimumPairEnergyErg:pairRestEnergy,energyLimitedRatePerSecond:energyRate,cappedPairRatePerSecond:capped,observedPositronRatePerSecond:CONSTANTS.POSITRON_RATE_OBS_511,rawRatio511:raw/CONSTANTS.POSITRON_RATE_OBS_511,cappedRatio511:capped/CONSTANTS.POSITRON_RATE_OBS_511,energyLimited:raw>energyRate};
+  }
+  function inferSchwingerFieldForObservedRate(input,options={}){
+    const target=options.targetRatePerSecond||CONSTANTS.POSITRON_RATE_OBS_511,volume=pairProductionVolume(input,options.radiusRg||1,options.thicknessRg||1,options.fillingFactor||1),targetDensity=target/volume.volumeCm3;let lo=1e-8,hi=10;
+    for(let i=0;i<180;i+=1){const mid=Math.sqrt(lo*hi),rate=schwingerPairRateDensity(mid*CONSTANTS.SCHWINGER_ECRIT_V_CM);if(rate<targetDensity)lo=mid;else hi=mid;}
+    const x=Math.sqrt(lo*hi),E=x*CONSTANTS.SCHWINGER_ECRIT_V_CM;return {targetRatePerSecond:target,volume,electricFieldOverCritical:x,electricFieldVcm:E,rateDensityCm3S:schwingerPairRateDensity(E)};
+  }
+  function pairProductionAudit(input){
+    const p=normalizeParams(input),required=inferSchwingerFieldForObservedRate(p),accretionPower=p.mdot*CONSTANTS.C**2,pairRestEnergy=2*0.511*CONSTANTS.POSITRON_ENERGY,minimumObservedPairPower=CONSTANTS.POSITRON_RATE_OBS_511*pairRestEnergy;
+    return {mechanism:"Schwinger constant-field e+e- production",status:"explicit-idealized",assumptions:["locally constant homogeneous electric field","vacuum Schwinger rate; plasma screening/backreaction omitted","fiducial active volume 4π r² Δr with r=Δr=r_g and filling factor 1","energy ceiling uses mdot c², not a derived electromagnetic extraction efficiency"],criticalFieldVcm:CONSTANTS.SCHWINGER_ECRIT_V_CM,required,accretionPowerErgS:accretionPower,minimumObservedPairPowerErgS:minimumObservedPairPower,energyBudgetRatio:accretionPower/minimumObservedPairPower,energyBudgetCanSupplyMinimumRestMass:accretionPower>=minimumObservedPairPower};
+  }
+
   function deficitOrders(value, target = 1) {
     const metric = Number(value);
     const goal = Number(target);
@@ -3414,6 +3446,11 @@
     positronRateFromPower,
     positronObservableFromPower,
     microphysicsAudit,
+    schwingerPairRateDensity,
+    pairProductionVolume,
+    schwingerPairProduction,
+    inferSchwingerFieldForObservedRate,
+    pairProductionAudit,
     PRESETS,
     mdotGsFromMsunPerYear,
     mdotMsunPerYearFromGs,
