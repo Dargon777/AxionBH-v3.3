@@ -42,7 +42,8 @@
     burstEnergy: "E_burst",
     burstIntervalYears: "Δt_burst",
     burstDuration: "t_burst",
-    burstEfficiency: "ε_burst"
+    burstEfficiency: "ε_pair",
+    superradianceSeedOccupation: "N_seed"
   };
 
   const parameterIds = [
@@ -51,7 +52,8 @@
     "electronDensityCm3", "accretionRadiusRg",
     "radialVelocityFracC", "scaleHeightRatio",
     "electronFractionYe", "nProfile", "axionMassEv", "burstEnergy",
-    "burstIntervalYears", "burstDuration", "burstEfficiency"
+    "burstIntervalYears", "burstDuration", "burstEfficiency",
+    "superradianceSeedOccupation"
   ];
 
   function n(id) {
@@ -226,6 +228,14 @@
       "hidden",
       !["superradiant", "hybrid"].includes(mode)
     );
+    $("superradianceFields").classList.toggle(
+      "hidden",
+      !["superradiant", "hybrid"].includes(mode)
+    );
+    $("conversionEfficiencyField").classList.toggle(
+      "hidden",
+      mode === "cme"
+    );
     $("burstManualFields").classList.toggle("hidden", mode !== "bosenova");
 
     const plasmaMode =
@@ -263,7 +273,7 @@
         ["κ", A.formatScientific(result.kappa), "эффективность конверсии"],
         ["P_proxy", A.formatScientific(result.luminosity) + " erg/s", "phenomenological energy-budget power"],
         ["Ṅₑ₊,eq", A.formatScientific(result.equivalentPositronRate) + " s⁻¹", "energy-budget equivalent"],
-        ["e⁺ budget / target", formatRatio(result.ratio511), "target 1.07×10⁴³ e⁺/s"]
+        ["e⁺ budget / target", formatRatio(result.ratio511), "target 2×10⁴³ e⁺/s"]
       ];
     }
     if (result.mode === "bosenova") {
@@ -277,9 +287,9 @@
     if (result.mode === "superradiant") {
       return [
         ["α", A.formatScientific(result.alpha), "гравитационная связь"],
-        ["Γ", A.formatScientific(result.gamma) + " s⁻¹", "темп роста"],
-        ["t_sat", A.formatDuration(result.saturationTime), "до 5% массы облака"],
-        ["Lₑ₊ / L₅₁₁", formatRatio(result.ratio511), "при заданной эффективности"]
+        ["SR gate", result.superradiantCondition ? "OPEN" : "CLOSED", "ω_R < mΩ_H"],
+        ["Γ₂₁₁", A.formatScientific(result.gamma) + " s⁻¹", "small-α literature fit"],
+        ["e⁺ budget / target", formatRatio(result.ratio511), "phenomenological conversion"]
       ];
     }
     return [
@@ -329,16 +339,29 @@
       );
     } else {
       rows.push(
+        ["Уровень", result.level || "211"],
         ["Активна суперрадиация", result.active ? "да" : "нет"],
+        ["Условие ω_R < mΩ_H", result.superradiantCondition ? "выполнено" : "не выполнено"],
         ["α", A.formatScientific(result.alpha)],
-        ["Γ", A.formatScientific(result.gamma) + " s⁻¹"],
+        ["ω_R M", A.formatScientific(result.omegaRDimensionless)],
+        ["Ω_H M", A.formatScientific(result.horizonOmegaDimensionless)],
+        ["Критический spin", result.criticalSpin == null ? "—" : A.formatScientific(result.criticalSpin)],
+        ["Growth bracket", A.formatScientific(result.growthBracket)],
+        ["Γ₂₁₁", A.formatScientific(result.gamma) + " s⁻¹"],
         ["e-fold", A.formatDuration(result.eFoldTime)],
+        ["N_seed", A.formatScientific(result.seedOccupation)],
+        ["N_sat", A.formatScientific(result.saturationOccupation)],
+        ["Число e-fold", A.formatScientific(result.eFoldCount)],
+        ["Доля массы облака при saturation", A.formatScientific(result.saturationFraction)],
         ["Насыщение", A.formatDuration(result.saturationTime)]
       );
       if (result.mode === "superradiant") {
         rows.push(
-          ["Мощность облака при насыщении", A.formatScientific(result.saturationPower) + " erg/s"],
-          ["Позитронная мощность", A.formatScientific(result.positronPower) + " erg/s"]
+          ["Энергия облака при saturation", A.formatScientific(result.cloudEnergyErg) + " erg"],
+          ["ΓE_cloud proxy", A.formatScientific(result.growthPowerAtSaturationProxy) + " erg/s"],
+          ["Средняя мощность извлечения", A.formatScientific(result.averageExtractionPower) + " erg/s"],
+          ["ε_pair", A.formatScientific(result.conversionEfficiency)],
+          ["Позитронная мощность proxy", A.formatScientific(result.positronPower) + " erg/s"]
         );
       } else {
         rows.push(
@@ -359,7 +382,7 @@
       ordered[key] = Number(p[key]);
     });
     const source = JSON.stringify({
-      model: "AxionBH-v8.5.1",
+      model: "AxionBH-v8.5.2",
       mode,
       parameters: ordered
     });
@@ -434,9 +457,17 @@
       .join("");
 
     const ratio = Number(result.ratio511 || 0);
-    $("interpretation").textContent = ratio >= 1
-      ? "В этой точке реализация модели достигает или превышает выбранную опорную светимость."
-      : "В этой точке реализация модели остаётся ниже выбранной опорной светимости.";
+    if (
+      (result.mode === "superradiant" || result.mode === "hybrid") &&
+      !result.superradiantCondition
+    ) {
+      $("interpretation").textContent =
+        "Scalar 211 superradiance kinematically closed: ω_R ≥ mΩ_H. Γ is set to zero before any positron-conversion proxy.";
+    } else {
+      $("interpretation").textContent = ratio >= 1
+        ? "В этой точке реализация модели достигает или превышает выбранный positron-rate target."
+        : "В этой точке реализация модели остаётся ниже выбранного positron-rate target.";
+    }
     renderDiagnostics(result);
   }
 
@@ -1021,7 +1052,7 @@
     if ($("mode").value !== "cme") {
       setAnalysisMeta(
         "Parameter Inference",
-        "v8.5.1 inverse solver сейчас определён для CVE closure"
+        "v8.5.2 inverse solver сейчас определён для CVE closure"
       );
       setAnalysisTable(
         '<div class="inference-empty">Переключи режим на CME, чтобы оценить дефицит и требуемые однопараметрические сдвиги.</div>'
@@ -1889,7 +1920,7 @@
         '</span><span>E_cost=' +
         A.formatScientific(audit.mu5ToPositrons.energyCostErg,3) +
         ' erg/e⁺; no microscopic pair-production rate is derived.</span></div>',
-      '<div class="missing-note"><strong>Observable correction:</strong> the Galactic ~10⁴³ quantity is an annihilation/injection rate in e⁺/s, not an energy luminosity in erg/s. v8.5.1 therefore audits the corrected rate ratio separately; the legacy numerical e⁺ budget ratio fields remain untouched for backward reproducibility.</div>'
+      '<div class="missing-note"><strong>Observable correction:</strong> the Galactic ~10⁴³ quantity is an annihilation/injection rate in e⁺/s, not an energy luminosity in erg/s. v8.5.2 therefore audits the corrected rate ratio separately; the legacy numerical e⁺ budget ratio fields remain untouched for backward reproducibility.</div>'
     ].join("");
     setAnalysisTable(html);
     if (!window.Plotly) return;
@@ -2394,7 +2425,7 @@
     const diagnostics = currentDiagnostics();
     const payload = {
       generatedAt: new Date().toISOString(),
-      model: "AxionBH research workbench v8.5.1",
+      model: "AxionBH research workbench v8.5.2",
       modelVersion: A.MODEL_VERSION,
       stateSchemaVersion: A.STATE_SCHEMA_VERSION,
       stateId: runStateId(state.lastMode, state.lastParams),
@@ -2472,7 +2503,7 @@
     const lines = [
       "# AxionBH reproducibility report",
       "",
-      "- Model: AxionBH Research Workbench v8.5.1",
+      "- Model: AxionBH Research Workbench v8.5.2",
       "- Generated: " + new Date().toISOString(),
       "- State ID: " + stateId,
       "- Mode: " + modeNames[state.lastMode],
