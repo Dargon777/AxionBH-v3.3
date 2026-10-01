@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="AxionBH interactive browser simulator for exploratory black-hole/axion model calculations.">
-  <title>AxionBH — Simulator v7</title>
+  <meta name="description" content="AxionBH interactive browser simulator and parameter-analysis workbench.">
+  <title>AxionBH — Research Workbench v7.1</title>
   <link rel="stylesheet" href="simulator.css">
   <script defer src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <script defer src="simulator-core.js"></script>
@@ -15,7 +15,7 @@
     <div class="topbar-inner">
       <a class="brand" href="index.html">
         <span class="brand-mark">A</span>
-        <span>AxionBH<small>browser simulator · v7</small></span>
+        <span>AxionBH<small>research workbench · v7.1</small></span>
       </a>
       <nav class="nav">
         <a href="index.html">Теория</a>
@@ -28,25 +28,25 @@
   <main class="shell">
     <section class="hero">
       <div>
-        <div class="eyebrow">AxionBH · interactive model</div>
+        <div class="eyebrow">AxionBH · research workbench</div>
         <h1>Аксионное облако вокруг вращающейся чёрной дыры</h1>
-        <p>Быстрый браузерный расчёт CME, ручной Bosenova, суперрадиантного роста и гибридного режима. Вычисления выполняются локально — без Pyodide, сервера и фоновой отправки данных.</p>
+        <p>Локальный интерактивный расчёт CME, Bosenova, суперрадиантного и гибридного режимов — теперь со сравнением сценариев, картой параметров и анализом чувствительности.</p>
       </div>
       <div class="status-stack">
         <span class="badge"><span id="runStatusDot" class="dot"></span><span id="runStatus">Движок готов</span></span>
-        <span class="badge">local-only · no upload</span>
+        <span class="badge">local-only · reproducible</span>
       </div>
     </section>
 
     <div class="notice">
-      <strong>Исследовательский калькулятор.</strong> Это реализация текущей модели AxionBH, а не подтверждённая астрофизическая модель и не инструмент для вывода наблюдательных ограничений. Численные результаты нужно интерпретировать только вместе с принятыми допущениями и единицами.
+      <strong>Исследовательский калькулятор.</strong> AxionBH реализует текущие допущения модели и не является подтверждённым инструментом наблюдательной астрофизики. Карты и sensitivity показывают поведение именно этой реализации, а не доверительные интервалы природы.
     </div>
 
     <section class="workspace">
       <aside class="panel controls">
         <div class="panel-title">
           <h2>Параметры</h2>
-          <span class="muted">v7</span>
+          <span class="muted">v7.1</span>
         </div>
 
         <div class="field">
@@ -57,6 +57,10 @@
             <option value="optimistic">Optimistic</option>
             <option value="custom">Пользовательский</option>
           </select>
+          <div class="preset-actions">
+            <button id="savePresetBtn" class="mini-btn" type="button">+ Сохранить</button>
+            <button id="deletePresetBtn" class="mini-btn" type="button" disabled>Удалить</button>
+          </div>
         </div>
 
         <div class="field">
@@ -114,7 +118,7 @@
 
         <div class="actions">
           <button id="runBtn" class="btn btn-primary" type="button">Рассчитать</button>
-          <button id="plotBtn" class="btn btn-secondary" type="button">κ(spin)</button>
+          <button id="shareBtn" class="btn btn-secondary" type="button">Ссылка</button>
         </div>
       </aside>
 
@@ -140,10 +144,21 @@
         </div>
 
         <div class="panel chart-panel">
-          <div class="result-head">
-            <div><h2>κ как функция спина</h2><div class="muted">CME-ветка · логарифмическая шкала</div></div>
+          <div class="result-head analysis-head">
+            <div>
+              <h2 id="analysisTitle">κ как функция спина</h2>
+              <div id="analysisSubtitle" class="muted">CME-ветка · логарифмическая шкала</div>
+            </div>
+            <div class="analysis-tabs" role="tablist" aria-label="Анализ">
+              <button class="analysis-tab active" data-analysis="spin" type="button">κ(spin)</button>
+              <button class="analysis-tab" data-analysis="map" type="button">spin × B</button>
+              <button class="analysis-tab" data-analysis="sensitivity" type="button">Sensitivity</button>
+              <button class="analysis-tab" data-analysis="compare" type="button">Сценарии</button>
+            </div>
           </div>
+          <div id="analysisBusy" class="analysis-busy hidden">Считаю сетку…</div>
           <div id="plot"></div>
+          <div id="analysisTable" class="analysis-table hidden"></div>
         </div>
       </section>
     </section>
@@ -151,7 +166,7 @@
 
   <footer class="footer">
     <span>AxionBH Collaboration · 2026</span>
-    <span>Все расчёты выполняются локально в браузере.</span>
+    <span>Расчёты и пользовательские пресеты остаются локально в браузере.</span>
   </footer>
   <div id="toast" class="toast"></div>
 </body>

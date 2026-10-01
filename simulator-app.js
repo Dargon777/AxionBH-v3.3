@@ -3,7 +3,15 @@
 
   const A = window.AxionBH;
   const $ = (id) => document.getElementById(id);
-  const state = { lastResult: null, lastParams: null, lastMode: "cme" };
+  const USER_PRESETS_KEY = "axionbh-user-presets-v1";
+
+  const state = {
+    lastResult: null,
+    lastParams: null,
+    lastMode: "cme",
+    analysis: "spin",
+    userPresets: []
+  };
 
   const modeNames = {
     cme: "CME / стационарное облако",
@@ -12,10 +20,27 @@
     hybrid: "Superradiant + Bosenova"
   };
 
+  const parameterLabels = {
+    massSolar: "M",
+    spin: "a/M",
+    B0: "B₀",
+    betaTurb: "β_turb",
+    faGev: "fₐ",
+    mEff: "m_eff",
+    mdot: "Ṁ",
+    temperature: "T",
+    nProfile: "n",
+    axionMassEv: "mₐ",
+    burstEnergy: "E_burst",
+    burstIntervalYears: "Δt_burst",
+    burstDuration: "t_burst",
+    burstEfficiency: "ε_burst"
+  };
+
   const parameterIds = [
-    "massSolar","spin","B0","betaTurb","faGev","mEff","mdot",
-    "temperature","nProfile","axionMassEv","burstEnergy",
-    "burstIntervalYears","burstDuration","burstEfficiency"
+    "massSolar", "spin", "B0", "betaTurb", "faGev", "mEff", "mdot",
+    "temperature", "nProfile", "axionMassEv", "burstEnergy",
+    "burstIntervalYears", "burstDuration", "burstEfficiency"
   ];
 
   function n(id) {
@@ -28,12 +53,6 @@
     return A.normalizeParams(out);
   }
 
-  function setValue(id, value) {
-    $(id).value = value;
-    const output = $(id + "Out");
-    if (output) output.textContent = displayInput(value);
-  }
-
   function displayInput(value) {
     const v = Number(value);
     if (!Number.isFinite(v)) return "—";
@@ -43,28 +62,174 @@
     return String(Number(v.toPrecision(5)));
   }
 
-  function setPreset(name) {
-    if (name === "custom") return;
-    const preset = A.PRESETS[name];
-    if (!preset) return;
-    Object.entries(preset).forEach(([key, value]) => {
-      if ($(key)) setValue(key, value);
+  function setValue(id, value) {
+    const element = $(id);
+    if (!element) return;
+    element.value = value;
+    const output = $(id + "Out");
+    if (output) output.textContent = displayInput(value);
+  }
+
+  function applyParameters(values) {
+    Object.entries(values || {}).forEach(([key, value]) => {
+      if ($(key) && Number.isFinite(Number(value))) setValue(key, Number(value));
     });
+  }
+
+  function loadUserPresets() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(USER_PRESETS_KEY) || "[]");
+      if (!Array.isArray(parsed)) return [];
+      return parsed
+        .filter((item) =>
+          item &&
+          typeof item.id === "string" &&
+          typeof item.name === "string" &&
+          typeof item.mode === "string" &&
+          item.params &&
+          typeof item.params === "object"
+        )
+        .slice(0, 20);
+    } catch {
+      return [];
+    }
+  }
+
+  function persistUserPresets() {
+    localStorage.setItem(
+      USER_PRESETS_KEY,
+      JSON.stringify(state.userPresets.slice(0, 20))
+    );
+  }
+
+  function refreshPresetOptions(selectedValue) {
+    const select = $("preset");
+    [...select.querySelectorAll('option[data-user="true"]')].forEach((option) =>
+      option.remove()
+    );
+
+    state.userPresets.forEach((preset) => {
+      const option = document.createElement("option");
+      option.value = "user:" + preset.id;
+      option.textContent = "★ " + preset.name;
+      option.dataset.user = "true";
+      select.appendChild(option);
+    });
+
+    if (selectedValue && [...select.options].some((o) => o.value === selectedValue)) {
+      select.value = selectedValue;
+    }
+    updatePresetButtons();
+  }
+
+  function updatePresetButtons() {
+    $("deletePresetBtn").disabled = !$("preset").value.startsWith("user:");
+  }
+
+  function selectPreset(value) {
+    if (value === "custom") {
+      updatePresetButtons();
+      return;
+    }
+
+    if (value.startsWith("user:")) {
+      const id = value.slice(5);
+      const saved = state.userPresets.find((item) => item.id === id);
+      if (!saved) return;
+      applyParameters(saved.params);
+      $("mode").value = saved.mode;
+      updateConditionalFields();
+      updatePresetButtons();
+      run();
+      return;
+    }
+
+    const preset = A.PRESETS[value];
+    if (!preset) return;
+    applyParameters(preset);
+    updatePresetButtons();
     run();
+  }
+
+  function saveUserPreset() {
+    let name = window.prompt("Название пресета:");
+    if (!name) return;
+    name = name.trim().slice(0, 48);
+    if (!name) return;
+
+    let p;
+    try {
+      p = params();
+    } catch (error) {
+      return toast(error.message || String(error));
+    }
+
+    const existing = state.userPresets.find(
+      (item) => item.name.toLocaleLowerCase() === name.toLocaleLowerCase()
+    );
+    const record = {
+      id: existing ? existing.id : String(Date.now()),
+      name,
+      mode: $("mode").value,
+      params: p
+    };
+
+    if (existing) {
+      state.userPresets = state.userPresets.map((item) =>
+        item.id === existing.id ? record : item
+      );
+    } else {
+      state.userPresets.unshift(record);
+      state.userPresets = state.userPresets.slice(0, 20);
+    }
+
+    persistUserPresets();
+    refreshPresetOptions("user:" + record.id);
+    toast("Пресет сохранён локально.");
+  }
+
+  function deleteUserPreset() {
+    const value = $("preset").value;
+    if (!value.startsWith("user:")) return;
+    const id = value.slice(5);
+    state.userPresets = state.userPresets.filter((item) => item.id !== id);
+    persistUserPresets();
+    refreshPresetOptions("custom");
+    toast("Пресет удалён.");
+  }
+
+  function markCustom() {
+    if (!$("preset").value.startsWith("user:")) {
+      $("preset").value = "custom";
+    }
+    updatePresetButtons();
   }
 
   function updateConditionalFields() {
     const mode = $("mode").value;
-    $("bosenovaFields").classList.toggle("hidden", !["bosenova","hybrid"].includes(mode));
-    $("axionMassField").classList.toggle("hidden", !["superradiant","hybrid"].includes(mode));
+    $("bosenovaFields").classList.toggle(
+      "hidden",
+      !["bosenova", "hybrid"].includes(mode)
+    );
+    $("axionMassField").classList.toggle(
+      "hidden",
+      !["superradiant", "hybrid"].includes(mode)
+    );
     $("burstManualFields").classList.toggle("hidden", mode !== "bosenova");
   }
 
-  function formatRatio(v) {
+  function formatRatio(value) {
+    const v = Number(value);
     if (!Number.isFinite(v)) return "—";
     if (v === 0) return "0 ×";
-    if (v >= .01 && v < 1000) return v.toPrecision(4) + " ×";
+    if (v >= 0.01 && v < 1000) return v.toPrecision(4) + " ×";
     return A.formatScientific(v, 3) + " ×";
+  }
+
+  function formatPercent(value) {
+    if (!Number.isFinite(value)) return "—";
+    const pct = value * 100;
+    return (pct >= 0 ? "+" : "") + pct.toFixed(Math.abs(pct) < 10 ? 2 : 1) + "%";
   }
 
   function primaryMetrics(result) {
@@ -150,20 +315,230 @@
     $("resultArea").classList.remove("hidden");
     $("modeBadge").textContent = modeNames[result.mode];
 
-    $("metricGrid").innerHTML = primaryMetrics(result).map(([k,v,d]) =>
-      '<div class="metric"><span>'+k+'</span><strong>'+v+'</strong><small>'+d+'</small></div>'
-    ).join("");
+    $("metricGrid").innerHTML = primaryMetrics(result)
+      .map(([key, value, detail]) =>
+        '<div class="metric"><span>' + key + '</span><strong>' +
+        value + '</strong><small>' + detail + '</small></div>'
+      )
+      .join("");
 
-    $("resultTable").innerHTML = detailedRows(result).flatMap(([k,v]) => [
-      '<div class="key">'+k+'</div>',
-      '<div class="value">'+v+'</div>'
-    ]).join("");
+    $("resultTable").innerHTML = detailedRows(result)
+      .flatMap(([key, value]) => [
+        '<div class="key">' + key + '</div>',
+        '<div class="value">' + value + '</div>'
+      ])
+      .join("");
 
     const ratio = Number(result.ratio511 || 0);
-    const ratioText = ratio >= 1
-      ? "Модель в этой точке достигает или превышает выбранную опорную светимость."
-      : "Модель в этой точке ниже выбранной опорной светимости.";
-    $("interpretation").textContent = ratioText;
+    $("interpretation").textContent = ratio >= 1
+      ? "В этой точке реализация модели достигает или превышает выбранную опорную светимость."
+      : "В этой точке реализация модели остаётся ниже выбранной опорной светимости.";
+  }
+
+  function themeColors() {
+    const styles = getComputedStyle(document.documentElement);
+    return {
+      text: styles.getPropertyValue("--muted").trim() || "#94a3b8",
+      grid: styles.getPropertyValue("--border").trim() || "#263347",
+      accent: styles.getPropertyValue("--accent").trim() || "#7aa8ff",
+      accent2: styles.getPropertyValue("--accent-2").trim() || "#9b8cff"
+    };
+  }
+
+  function plotLayout(titleX, titleY) {
+    const colors = themeColors();
+    return {
+      paper_bgcolor: "transparent",
+      plot_bgcolor: "transparent",
+      font: { color: colors.text },
+      xaxis: { title: titleX, gridcolor: colors.grid, zerolinecolor: colors.grid },
+      yaxis: { title: titleY, gridcolor: colors.grid, zerolinecolor: colors.grid },
+      margin: { l: 70, r: 24, t: 24, b: 60 }
+    };
+  }
+
+  function setAnalysisMeta(title, subtitle) {
+    $("analysisTitle").textContent = title;
+    $("analysisSubtitle").textContent = subtitle;
+  }
+
+  function setAnalysisTable(html) {
+    const table = $("analysisTable");
+    table.innerHTML = html || "";
+    table.classList.toggle("hidden", !html);
+  }
+
+  function setAnalysisBusy(busy) {
+    $("analysisBusy").classList.toggle("hidden", !busy);
+  }
+
+  function renderSpinAnalysis() {
+    const p = params();
+    const points = A.spinSweep(p, 72);
+    setAnalysisMeta("κ как функция спина", "CME-ветка · логарифмическая шкала");
+    setAnalysisTable("");
+
+    if (!window.Plotly) return toast("Plotly не загрузился; сами расчёты работают.");
+
+    const layout = plotLayout("spin a/M", "κ");
+    layout.yaxis.type = "log";
+    layout.shapes = [{
+      type: "line",
+      x0: 0.35, x1: 0.35, y0: 0, y1: 1, yref: "paper",
+      line: { dash: "dot", width: 1 }
+    }];
+
+    Plotly.react("plot", [{
+      x: points.map((point) => point.spin),
+      y: points.map((point) => point.kappa > 0 ? point.kappa : null),
+      mode: "lines",
+      line: { width: 3, color: themeColors().accent },
+      hovertemplate: "a/M=%{x:.3f}<br>κ=%{y:.3e}<extra></extra>"
+    }], layout, { responsive: true, displaylogo: false });
+  }
+
+  function renderParameterMap() {
+    const p = params();
+    setAnalysisMeta(
+      "Карта spin × B₀",
+      "CME · цвет = log₁₀(L/L₅₁₁) · карта модели, не статистическая вероятность"
+    );
+    setAnalysisTable("");
+
+    const map = A.parameterMap(p, {
+      mode: "cme",
+      xValues: A.linearSpace(0.05, 0.998, 34),
+      yValues: A.logSpace(1, 2e5, 26),
+      metric: "ratio511"
+    });
+
+    if (!window.Plotly) return toast("Plotly не загрузился; карта рассчитана, но не может быть нарисована.");
+
+    const zLog = map.z.map((row) =>
+      row.map((value) => value !== null && value > 0 ? Math.log10(value) : null)
+    );
+
+    const layout = plotLayout("spin a/M", "B₀, G");
+    layout.yaxis.type = "log";
+    layout.margin.l = 78;
+
+    Plotly.react("plot", [{
+      type: "heatmap",
+      x: map.xValues,
+      y: map.yValues,
+      z: zLog,
+      customdata: map.z,
+      colorbar: { title: "log₁₀ L/L₅₁₁" },
+      hovertemplate:
+        "a/M=%{x:.3f}<br>B₀=%{y:.3e} G<br>L/L₅₁₁=%{customdata:.3e}<extra></extra>"
+    }], layout, { responsive: true, displaylogo: false });
+  }
+
+  function renderSensitivity() {
+    const mode = $("mode").value;
+    const analysis = A.sensitivityAnalysis(mode, params(), {
+      fraction: 0.1,
+      metric: "ratio511"
+    });
+
+    setAnalysisMeta(
+      "Чувствительность ±10%",
+      modeNames[mode] + " · отклик L/L₅₁₁ на изменение одного параметра"
+    );
+
+    const rows = analysis.rows;
+    const html = [
+      '<div class="analysis-row analysis-row-head"><span>Параметр</span><span>−10%</span><span>+10%</span><span>Эластичность</span></div>',
+      ...rows.map((row) =>
+        '<div class="analysis-row"><strong>' +
+        (parameterLabels[row.key] || row.key) +
+        '</strong><span>' + formatPercent(row.minusRelative) +
+        '</span><span>' + formatPercent(row.plusRelative) +
+        '</span><span>' +
+        (Number.isFinite(row.elasticity) ? row.elasticity.toFixed(3) : "—") +
+        '</span></div>'
+      )
+    ].join("");
+    setAnalysisTable(html);
+
+    if (!window.Plotly) return;
+    const layout = plotLayout("параметр", "макс. |Δ(L/L₅₁₁)|, %");
+    Plotly.react("plot", [{
+      type: "bar",
+      x: rows.map((row) => parameterLabels[row.key] || row.key),
+      y: rows.map((row) => row.impact * 100),
+      marker: { color: themeColors().accent },
+      hovertemplate: "%{x}<br>impact=%{y:.2f}%<extra></extra>"
+    }], layout, { responsive: true, displaylogo: false });
+  }
+
+  function renderComparison() {
+    const mode = $("mode").value;
+    const scenarios = A.comparePresets(mode);
+    const currentResult = A.simulate(mode, params());
+    scenarios.push({
+      name: "current",
+      parameters: params(),
+      result: currentResult,
+      metric: Number(currentResult.ratio511)
+    });
+
+    const names = {
+      baseline: "Sgr A* baseline",
+      breakthrough: "High-B breakthrough",
+      optimistic: "Optimistic",
+      current: "Текущие параметры"
+    };
+
+    setAnalysisMeta(
+      "Сравнение сценариев",
+      modeNames[mode] + " · одна и та же метрика L/L₅₁₁"
+    );
+
+    const html = [
+      '<div class="analysis-row analysis-row-head compare"><span>Сценарий</span><span>a/M</span><span>B₀</span><span>L/L₅₁₁</span></div>',
+      ...scenarios.map((item) =>
+        '<div class="analysis-row compare"><strong>' +
+        names[item.name] +
+        '</strong><span>' + item.parameters.spin.toFixed(3) +
+        '</span><span>' + A.formatScientific(item.parameters.B0, 2) +
+        '</span><span>' + A.formatScientific(item.metric, 3) +
+        '</span></div>'
+      )
+    ].join("");
+    setAnalysisTable(html);
+
+    if (!window.Plotly) return;
+    const layout = plotLayout("сценарий", "L/L₅₁₁");
+    layout.yaxis.type = "log";
+    Plotly.react("plot", [{
+      type: "bar",
+      x: scenarios.map((item) => names[item.name]),
+      y: scenarios.map((item) => item.metric > 0 ? item.metric : null),
+      marker: { color: themeColors().accent2 },
+      hovertemplate: "%{x}<br>L/L₅₁₁=%{y:.3e}<extra></extra>"
+    }], layout, { responsive: true, displaylogo: false });
+  }
+
+  function renderAnalysis(kind = state.analysis) {
+    state.analysis = kind;
+    document.querySelectorAll(".analysis-tab").forEach((button) => {
+      button.classList.toggle("active", button.dataset.analysis === kind);
+    });
+
+    setAnalysisBusy(true);
+    window.requestAnimationFrame(() => {
+      try {
+        if (kind === "map") renderParameterMap();
+        else if (kind === "sensitivity") renderSensitivity();
+        else if (kind === "compare") renderComparison();
+        else renderSpinAnalysis();
+      } catch (error) {
+        toast(error.message || String(error));
+      } finally {
+        setAnalysisBusy(false);
+      }
+    });
   }
 
   function run() {
@@ -177,42 +552,10 @@
       render(result);
       $("runStatus").textContent = "Расчёт завершён";
       $("runStatusDot").style.background = "var(--ok)";
+      renderAnalysis(state.analysis);
     } catch (error) {
       $("runStatus").textContent = "Ошибка параметров";
       $("runStatusDot").style.background = "var(--danger)";
-      toast(error.message || String(error));
-    }
-  }
-
-  function plot() {
-    try {
-      const p = params();
-      const points = A.spinSweep(p, 72);
-      if (!window.Plotly) {
-        toast("Plotly не загрузился; сам расчёт при этом работает.");
-        return;
-      }
-      const theme = document.documentElement.dataset.theme || "dark";
-      const dark = theme !== "light";
-      Plotly.react("plot", [{
-        x: points.map(x => x.spin),
-        y: points.map(x => x.kappa > 0 ? x.kappa : null),
-        mode: "lines",
-        line: { width: 3 },
-        hovertemplate: "a/M=%{x:.3f}<br>κ=%{y:.3e}<extra></extra>"
-      }], {
-        paper_bgcolor: "transparent",
-        plot_bgcolor: "transparent",
-        font: { color: dark ? "#cbd5e1" : "#475569" },
-        xaxis: { title: "spin a/M", gridcolor: dark ? "#233044" : "#dce3ed" },
-        yaxis: { title: "κ", type: "log", gridcolor: dark ? "#233044" : "#dce3ed" },
-        margin: { l: 66, r: 20, t: 24, b: 58 },
-        shapes: [{
-          type: "line", x0: .35, x1: .35, y0: 0, y1: 1, yref: "paper",
-          line: { dash: "dot", width: 1 }
-        }]
-      }, { responsive: true, displaylogo: false });
-    } catch (error) {
       toast(error.message || String(error));
     }
   }
@@ -221,29 +564,87 @@
     if (!state.lastResult) return toast("Сначала выполни расчёт.");
     const payload = {
       generatedAt: new Date().toISOString(),
-      model: "AxionBH browser simulator v7",
+      model: "AxionBH research workbench v7.1",
       mode: state.lastMode,
       parameters: state.lastParams,
       result: state.lastResult,
       note: "Exploratory model output; not a validated astrophysical inference."
     };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const blob = new Blob(
+      [JSON.stringify(payload, null, 2)],
+      { type: "application/json" }
+    );
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "axionbh-result-" + Date.now() + ".json";
-    a.click();
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "axionbh-result-" + Date.now() + ".json";
+    anchor.click();
     URL.revokeObjectURL(url);
   }
 
   async function copyResult() {
     if (!state.lastResult) return toast("Сначала выполни расчёт.");
-    const text = detailedRows(state.lastResult).map(([k,v]) => k + ": " + v).join("\n");
+    const text = detailedRows(state.lastResult)
+      .map(([key, value]) => key + ": " + value)
+      .join("\n");
     try {
       await navigator.clipboard.writeText(text);
       toast("Результаты скопированы.");
     } catch {
-      toast("Буфер обмена недоступен в этом браузере.");
+      toast("Буфер обмена недоступен.");
+    }
+  }
+
+  function encodeState(payload) {
+    return btoa(JSON.stringify(payload))
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/g, "");
+  }
+
+  function decodeState(encoded) {
+    const normalized = encoded.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized + "=".repeat((4 - normalized.length % 4) % 4);
+    return JSON.parse(atob(padded));
+  }
+
+  async function shareCurrentState() {
+    let p;
+    try {
+      p = params();
+    } catch (error) {
+      return toast(error.message || String(error));
+    }
+    const url = new URL(window.location.href);
+    url.search = "";
+    url.searchParams.set("state", encodeState({
+      mode: $("mode").value,
+      params: p
+    }));
+
+    try {
+      await navigator.clipboard.writeText(url.toString());
+      toast("Ссылка на этот расчёт скопирована.");
+    } catch {
+      window.prompt("Скопируй ссылку:", url.toString());
+    }
+  }
+
+  function restoreSharedState() {
+    const encoded = new URLSearchParams(window.location.search).get("state");
+    if (!encoded) return false;
+    try {
+      const payload = decodeState(encoded);
+      const restored = A.normalizeParams(payload.params || {});
+      applyParameters(restored);
+      if (modeNames[payload.mode]) $("mode").value = payload.mode;
+      $("preset").value = "custom";
+      updateConditionalFields();
+      updatePresetButtons();
+      return true;
+    } catch {
+      toast("Не удалось прочитать параметры из ссылки.");
+      return false;
     }
   }
 
@@ -252,50 +653,65 @@
     const next = current === "dark" ? "light" : "dark";
     document.documentElement.dataset.theme = next;
     localStorage.setItem("axionbh-theme", next);
-    if (state.lastResult) plot();
+    if (state.lastResult) renderAnalysis(state.analysis);
   }
 
   let toastTimer;
   function toast(message) {
-    const el = $("toast");
-    el.textContent = message;
-    el.classList.add("show");
+    const element = $("toast");
+    element.textContent = message;
+    element.classList.add("show");
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => el.classList.remove("show"), 2400);
+    toastTimer = setTimeout(() => element.classList.remove("show"), 2600);
   }
 
   function init() {
     const savedTheme = localStorage.getItem("axionbh-theme");
     if (savedTheme === "light") document.documentElement.dataset.theme = "light";
 
-    Object.entries(A.DEFAULTS).forEach(([key,value]) => {
-      if ($(key)) setValue(key,value);
+    state.userPresets = loadUserPresets();
+    refreshPresetOptions("baseline");
+
+    Object.entries(A.DEFAULTS).forEach(([key, value]) => {
+      if ($(key)) setValue(key, value);
     });
 
     document.querySelectorAll('input[type="range"]').forEach((input) => {
       input.addEventListener("input", () => {
-        const out = $(input.id + "Out");
-        if (out) out.textContent = displayInput(input.value);
-        $("preset").value = "custom";
+        const output = $(input.id + "Out");
+        if (output) output.textContent = displayInput(input.value);
+        markCustom();
       });
     });
 
     parameterIds.forEach((id) => {
-      const el = $(id);
-      if (el && el.type !== "range") el.addEventListener("input", () => $("preset").value = "custom");
+      const element = $(id);
+      if (element && element.type !== "range") {
+        element.addEventListener("input", markCustom);
+      }
     });
 
-    $("preset").addEventListener("change", (e) => setPreset(e.target.value));
-    $("mode").addEventListener("change", () => { updateConditionalFields(); run(); });
+    $("preset").addEventListener("change", (event) => selectPreset(event.target.value));
+    $("savePresetBtn").addEventListener("click", saveUserPreset);
+    $("deletePresetBtn").addEventListener("click", deleteUserPreset);
+    $("mode").addEventListener("change", () => {
+      updateConditionalFields();
+      markCustom();
+      run();
+    });
     $("runBtn").addEventListener("click", run);
-    $("plotBtn").addEventListener("click", plot);
+    $("shareBtn").addEventListener("click", shareCurrentState);
     $("copyBtn").addEventListener("click", copyResult);
     $("exportBtn").addEventListener("click", downloadJson);
     $("themeBtn").addEventListener("click", toggleTheme);
 
+    document.querySelectorAll(".analysis-tab").forEach((button) => {
+      button.addEventListener("click", () => renderAnalysis(button.dataset.analysis));
+    });
+
     updateConditionalFields();
+    restoreSharedState();
     run();
-    plot();
   }
 
   document.addEventListener("DOMContentLoaded", init);

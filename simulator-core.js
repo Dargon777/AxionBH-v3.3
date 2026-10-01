@@ -388,6 +388,213 @@
     return points;
   }
 
+  function linearSpace(start, stop, count) {
+    const n = Math.max(2, Math.min(200, Math.trunc(count)));
+    if (!Number.isFinite(start) || !Number.isFinite(stop) || stop <= start) {
+      throw new RangeError("linearSpace requires finite stop > start");
+    }
+    return Array.from({ length: n }, (_, index) =>
+      start + ((stop - start) * index) / (n - 1)
+    );
+  }
+
+  function logSpace(start, stop, count) {
+    if (!(start > 0) || !(stop > start)) {
+      throw new RangeError("logSpace requires 0 < start < stop");
+    }
+    const lo = Math.log10(start);
+    const hi = Math.log10(stop);
+    return linearSpace(lo, hi, count).map((value) => Math.pow(10, value));
+  }
+
+  function extractMetric(result, metric = "ratio511") {
+    const value = Number(result && result[metric]);
+    return Number.isFinite(value) ? value : null;
+  }
+
+  function parameterMap(
+    input,
+    {
+      mode = "cme",
+      xKey = "spin",
+      yKey = "B0",
+      xValues = linearSpace(0.05, 0.998, 28),
+      yValues = logSpace(1, 2e5, 22),
+      metric = "ratio511"
+    } = {}
+  ) {
+    const base = normalizeParams(input);
+    if (!Array.isArray(xValues) || xValues.length < 2) {
+      throw new RangeError("xValues must contain at least two values");
+    }
+    if (!Array.isArray(yValues) || yValues.length < 2) {
+      throw new RangeError("yValues must contain at least two values");
+    }
+
+    const z = yValues.map((y) =>
+      xValues.map((x) => {
+        try {
+          const result = simulate(mode, { ...base, [xKey]: x, [yKey]: y });
+          return extractMetric(result, metric);
+        } catch {
+          return null;
+        }
+      })
+    );
+
+    return {
+      mode,
+      metric,
+      xKey,
+      yKey,
+      xValues: [...xValues],
+      yValues: [...yValues],
+      z
+    };
+  }
+
+  const SENSITIVITY_KEYS = Object.freeze({
+    cme: Object.freeze([
+      "massSolar",
+      "spin",
+      "B0",
+      "betaTurb",
+      "faGev",
+      "mEff",
+      "mdot",
+      "temperature",
+      "nProfile"
+    ]),
+    bosenova: Object.freeze([
+      "burstEnergy",
+      "burstIntervalYears",
+      "burstDuration",
+      "burstEfficiency"
+    ]),
+    superradiant: Object.freeze([
+      "massSolar",
+      "spin",
+      "axionMassEv",
+      "burstEfficiency"
+    ]),
+    hybrid: Object.freeze([
+      "massSolar",
+      "spin",
+      "axionMassEv",
+      "burstDuration",
+      "burstEfficiency"
+    ])
+  });
+
+  function perturbedValue(key, value, factor) {
+    let next = value * factor;
+    if (key === "spin") {
+      next = Math.max(0, Math.min(0.998, next));
+    }
+    return next;
+  }
+
+  function sensitivityAnalysis(
+    mode,
+    input,
+    {
+      fraction = 0.1,
+      metric = "ratio511",
+      keys = SENSITIVITY_KEYS[mode] || []
+    } = {}
+  ) {
+    if (!Number.isFinite(fraction) || fraction <= 0 || fraction >= 0.95) {
+      throw new RangeError("fraction must satisfy 0 < fraction < 0.95");
+    }
+
+    const baseParams = normalizeParams(input);
+    const baseResult = simulate(mode, baseParams);
+    const baseValue = extractMetric(baseResult, metric);
+    const rows = [];
+
+    for (const key of keys) {
+      const center = Number(baseParams[key]);
+      if (!Number.isFinite(center) || center <= 0) continue;
+
+      const minusParam = perturbedValue(key, center, 1 - fraction);
+      const plusParam = perturbedValue(key, center, 1 + fraction);
+
+      let minusValue = null;
+      let plusValue = null;
+      try {
+        minusValue = extractMetric(
+          simulate(mode, { ...baseParams, [key]: minusParam }),
+          metric
+        );
+      } catch {}
+      try {
+        plusValue = extractMetric(
+          simulate(mode, { ...baseParams, [key]: plusParam }),
+          metric
+        );
+      } catch {}
+
+      const minusRelative =
+        baseValue && minusValue !== null ? minusValue / baseValue - 1 : null;
+      const plusRelative =
+        baseValue && plusValue !== null ? plusValue / baseValue - 1 : null;
+
+      let elasticity = null;
+      if (
+        minusValue !== null &&
+        plusValue !== null &&
+        minusValue > 0 &&
+        plusValue > 0 &&
+        minusParam > 0 &&
+        plusParam > minusParam
+      ) {
+        elasticity =
+          Math.log(plusValue / minusValue) /
+          Math.log(plusParam / minusParam);
+      }
+
+      const relativeChanges = [minusRelative, plusRelative]
+        .filter((value) => Number.isFinite(value))
+        .map((value) => Math.abs(value));
+
+      rows.push({
+        key,
+        center,
+        minusParam,
+        plusParam,
+        minusValue,
+        plusValue,
+        minusRelative,
+        plusRelative,
+        elasticity,
+        impact: relativeChanges.length ? Math.max(...relativeChanges) : 0
+      });
+    }
+
+    rows.sort((a, b) => b.impact - a.impact);
+
+    return {
+      mode,
+      metric,
+      fraction,
+      baseValue,
+      rows
+    };
+  }
+
+  function comparePresets(mode, overrides = {}) {
+    return Object.entries(PRESETS).map(([name, preset]) => {
+      const parameters = normalizeParams({ ...preset, ...overrides });
+      const result = simulate(mode, parameters);
+      return {
+        name,
+        parameters,
+        result,
+        metric: extractMetric(result, "ratio511")
+      };
+    });
+  }
+
   function formatScientific(value, digits = 3) {
     if (value === Number.POSITIVE_INFINITY) return "∞";
     if (!Number.isFinite(value)) return "—";
@@ -423,6 +630,12 @@
     hybrid,
     simulate,
     spinSweep,
+    linearSpace,
+    logSpace,
+    parameterMap,
+    sensitivityAnalysis,
+    comparePresets,
+    SENSITIVITY_KEYS,
     formatScientific,
     formatDuration
   });
