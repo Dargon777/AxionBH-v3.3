@@ -358,7 +358,7 @@
       ordered[key] = Number(p[key]);
     });
     const source = JSON.stringify({
-      model: "AxionBH-v8.1",
+      model: "AxionBH-v8.2",
       mode,
       parameters: ordered
     });
@@ -1020,7 +1020,7 @@
     if ($("mode").value !== "cme") {
       setAnalysisMeta(
         "Parameter Inference",
-        "v8.1 inverse solver сейчас определён для CVE closure"
+        "v8.2 inverse solver сейчас определён для CVE closure"
       );
       setAnalysisTable(
         '<div class="inference-empty">Переключи режим на CME, чтобы оценить дефицит и требуемые однопараметрические сдвиги.</div>'
@@ -1662,6 +1662,187 @@
     });
   }
 
+
+  function flowGeometryRow(point, context) {
+    return '<div class="analysis-row flow-geometry">' +
+      '<strong>' + point.label + '</strong>' +
+      '<span>' + A.formatScientific(
+        point.radiusRg,
+        3
+      ) + '</span>' +
+      '<span>' + A.formatScientific(
+        point.scaleHeightRatio,
+        3
+      ) + '</span>' +
+      '<span>' + (
+        point.alpha === null
+          ? "explicit"
+          : A.formatScientific(point.alpha, 3)
+      ) + '</span>' +
+      '<span>' + A.formatScientific(
+        point.radialVelocityFracC,
+        3
+      ) + '</span>' +
+      '<span>' + A.formatScientific(
+        point.electronFractionYe,
+        3
+      ) + '</span>' +
+      '<span>' + A.formatScientific(
+        point.flow.netElectronDensityCm3,
+        3
+      ) + '</span>' +
+      '<span>' + A.formatScientific(
+        point.ratio511,
+        3
+      ) + '</span>' +
+      '<span>' + (
+        Number.isFinite(point.deficitDex)
+          ? point.deficitDex.toFixed(2) + " dex"
+          : "∞"
+      ) + '</span>' +
+      '</div>';
+  }
+
+  function renderFlowGeometryCalibration() {
+    if ($("mode").value !== "cme") {
+      setAnalysisMeta(
+        "Flow Geometry Calibration",
+        "RIAF geometry envelope is evaluated through the stationary CVE accretion-plasma chain"
+      );
+      setAnalysisTable(
+        '<div class="inference-empty">Переключи режим на CVE closure.</div>'
+      );
+      if (window.Plotly) Plotly.purge("plot");
+      return;
+    }
+
+    const analysis =
+      A.flowGeometryCalibrationAnalysis(
+        params(),
+        { mapResolution: 7 }
+      );
+    const best = analysis.best;
+    const worst = analysis.worst;
+    const context = analysis.context;
+
+    setAnalysisMeta(
+      "Flow Geometry Calibration",
+      "EHT geometric-mid Ṁ held fixed · RIAF v_r/c = α(H/R)²/√(r/r_g)"
+    );
+
+    const summary = [
+      '<div class="flow-summary">',
+      '<div><span>Ṁ fixed</span><strong>' +
+        A.formatScientific(
+          analysis.mdotMsunPerYear,
+          3
+        ) + ' M☉/yr</strong></div>',
+      '<div><span>Best deficit</span><strong>' +
+        (best ? best.deficitDex.toFixed(2) : "—") +
+        ' dex</strong></div>',
+      '<div><span>Worst deficit</span><strong>' +
+        (worst ? worst.deficitDex.toFixed(2) : "—") +
+        ' dex</strong></div>',
+      '<div><span>Geometry leverage</span><strong>' +
+        A.formatScientific(
+          analysis.geometryLeverageDex,
+          3
+        ) + ' dex</strong></div>',
+      '<div><span>Density leverage</span><strong>' +
+        A.formatScientific(
+          analysis.densityLeverageDex,
+          3
+        ) + ' dex</strong></div>',
+      '</div>'
+    ].join("");
+
+    const table = [
+      '<div class="analysis-row analysis-row-head flow-geometry"><span>Case</span><span>r/r_g</span><span>H/r</span><span>α</span><span>|v_r|/c</span><span>Y_e</span><span>nₑ,net</span><span>L/L₅₁₁</span><span>Deficit</span></div>',
+      flowGeometryRow(
+        analysis.current,
+        context
+      ),
+      flowGeometryRow(
+        analysis.reference,
+        context
+      ),
+      best
+        ? flowGeometryRow(
+            {
+              ...best,
+              label: "Envelope best"
+            },
+            context
+          )
+        : "",
+      worst
+        ? flowGeometryRow(
+            {
+              ...worst,
+              label: "Envelope worst"
+            },
+            context
+          )
+        : ""
+    ].join("");
+
+    const note =
+      '<div class="missing-note"><strong>RIAF anchor:</strong> ' +
+      context.source.statement +
+      '<br><strong>Envelope:</strong> r/r_g=' +
+      context.radiusRg.min + '–' +
+      context.radiusRg.max + ', H/r=' +
+      context.scaleHeightRatio.min + '–' +
+      context.scaleHeightRatio.max +
+      ', α=' + context.alpha.min + '–' +
+      context.alpha.max + ', Y_e=' +
+      context.electronFractionYe.min + '–' +
+      context.electronFractionYe.max +
+      '. Radius, the H/r lower edge and composition interval are exploratory, not observational confidence intervals.</div>';
+
+    setAnalysisTable(summary + table + note);
+
+    if (!window.Plotly) return;
+
+    const colors = themeColors();
+    const layout = plotLayout(
+      "r / r_g",
+      "H / r"
+    );
+    layout.xaxis.type = "log";
+
+    Plotly.react("plot", [{
+      type: "heatmap",
+      x: analysis.map.radiusRg,
+      y: analysis.map.scaleHeightRatio,
+      z: analysis.map.deficitDex,
+      colorbar: {
+        title: "deficit<br>dex"
+      },
+      colorscale: "Viridis",
+      hovertemplate:
+        "r=%{x:.2f} r_g" +
+        "<br>H/r=%{y:.2f}" +
+        "<br>deficit=%{z:.2f} dex" +
+        "<extra></extra>"
+    }, {
+      type: "scatter",
+      mode: "markers",
+      x: [analysis.reference.radiusRg],
+      y: [analysis.reference.scaleHeightRatio],
+      marker: {
+        size: 10,
+        color: colors.accent
+      },
+      name: "RIAF reference",
+      hovertemplate:
+        "RIAF reference<extra></extra>"
+    }], layout, {
+      responsive: true,
+      displaylogo: false
+    });
+  }
+
   function renderValidity() {
     const p = params();
     const mode = $("mode").value;
@@ -2081,6 +2262,7 @@
         else if (kind === "transport") renderTransport();
         else if (kind === "plasma") renderPlasma();
         else if (kind === "calibration") renderAccretionCalibration();
+        else if (kind === "flow") renderFlowGeometryCalibration();
         else if (kind === "validity") renderValidity();
         else if (kind === "chirality") renderChirality();
         else if (kind === "missing") renderMissingPhysics();
@@ -2129,7 +2311,7 @@
     const diagnostics = currentDiagnostics();
     const payload = {
       generatedAt: new Date().toISOString(),
-      model: "AxionBH research workbench v8.1",
+      model: "AxionBH research workbench v8.2",
       modelVersion: A.MODEL_VERSION,
       stateSchemaVersion: A.STATE_SCHEMA_VERSION,
       stateId: runStateId(state.lastMode, state.lastParams),
@@ -2166,6 +2348,12 @@
               state.lastParams
             )
           : null,
+      flowGeometryCalibration:
+        state.lastMode === "cme"
+          ? A.flowGeometryCalibrationAnalysis(
+              state.lastParams
+            )
+          : null,
       missingPhysics: {
         placement: $("missingPlacement").value,
         gainExp: Number($("missingGainExp").value),
@@ -2189,7 +2377,7 @@
     const lines = [
       "# AxionBH reproducibility report",
       "",
-      "- Model: AxionBH Research Workbench v8.1",
+      "- Model: AxionBH Research Workbench v8.2",
       "- Generated: " + new Date().toISOString(),
       "- State ID: " + stateId,
       "- Mode: " + modeNames[state.lastMode],
@@ -2385,7 +2573,7 @@
       applyParameters(restored);
       if (modeNames[payload.mode]) $("mode").value = payload.mode;
 
-      if (["spin", "explorer", "sensitivity", "inference", "transport", "plasma", "calibration", "validity", "chirality", "missing", "compare"].includes(payload.analysis)) {
+      if (["spin", "explorer", "sensitivity", "inference", "transport", "plasma", "calibration", "flow", "validity", "chirality", "missing", "compare"].includes(payload.analysis)) {
         state.analysis = payload.analysis;
       }
 

@@ -677,7 +677,7 @@ console.log("AxionBH simulator-core tests passed");
 
 
 {
-  assert.equal(A.MODEL_VERSION, "8.1.0");
+  assert.equal(A.MODEL_VERSION, "8.2.0");
   assert.equal(A.STATE_SCHEMA_VERSION, 8);
 }
 
@@ -745,7 +745,7 @@ console.log("AxionBH simulator-core tests passed");
     },
     "cme"
   );
-  assert.equal(report.modelVersion, "8.1.0");
+  assert.equal(report.modelVersion, "8.2.0");
   assert.equal(report.stateSchemaVersion, 8);
   assert.equal(report.layers.length, A.MODEL_LAYERS.length);
   assert.ok(report.accretion);
@@ -802,4 +802,66 @@ console.log("AxionBH simulator-core tests passed");
     analysis.legacy.ratio511 >
     analysis.ranges.eht2023.high.ratio511
   );
+}
+
+
+{
+  const v = A.riafRadialVelocityFracC(
+    10,
+    1,
+    0.2
+  );
+  assert.ok(
+    Math.abs(v - 0.2 / Math.sqrt(10)) <
+    1e-14
+  );
+}
+
+{
+  const analysis =
+    A.flowGeometryCalibrationAnalysis(
+      A.DEFAULTS,
+      { mapResolution: 5 }
+    );
+  assert.equal(analysis.corners.length, 16);
+  assert.ok(analysis.best);
+  assert.ok(analysis.worst);
+  assert.ok(
+    analysis.best.deficitDex <
+    analysis.worst.deficitDex
+  );
+  assert.ok(analysis.geometryLeverageDex > 0);
+  assert.ok(analysis.densityLeverageDex > 0);
+  assert.equal(analysis.map.radiusRg.length, 5);
+  assert.equal(
+    analysis.map.scaleHeightRatio.length,
+    5
+  );
+  assert.equal(
+    analysis.map.deficitDex.length,
+    5
+  );
+  assert.ok(
+    analysis.best.deficitDex > 0
+  );
+}
+
+{
+  const point = A.flowGeometryCalibrationPoint(
+    A.DEFAULTS,
+    {
+      radiusRg: 10,
+      scaleHeightRatio: 1,
+      alpha: 0.2,
+      electronFractionYe: 0.85,
+      mdotMsunPerYear: 7e-9
+    }
+  );
+  assert.equal(
+    point.parameters.electronDensityMode,
+    2
+  );
+  assert.ok(point.flow.netElectronDensityCm3 > 0);
+  assert.ok(point.plasma.vectorMuMeV > 0);
+  assert.ok(point.ratio511 > 0);
 }
