@@ -3,7 +3,7 @@
 
 AxionBH is an exploratory browser simulator for the black-hole / axion model documented in `index.html`.
 
-## Research Workbench v8.4.1
+## Research Workbench v8.5.2
 
 Open `sim.html` in a modern browser.
 
@@ -211,3 +211,24 @@ The Microphysics audit additionally evaluates the derivative axion-fermion bench
 The canonical Galactic-bulge positron-rate reference is calibrated to 2e43 e+/s, following the model-dependent bulge production-rate estimate of Siegert et al. (2016, A&A 586 A84). A total visible Galactic rate of order 5e43 e+/s is stored as context, not used as the bulge target.
 
 All power-to-pair-rate conversions now use the same exact minimum pair rest energy, 2 m_e c^2 = 1.637421155e-6 erg. This includes the canonical CVE observable, manual Bosenova, superradiant conversion, Missing Physics and the closure ceiling. The v8.5 Gap/Schwinger layer is preserved unchanged except that it shares the same target reference.
+
+
+## v8.5.2 scalar 211 superradiance physics fix
+
+The superradiant branch no longer uses the historical `spin >= 0.4` switch or the ad-hoc `a_*^4 alpha^16` growth law.
+
+For the scalar `211` level it now:
+
+- evaluates the hydrogenic bound-state frequency `omega_R / mu ~= 1 - alpha^2/8`;
+- requires the physical Kerr superradiance condition `omega_R < m Omega_H` with `m=1`;
+- uses the small-`alpha` literature fit `Gamma_211 / mu ~= 4e-2 alpha^8 [a_* - 2 alpha (1 + sqrt(1-a_*^2))]` from Baryakhtar et al. (2021, Phys. Rev. D 103, 095019, Table IV);
+- reports the corresponding critical spin instead of a universal spin threshold;
+- estimates the cloud saturation energy by conserving black-hole energy and angular momentum while spinning down to the superradiant boundary;
+- replaces the hidden `1e-10 M_BH` seed with an explicit boson seed occupation `N_seed` (default 1);
+- computes the number of e-folds from `ln(N_sat/N_seed)`;
+- reports both the instantaneous `Gamma E_cloud` growth-power scale and the time-averaged extraction power `E_cloud/t_sat`;
+- keeps `epsilon_pair` as an explicitly phenomenological energy-to-positron conversion proxy. No microscopic direct conversion of an ultralight axion quantum into an electron-positron pair is assumed.
+
+The growth formula is a small-`alpha` approximation, not a numerical Teukolsky solution. The saturation estimate omits accretion during growth, gravitational-wave losses and axion self-interactions.
+
+The previous default point `M=4.28e6 M_sun`, `a_*=0.89`, `m_a=1e-17 eV` is now correctly classified as kinematically closed for scalar-211 superradiance rather than forced active by a spin-only gate.

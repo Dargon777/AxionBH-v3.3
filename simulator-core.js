@@ -5,8 +5,8 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  const MODEL_VERSION = "8.5.1";
-  const STATE_SCHEMA_VERSION = 9;
+  const MODEL_VERSION = "8.5.2";
+  const STATE_SCHEMA_VERSION = 10;
 
   const CONSTANTS = Object.freeze({
     G: 6.6743015e-8,
@@ -76,7 +76,8 @@
     burstEnergy: 1e55,
     burstIntervalYears: 1e6,
     burstDuration: 1e6,
-    burstEfficiency: 1e-17
+    burstEfficiency: 1e-17,
+    superradianceSeedOccupation: 1
   });
 
   function mdotGsFromMsunPerYear(value) {
@@ -195,7 +196,7 @@
       "temperature", "accretionRadiusRg", "radialVelocityFracC",
       "scaleHeightRatio", "electronFractionYe", "nProfile",
       "axionMassEv", "burstEnergy", "burstIntervalYears",
-      "burstDuration", "burstEfficiency"
+      "burstDuration", "burstEfficiency", "superradianceSeedOccupation"
     ].forEach((key) => {
       p[key] = Number(p[key]);
       assertFinitePositive(p[key], key);
@@ -1591,41 +1592,136 @@
     };
   }
 
-  function superradiant(input) {
+  function scalar211Superradiance(input) {
     const p = normalizeParams(input);
     const c = CONSTANTS;
     const massG = p.massSolar * c.MSUN;
-    const mu = p.axionMassEv * c.ERG_PER_EV / (c.HBAR * c.C);
-    const alpha = c.G * massG * mu / (c.C * c.C);
+    const muWaveNumber =
+      p.axionMassEv * c.ERG_PER_EV / (c.HBAR * c.C);
+    const muFrequency = muWaveNumber * c.C;
+    const alpha =
+      c.G * massG * muWaveNumber / (c.C * c.C);
 
-    let gamma = 0;
-    if (alpha >= 0.05 && p.spin >= 0.4) {
-      const factor = 0.05 * Math.pow(p.spin * Math.pow(alpha, 4), 4);
-      gamma = factor * mu * c.C;
-      if (!Number.isFinite(gamma) || gamma < 0) gamma = 0;
+    // Hydrogenic real-frequency approximation for the scalar 211 level:
+    // omega_R / mu ~= 1 - alpha^2 / (2 n^2), with n=2.
+    const boundFrequencyFactor = Math.max(0, 1 - alpha * alpha / 8);
+    const omegaRDimensionless = alpha * boundFrequencyFactor;
+    const horizonOmegaDimensionless =
+      p.spin === 0
+        ? 0
+        : p.spin /
+          (2 * (1 + Math.sqrt(Math.max(0, 1 - p.spin * p.spin))));
+    const superradiant =
+      omegaRDimensionless > 0 &&
+      omegaRDimensionless < horizonOmegaDimensionless;
+
+    // Critical Kerr spin from Omega_H M = omega_R M / m for m=1.
+    const q = omegaRDimensionless;
+    const criticalSpin =
+      q > 0 && q < 0.5
+        ? (4 * q) / (1 + 4 * q * q)
+        : null;
+
+    // Small-alpha 211 scalar growth fit from Baryakhtar et al. (2021),
+    // Phys. Rev. D 103, 095019, Table IV:
+    // Gamma_211 / mu ~= 4e-2 alpha^8
+    //   [a_* - 2 alpha (1 + sqrt(1-a_*^2))].
+    const growthBracket =
+      p.spin -
+      2 * alpha *
+        (1 + Math.sqrt(Math.max(0, 1 - p.spin * p.spin)));
+    const growthRatio =
+      superradiant && growthBracket > 0
+        ? 4e-2 * Math.pow(alpha, 8) * growthBracket
+        : 0;
+    const gamma =
+      Number.isFinite(growthRatio * muFrequency)
+        ? Math.max(0, growthRatio * muFrequency)
+        : 0;
+
+    // Estimate the cloud energy extracted while spinning the BH down to the
+    // superradiant boundary.  In G=c=M_i=1 units conserve
+    // J_f = J_i - (m/omega_R) E_cloud with m=1 and
+    // a_f = J_f / M_f^2.  The smaller positive root is the weak-extraction
+    // branch.  This remains an idealized no-accretion/no-self-interaction
+    // saturation estimate.
+    let saturationFraction = 0;
+    if (
+      gamma > 0 &&
+      criticalSpin !== null &&
+      criticalSpin < p.spin &&
+      omegaRDimensionless > 0
+    ) {
+      const A = criticalSpin;
+      const B = 1 / omegaRDimensionless - 2 * criticalSpin;
+      const C = criticalSpin - p.spin;
+      const discriminant = B * B - 4 * A * C;
+      if (discriminant >= 0 && A > 0) {
+        const root1 = (-B + Math.sqrt(discriminant)) / (2 * A);
+        const root2 = (-B - Math.sqrt(discriminant)) / (2 * A);
+        saturationFraction = [root1, root2]
+          .filter((value) => Number.isFinite(value) && value > 0 && value < 1)
+          .sort((a, b) => a - b)[0] || 0;
+      }
     }
 
-    const initialFraction = 1e-10;
-    const saturationFraction = 0.05;
-    const saturationTime = gamma > 0
-      ? Math.log(saturationFraction / initialFraction) / gamma
-      : Number.POSITIVE_INFINITY;
+    const cloudEnergyErg =
+      saturationFraction * massG * c.C * c.C;
+    const bosonEnergyErg =
+      p.axionMassEv * c.ERG_PER_EV;
+    const saturationOccupation =
+      bosonEnergyErg > 0
+        ? cloudEnergyErg / bosonEnergyErg
+        : 0;
+    const seedOccupation = p.superradianceSeedOccupation;
+    const eFoldCount =
+      gamma > 0 &&
+      saturationOccupation > seedOccupation
+        ? Math.log(saturationOccupation / seedOccupation)
+        : 0;
+    const saturationTime =
+      gamma > 0 && eFoldCount > 0
+        ? eFoldCount / gamma
+        : Number.POSITIVE_INFINITY;
 
-    const saturationPower = gamma > 0
-      ? saturationFraction * massG * c.C * c.C * gamma
-      : 0;
-    const positronPower = saturationPower * p.burstEfficiency;
+    const growthPowerAtSaturationProxy =
+      gamma > 0 ? cloudEnergyErg * gamma : 0;
+    const averageExtractionPower =
+      Number.isFinite(saturationTime) && saturationTime > 0
+        ? cloudEnergyErg / saturationTime
+        : 0;
+    const positronPower =
+      averageExtractionPower * p.burstEfficiency;
     const positronRate =
       positronPower / c.PAIR_REST_ENERGY_ERG;
 
     return {
       mode: "superradiant",
+      level: "211",
       alpha,
+      boundFrequencyFactor,
+      omegaRDimensionless,
+      horizonOmegaDimensionless,
+      superradiantCondition: superradiant,
+      criticalSpin,
+      growthBracket,
+      growthRatio,
+      growthApproximation: "small-alpha scalar 211; Baryakhtar et al. 2021 Table IV",
+      growthApproximationValid: alpha > 0 && alpha <= 0.5,
       gamma,
-      eFoldTime: gamma > 0 ? 1 / gamma : Number.POSITIVE_INFINITY,
+      eFoldTime:
+        gamma > 0 ? 1 / gamma : Number.POSITIVE_INFINITY,
+      seedOccupation,
+      saturationOccupation,
+      eFoldCount,
       saturationTime,
       saturationFraction,
-      saturationPower,
+      cloudEnergyErg,
+      growthPowerAtSaturationProxy,
+      saturationPower: growthPowerAtSaturationProxy,
+      averageExtractionPower,
+      conversionEfficiency: p.burstEfficiency,
+      conversionStatus: "phenomenological-energy-proxy",
       positronPower,
       positronRate,
       equivalentPositronRate: positronRate,
@@ -1640,6 +1736,10 @@
         c.POSITRON_RATE_OBS_511,
       active: gamma > 0
     };
+  }
+
+  function superradiant(input) {
+    return scalar211Superradiance(input);
   }
 
   function hybrid(input) {
@@ -2706,12 +2806,14 @@
       "massSolar",
       "spin",
       "axionMassEv",
+      "superradianceSeedOccupation",
       "burstEfficiency"
     ]),
     hybrid: Object.freeze([
       "massSolar",
       "spin",
       "axionMassEv",
+      "superradianceSeedOccupation",
       "burstDuration",
       "burstEfficiency"
     ])
@@ -3423,24 +3525,45 @@
     }
 
     if (mode === "superradiant" || mode === "hybrid") {
+      add(
+        r.superradiantCondition ? "ok" : "warning",
+        "superradiance_condition",
+        r.superradiantCondition
+          ? "Условие ω_R < mΩ_H для scalar 211 выполнено."
+          : "Условие ω_R < mΩ_H для scalar 211 не выполнено; экспоненциальный superradiant growth выключен.",
+        Number(r.omegaRDimensionless) -
+          Number(r.horizonOmegaDimensionless)
+      );
+      if (!r.growthApproximationValid) {
+        add(
+          "warning",
+          "superradiance_small_alpha",
+          "Используемая формула Γ_211 — small-α approximation; при α > 0.5 количественная точность не гарантируется.",
+          Number(r.alpha)
+        );
+      }
       if (!r.active) {
-        const reasons = [];
-        if (p.spin < 0.4) reasons.push("a/M < 0.4");
-        if (Number(r.alpha) < 0.05) reasons.push("α < 0.05");
         add(
           "info",
           "superradiance_inactive",
-          "В текущей реализации Γ = 0" +
-            (reasons.length ? " (" + reasons.join(", ") + ")." : "."),
-          Number(r.alpha)
+          "Γ_211 = 0 после физического superradiance gate и знака growth factor.",
+          Number(r.growthBracket)
         );
       } else {
         add(
           "ok",
           "superradiance_active",
-          "Суперрадиантная ветка активна по внутренним порогам текущей реализации.",
+          "Scalar 211 ветка активна; Γ рассчитана small-α literature fit.",
           Number(r.gamma)
         );
+        if (!(r.saturationFraction > 0)) {
+          add(
+            "warning",
+            "superradiance_saturation",
+            "Не удалось получить положительную слабую ветвь spin-down saturation.",
+            Number(r.saturationFraction)
+          );
+        }
       }
     }
 
@@ -3476,6 +3599,9 @@
     "axion_chiral_coupling",
     "stationary_closure",
     "chirality_dynamics",
+    "superradiance_rate",
+    "cloud_saturation",
+    "positron_conversion",
     "positron_luminosity"
   ]);
 
@@ -3559,6 +3685,39 @@
         state: "diagnostic only",
         detail:
           "S_proxy = |J5,CVE|/L_eff and massless axial susceptibility are not a finite-mass kinetic derivation."
+      },
+      {
+        id: "superradiance_rate",
+        category: "literature-model",
+        title: "Scalar 211 superradiance rate",
+        state:
+          mode === "superradiant" || mode === "hybrid"
+            ? (r.active ? "active" : "inactive")
+            : "not selected",
+        detail:
+          "Uses the physical omega_R < m Omega_H gate, a hydrogenic 211 bound frequency, and the small-alpha Gamma_211 fit from Baryakhtar et al. 2021; it is not a numerical Teukolsky solve."
+      },
+      {
+        id: "cloud_saturation",
+        category: "idealized",
+        title: "Cloud spin-down saturation",
+        state:
+          mode === "superradiant" || mode === "hybrid"
+            ? "implemented proxy"
+            : "not selected",
+        detail:
+          "Cloud energy is estimated by energy/angular-momentum conservation while the BH spins down to the superradiant boundary; accretion and axion self-interactions are omitted."
+      },
+      {
+        id: "positron_conversion",
+        category: "phenomenological",
+        title: "Superradiant energy → positrons",
+        state:
+          mode === "superradiant" || mode === "hybrid"
+            ? "model ansatz"
+            : "not selected",
+        detail:
+          "burstEfficiency is retained as an explicit phenomenological pair-conversion efficiency. No microscopic process converts an ultralight axion quantum directly into an e+e- pair."
       },
       {
         id: "positron_luminosity",
@@ -3682,6 +3841,7 @@
     findCloud,
     cme,
     manualBosenova,
+    scalar211Superradiance,
     superradiant,
     hybrid,
     simulate,

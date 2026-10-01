@@ -123,8 +123,8 @@ for (const feature of [
   );
 }
 
-assert.ok(html.includes("v8.5.1"));
-assert.ok(app.includes("AxionBH research workbench v8.5.1"));
+assert.ok(html.includes("v8.5.2"));
+assert.ok(app.includes("AxionBH research workbench v8.5.2"));
 
 
 for (const feature of [
@@ -353,3 +353,19 @@ for (const feature of [
   );
 }
 for(const feature of ["blackHoleRotationalField","gapParallelElectricField","gapElectrodynamicsAudit","renderGapElectrodynamics"]){assert.ok(core.includes(feature)||app.includes(feature),"missing v8.5.1 feature: "+feature);}assert.ok(html.includes('data-analysis="gap"'));
+
+for (const feature of [
+  "scalar211Superradiance",
+  "superradiantCondition",
+  "criticalSpin",
+  "growthBracket",
+  "superradianceSeedOccupation",
+  "averageExtractionPower"
+]) {
+  assert.ok(
+    core.includes(feature) || app.includes(feature) || html.includes(feature),
+    "missing v8.5.2 superradiance feature: " + feature
+  );
+}
+assert.ok(html.includes('id="superradianceFields"'));
+assert.ok(html.includes('id="conversionEfficiencyField"'));
