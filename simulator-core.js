@@ -2197,7 +2197,7 @@
     return {...u,parallelFieldFraction:fraction,screeningFraction:fraction,parallelElectricFieldVcm:u.electricFieldVcm*fraction};
   }
 
-  function goldreichJulianDensityScale(input,{radiusRg=2,fieldG=null,fieldLineOmegaFraction=0.5}={}){
+  function goldreichJulianDensityScale(input,{radiusRg=2.1,fieldG=null,fieldLineOmegaFraction=0.5}={}){
     const p=normalizeParams(input);
     const geometry=kerrGeometry(p.massSolar*CONSTANTS.MSUN,p.spin);
     const radius=assertFinitePositive(Number(radiusRg),"radiusRg");
@@ -2219,7 +2219,7 @@
   function gapChargeStarvationAudit(input,options={}){
     const p=normalizeParams(input);
     const geometry=kerrGeometry(p.massSolar*CONSTANTS.MSUN,p.spin);
-    const radiusRg=options.radiusRg==null?2:Number(options.radiusRg);
+    const radiusRg=options.radiusRg==null?Math.max(2.1,1.05*geometry.rPlus/geometry.rg):Number(options.radiusRg);
     if(!(radiusRg>geometry.rPlus/geometry.rg))throw new RangeError("gap radius must lie outside the Kerr horizon");
     const injectionFraction=options.plasmaInjectionFraction==null?1:Number(options.plasmaInjectionFraction);
     if(!(injectionFraction>=0&&injectionFraction<=1))throw new RangeError("plasmaInjectionFraction must be in [0,1]");
@@ -2283,7 +2283,7 @@
       voltageStatvolt:effectiveStatvolt,
       voltageV,
       averageParallelElectricFieldVcm:fieldVcm,
-      source:"Rieger & Katsoulakos 2017 gap-potential scalings: DeltaV~Phi0(h/rg)^2 or Phi0(h/rg)^3/6."
+      source:"Rieger & Katsoulakos 2017 gap-potential scalings: DeltaV~Phi0(h/rg)^2 or Phi0(h/rg)^3/6.",\n      caveat:"Multiplying the analytic potential by chargeDeficitFraction is a linear closure heuristic, not a GR Poisson solution."
     };
   }
 
@@ -2344,7 +2344,7 @@
   function softPhotonFieldAudit(input,options={}){
     const p=normalizeParams(input);
     const geometry=kerrGeometry(p.massSolar*CONSTANTS.MSUN,p.spin);
-    const radiusRg=assertFinitePositive(Number(options.softPhotonRadiusRg??2),"softPhotonRadiusRg");
+    const radiusRg=assertFinitePositive(Number(options.softPhotonRadiusRg??2.1),"softPhotonRadiusRg");
     const luminosity=assertFinitePositive(Number(options.softPhotonLuminosityErgS??1e36),"softPhotonLuminosityErgS");
     const energyEv=assertFinitePositive(Number(options.softPhotonEnergyEv??1),"softPhotonEnergyEv");
     const radiusCm=radiusRg*geometry.rg;
@@ -2386,7 +2386,7 @@
 
   function gapCascadeAudit(input,options={}){
     const p=normalizeParams(input);
-    const radiusRg=Number(options.radiusRg??2);
+    const defaultGeometry=kerrGeometry(p.massSolar*CONSTANTS.MSUN,p.spin);\n    const radiusRg=Number(options.radiusRg??Math.max(2.1,1.05*defaultGeometry.rPlus/defaultGeometry.rg));
     const starvation=gapChargeStarvationAudit(p,{
       radiusRg,
       plasmaInjectionFraction:options.plasmaInjectionFraction??1,
