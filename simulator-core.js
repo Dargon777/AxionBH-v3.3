@@ -3370,6 +3370,25 @@
 
   function positronTransportSweep(input,options={}){
     const p=normalizeParams(input);
+    const transportModel=options.transportModel||"ism-timescale";
+    if(transportModel==="ism-timescale"){
+      const values=options.injectionEnergyValuesMeV||logSpace(0.03,10,64);
+      return {
+        xKey:"injectionEnergyMeV",
+        points:values.map((value)=>{
+          const result=positronTransportPipeline(p,{...options,injectionEnergyMeV:value});
+          return {
+            injectionEnergyMeV:value,
+            effectiveSmearingPc:result.smearingScalePc,
+            spatialRetentionFraction:result.spatialRetentionFraction,
+            inFlightSurvivalFraction:result.thermalizationSurvivalFraction,
+            postThermalAnnihilationFraction:result.annihilationFraction,
+            linePhotonRateToBulgeReference:result.linePhotonRateToBulgeReference,
+            lineFluxToBulgeReference:result.lineFluxToBulgeReference
+          };
+        })
+      };
+    }
     const values=options.smearingValuesPc||linearSpace(50,500,64);
     return {
       xKey:"smearingScalePc",
