@@ -5,8 +5,8 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  const MODEL_VERSION = "8.7.0";
-  const STATE_SCHEMA_VERSION = 12;
+  const MODEL_VERSION = "8.8.0";
+  const STATE_SCHEMA_VERSION = 13;
 
   const CONSTANTS = Object.freeze({
     G: 6.6743015e-8,
@@ -20,10 +20,23 @@
     ERG_PER_EV: 1.602176634e-12,
     MEV_TO_ERG: 1.602176634e-6,
     YEAR: 365.25 * 86400,
-    // Siegert et al. 2016: model-dependent bulge positron production rate.
+    // Siegert et al. 2016: model-dependent bulge positron annihilation/production scale.
     POSITRON_RATE_OBS_511: 2e43,
     POSITRON_RATE_GALAXY_511: 5e43,
-    LINE_PHOTON_RATE_OBS_511: 5.0e42,
+    BULGE_511_LINE_FLUX_PH_CM2_S: 0.96e-3,
+    BULGE_511_LINE_FLUX_SIGMA_PH_CM2_S: 0.07e-3,
+    BULGE_EFFECTIVE_DISTANCE_KPC: 8.5,
+    KPC_TO_CM: 3.0856775814913673e21,
+    PC_TO_CM: 3.0856775814913673e18,
+    // Derived from 4 pi d^2 F using the Siegert et al. 2016 bulge flux and d=8.5 kpc.
+    LINE_PHOTON_RATE_OBS_511:
+      4 * Math.PI *
+      Math.pow(8.5 * 3.0856775814913673e21, 2) *
+      0.96e-3,
+    LINE_PHOTON_RATE_OBS_511_LEGACY: 5.0e42,
+    POSITRON_SMEARING_SCALE_PC: 150,
+    POSITRON_SMEARING_SIGMA_PC: 50,
+    POSITRON_INJECTION_MORPHOLOGY_MAX_MEV: 1.4,
     SCHWINGER_ECRIT_V_CM: 1.323285474e16,
     ELECTRON_COMPTON_REDUCED_CM: 3.8615926796e-11,
     PAIR_REST_ENERGY_ERG:
@@ -35,7 +48,11 @@
     L_OBS_511:
       2e43 * 2 * 0.51099895 * 1.602176634e-6,
     LINE_POWER_OBS_511:
-      5.0e42 * 0.51099895 * 1.602176634e-6,
+      (
+        4 * Math.PI *
+        Math.pow(8.5 * 3.0856775814913673e21, 2) *
+        0.96e-3
+      ) * 0.51099895 * 1.602176634e-6,
     SPIN_THRESHOLD: 0.35,
     B_EQ: 3e4,
     T_NORM: 1e7,
@@ -2867,6 +2884,233 @@
     };
   }
 
+  function bulge511Reference() {
+    const c=CONSTANTS;
+    const distanceCm=c.BULGE_EFFECTIVE_DISTANCE_KPC*c.KPC_TO_CM;
+    const linePhotonRate=
+      4*Math.PI*distanceCm*distanceCm*c.BULGE_511_LINE_FLUX_PH_CM2_S;
+    return {
+      source:"Siegert et al. 2016",
+      scope:"Galactic bulge",
+      effectiveDistanceKpc:c.BULGE_EFFECTIVE_DISTANCE_KPC,
+      lineFluxPhCm2S:c.BULGE_511_LINE_FLUX_PH_CM2_S,
+      lineFluxSigmaPhCm2S:c.BULGE_511_LINE_FLUX_SIGMA_PH_CM2_S,
+      linePhotonRatePerSecond:linePhotonRate,
+      positronRatePerSecond:c.POSITRON_RATE_OBS_511,
+      galaxyPositronRateContextPerSecond:c.POSITRON_RATE_GALAXY_511,
+      caveat:"The luminosity conversion assumes an effective bulge distance of 8.5 kpc and inherits the spatial-model dependence of the measured flux."
+    };
+  }
+
+  function positroniumLineYield(positroniumFraction=0.95) {
+    const f=Number(positroniumFraction);
+    if(!Number.isFinite(f)||f<0||f>1)throw new RangeError("positroniumFraction must be in [0,1]");
+    const directFraction=1-f;
+    const paraFraction=0.25*f;
+    const orthoFraction=0.75*f;
+    const linePhotonsPerAnnihilation=
+      2*directFraction+2*paraFraction;
+    const continuumPhotonsPerAnnihilation=
+      3*orthoFraction;
+    return {
+      positroniumFraction:f,
+      directFraction,
+      paraPositroniumFraction:paraFraction,
+      orthoPositroniumFraction:orthoFraction,
+      linePhotonsPerAnnihilation,
+      continuumPhotonsPerAnnihilation,
+      derivation:"2 photons for direct annihilation; positronium forms para-Ps 1/4 of the time (2 line photons) and ortho-Ps 3/4 of the time (3-photon continuum)."
+    };
+  }
+
+  function gaussianTransportRetentionFraction(radiusPc,smearingScalePc) {
+    const radius=assertFinitePositive(Number(radiusPc),"radiusPc");
+    const sigma=assertFinitePositive(Number(smearingScalePc),"smearingScalePc");
+    const x=radius/(Math.SQRT2*sigma);
+    const erf=(z)=>{
+      const sign=z<0?-1:1;
+      const a=Math.abs(z);
+      const t=1/(1+0.3275911*a);
+      const y=1-((((1.061405429*t-1.453152027)*t+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-a*a);
+      return sign*y;
+    };
+    const cdf=erf(x)-Math.sqrt(2/Math.PI)*(radius/sigma)*Math.exp(-0.5*(radius/sigma)**2);
+    return Math.max(0,Math.min(1,cdf));
+  }
+
+  function positronProductionSourceAudit(mode,input,options={}) {
+    const p=normalizeParams(input);
+    const sourceKind=options.sourceKind||"mode-proxy";
+    if(sourceKind==="mode-proxy"){
+      const result=simulate(mode,p);
+      const rate=Number(result.equivalentPositronRate??result.positronRate??0);
+      return {
+        sourceKind,
+        status:rate>0?"available":"zero",
+        positronProductionRatePerSecond:Number.isFinite(rate)&&rate>0?rate:0,
+        basis:mode==="cme"
+          ?"current-mode energy-budget-equivalent positron-rate proxy"
+          :"current-mode positron-rate output",
+        result
+      };
+    }
+
+    const gapOptions=options.gapOptions||{};
+    const closure=solveGapClosure(p,{
+      ...gapOptions,
+      minGapHeightRg:gapOptions.minGapHeightRg??1e-3,
+      maxGapHeightRg:gapOptions.maxGapHeightRg??1,
+      closureScanSteps:gapOptions.closureScanSteps??56
+    });
+    if(!closure.closureAudit){
+      return {
+        sourceKind,
+        status:"unresolved-gap-closure",
+        positronProductionRatePerSecond:0,
+        closure,
+        basis:"No self-consistent gap-height point satisfies both pair multiplicity and GJ-refill criteria in the configured interval."
+      };
+    }
+
+    const audit=closure.closureAudit;
+    if(sourceKind==="gap-cascade"){
+      return {
+        sourceKind,
+        status:"available",
+        positronProductionRatePerSecond:audit.cappedPairRatePerSecond,
+        closure,
+        basis:"v8.7 self-consistent curvature+IC gamma-gamma pair cascade; one positron per produced pair."
+      };
+    }
+
+    if(sourceKind==="gap-schwinger"){
+      const schwinger=schwingerPairProduction(p,{
+        electricFieldVcm:audit.potential.averageParallelElectricFieldVcm,
+        radiusRg:audit.radiusRg,
+        thicknessRg:audit.potential.gapHeightRg,
+        fillingFactor:audit.coveringFraction,
+        availablePowerErgS:audit.electricalPowerErgS
+      });
+      return {
+        sourceKind,
+        status:"available",
+        positronProductionRatePerSecond:schwinger.cappedPairRatePerSecond,
+        closure,
+        schwinger,
+        basis:"vacuum Schwinger pair production evaluated at the self-consistent gap potential scale; one positron per pair."
+      };
+    }
+
+    throw new RangeError("Unknown positron sourceKind: "+sourceKind);
+  }
+
+  function positronTransportPipeline(input,options={}) {
+    const p=normalizeParams(input);
+    const mode=options.mode||"cme";
+    const source=options.sourceAudit||positronProductionSourceAudit(mode,p,options);
+    const clamp01=(value,name)=>{
+      const x=Number(value);
+      if(!Number.isFinite(x)||x<0||x>1)throw new RangeError(name+" must be in [0,1]");
+      return x;
+    };
+    const sourceEscapeFraction=clamp01(options.sourceEscapeFraction??1,"sourceEscapeFraction");
+    const thermalizationSurvivalFraction=clamp01(options.thermalizationSurvivalFraction??1,"thermalizationSurvivalFraction");
+    const annihilationFraction=clamp01(options.annihilationFraction??1,"annihilationFraction");
+    const positroniumFraction=clamp01(options.positroniumFraction??0.95,"positroniumFraction");
+    const smearingScalePc=assertFinitePositive(Number(options.smearingScalePc??CONSTANTS.POSITRON_SMEARING_SCALE_PC),"smearingScalePc");
+    const bulgeAcceptanceRadiusPc=assertFinitePositive(Number(options.bulgeAcceptanceRadiusPc??1000),"bulgeAcceptanceRadiusPc");
+    const injectionEnergyMeV=assertFinitePositive(Number(options.injectionEnergyMeV??1),"injectionEnergyMeV");
+
+    const spatialRetentionFraction=
+      gaussianTransportRetentionFraction(bulgeAcceptanceRadiusPc,smearingScalePc);
+    const productionRate=source.positronProductionRatePerSecond;
+    const escapedRate=productionRate*sourceEscapeFraction;
+    const bulgeRetainedRate=escapedRate*spatialRetentionFraction;
+    const thermalizedRate=bulgeRetainedRate*thermalizationSurvivalFraction;
+    const annihilationRate=thermalizedRate*annihilationFraction;
+    const branching=positroniumLineYield(positroniumFraction);
+    const linePhotonRate=annihilationRate*branching.linePhotonsPerAnnihilation;
+    const continuumPhotonRate=annihilationRate*branching.continuumPhotonsPerAnnihilation;
+    const reference=bulge511Reference();
+    const lineFluxAtEarth=
+      linePhotonRate/
+      (
+        4*Math.PI*
+        Math.pow(reference.effectiveDistanceKpc*CONSTANTS.KPC_TO_CM,2)
+      );
+    const smearingSigmaDistance=
+      Math.abs(smearingScalePc-CONSTANTS.POSITRON_SMEARING_SCALE_PC)/
+      CONSTANTS.POSITRON_SMEARING_SIGMA_PC;
+    const injectionEnergyCompatible=
+      injectionEnergyMeV<=CONSTANTS.POSITRON_INJECTION_MORPHOLOGY_MAX_MEV;
+
+    return {
+      status:source.status==="available"||source.status==="zero"
+        ?"transport-proxy"
+        : source.status,
+      mode,
+      source,
+      productionRatePerSecond:productionRate,
+      sourceEscapeFraction,
+      escapedRatePerSecond:escapedRate,
+      smearingScalePc,
+      bulgeAcceptanceRadiusPc,
+      spatialRetentionFraction,
+      bulgeRetainedRatePerSecond:bulgeRetainedRate,
+      thermalizationSurvivalFraction,
+      thermalizedRatePerSecond:thermalizedRate,
+      annihilationFraction,
+      annihilationRatePerSecond:annihilationRate,
+      positronium:branching,
+      linePhotonRatePerSecond:linePhotonRate,
+      continuumPhotonRatePerSecond:continuumPhotonRate,
+      lineFluxAtEarthPhCm2S:lineFluxAtEarth,
+      reference,
+      annihilationRateToBulgeReference:
+        annihilationRate/reference.positronRatePerSecond,
+      linePhotonRateToBulgeReference:
+        reference.linePhotonRatePerSecond>0
+          ? linePhotonRate/reference.linePhotonRatePerSecond
+          : 0,
+      lineFluxToBulgeReference:
+        reference.lineFluxPhCm2S>0
+          ? lineFluxAtEarth/reference.lineFluxPhCm2S
+          : 0,
+      injectionEnergyMeV,
+      injectionEnergyMorphologyMaxMeV:
+        CONSTANTS.POSITRON_INJECTION_MORPHOLOGY_MAX_MEV,
+      injectionEnergyCompatibleWithSmearingScenario:injectionEnergyCompatible,
+      smearingReferencePc:CONSTANTS.POSITRON_SMEARING_SCALE_PC,
+      smearingReferenceSigmaPc:CONSTANTS.POSITRON_SMEARING_SIGMA_PC,
+      smearingOffsetSigma:smearingSigmaDistance,
+      smearingWithinOneSigma:smearingSigmaDistance<=1,
+      caveats:[
+        "The source escape, thermalization-survival and annihilation fractions are explicit phenomenological factors, not derived from a kinetic transport calculation.",
+        "The spatial-retention factor uses an isotropic 3D Gaussian transport kernel; the observed 150±50 pc smearing scale is not itself proof of Gaussian diffusion.",
+        "The <=1.4 MeV injection-energy diagnostic is scenario-dependent and comes from a morphology/propagation interpretation, not a universal exclusion bound.",
+        "The line flux assumes the same effective 8.5 kpc bulge distance used to convert the observational flux into luminosity.",
+        "The pipeline is quasi-steady and does not yet solve time-dependent diffusion, advection, Coulomb losses or phase-dependent ISM annihilation."
+      ]
+    };
+  }
+
+  function positronTransportSweep(input,options={}){
+    const p=normalizeParams(input);
+    const values=options.smearingValuesPc||linearSpace(50,500,64);
+    return {
+      xKey:"smearingScalePc",
+      points:values.map((value)=>{
+        const result=positronTransportPipeline(p,{...options,smearingScalePc:value});
+        return {
+          smearingScalePc:value,
+          spatialRetentionFraction:result.spatialRetentionFraction,
+          linePhotonRateToBulgeReference:result.linePhotonRateToBulgeReference,
+          lineFluxToBulgeReference:result.lineFluxToBulgeReference
+        };
+      })
+    };
+  }
+
   function deficitOrders(value, target = 1) {
     const metric = Number(value);
     const goal = Number(target);
@@ -4283,6 +4527,8 @@
     "inverse_compton",
     "pair_cascade",
     "gap_closure",
+    "positron_transport",
+    "annihilation_observable",
     "superradiance_rate",
     "cloud_saturation",
     "positron_conversion",
@@ -4419,6 +4665,22 @@
           "The solver searches h/r_g for both one-generation multiplicity >= 1 and a Goldreich-Julian refill proxy >= 1. Real GRPIC gaps can remain intermittent even when these algebraic criteria are met."
       },
       {
+        id: "positron_transport",
+        category: "diagnostic-proxy",
+        title: "Near-source pairs → bulge annihilation",
+        state: "explicit transport factors",
+        detail:
+          "v8.8 separates source production, escape, spatial retention, thermalization survival and annihilation. These efficiencies remain phenomenological until a kinetic ISM transport model is supplied."
+      },
+      {
+        id: "annihilation_observable",
+        category: "observational-calibration",
+        title: "Positronium → 511-keV line observable",
+        state: "explicit branching + bulge flux reference",
+        detail:
+          "The line yield follows direct annihilation plus para/ortho positronium branching. The bulge line reference uses the Siegert et al. 2016 0.96e-3 ph cm^-2 s^-1 flux at an effective 8.5 kpc distance."
+      },
+      {
         id: "superradiance_rate",
         category: "literature-model",
         title: "Scalar 211 superradiance rate",
@@ -4504,6 +4766,12 @@
     derivativeAxialBackgroundPeak,
     positronRateFromPower,
     positronObservableFromPower,
+    bulge511Reference,
+    positroniumLineYield,
+    gaussianTransportRetentionFraction,
+    positronProductionSourceAudit,
+    positronTransportPipeline,
+    positronTransportSweep,
     microphysicsAudit,
     schwingerPairRateDensity,
     pairProductionVolume,

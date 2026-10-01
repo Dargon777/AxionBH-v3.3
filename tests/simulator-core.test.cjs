@@ -732,8 +732,8 @@ console.log("AxionBH simulator-core tests passed");
 
 
 {
-  assert.equal(A.MODEL_VERSION, "8.7.0");
-  assert.equal(A.STATE_SCHEMA_VERSION, 12);
+  assert.equal(A.MODEL_VERSION, "8.8.0");
+  assert.equal(A.STATE_SCHEMA_VERSION, 13);
 }
 
 {
@@ -800,8 +800,8 @@ console.log("AxionBH simulator-core tests passed");
     },
     "cme"
   );
-  assert.equal(report.modelVersion, "8.7.0");
-  assert.equal(report.stateSchemaVersion, 12);
+  assert.equal(report.modelVersion, "8.8.0");
+  assert.equal(report.stateSchemaVersion, 13);
   assert.equal(report.layers.length, A.MODEL_LAYERS.length);
   assert.ok(report.accretion);
   assert.ok(report.layers.some(
@@ -1002,7 +1002,7 @@ console.log("AxionBH simulator-core tests passed");
 {const a=A.gapParallelElectricField(A.DEFAULTS,{screeningFraction:.1}),b=A.gapParallelElectricField(A.DEFAULTS,{screeningFraction:1});assert.ok(a.parallelElectricFieldVcm<b.parallelElectricFieldVcm);}
 
 {
-  assert.equal(A.MODEL_VERSION,"8.7.0");
+  assert.equal(A.MODEL_VERSION,"8.8.0");
   assert.equal(A.CONSTANTS.POSITRON_RATE_OBS_511,2e43);
   assert.equal(A.CONSTANTS.POSITRON_RATE_GALAXY_511,5e43);
   const base=A.cme(A.DEFAULTS);
@@ -1220,6 +1220,110 @@ console.log("AxionBH simulator-core tests passed");
 {
   const report=A.modelValidityReport(A.DEFAULTS,"cme");
   for(const id of ["soft_photon_spectrum","inverse_compton","gap_closure"]){
+    assert.ok(report.layers.some((layer)=>layer.id===id));
+  }
+}
+
+
+{
+  const ref=A.bulge511Reference();
+  assert.equal(ref.scope,"Galactic bulge");
+  assert.ok(Math.abs(ref.lineFluxPhCm2S/0.96e-3-1)<1e-12);
+  assert.ok(ref.linePhotonRatePerSecond>8e42);
+  assert.ok(ref.linePhotonRatePerSecond<8.6e42);
+  assert.ok(Math.abs(A.CONSTANTS.LINE_PHOTON_RATE_OBS_511/ref.linePhotonRatePerSecond-1)<1e-12);
+}
+
+{
+  const direct=A.positroniumLineYield(0);
+  const allPs=A.positroniumLineYield(1);
+  const typical=A.positroniumLineYield(0.95);
+  assert.equal(direct.linePhotonsPerAnnihilation,2);
+  assert.equal(allPs.linePhotonsPerAnnihilation,0.5);
+  assert.ok(Math.abs(typical.linePhotonsPerAnnihilation-0.575)<1e-12);
+  assert.ok(Math.abs(typical.continuumPhotonsPerAnnihilation-2.1375)<1e-12);
+}
+
+{
+  const near=A.gaussianTransportRetentionFraction(1000,100);
+  const broad=A.gaussianTransportRetentionFraction(1000,500);
+  assert.ok(near>broad);
+  assert.ok(near<=1&&near>0);
+  assert.ok(broad<1&&broad>0);
+}
+
+{
+  const source=A.positronProductionSourceAudit("cme",A.DEFAULTS,{
+    sourceKind:"mode-proxy"
+  });
+  assert.equal(source.sourceKind,"mode-proxy");
+  assert.ok(source.positronProductionRatePerSecond>=0);
+}
+
+{
+  const pipe=A.positronTransportPipeline(A.DEFAULTS,{
+    mode:"cme",
+    sourceKind:"mode-proxy",
+    sourceEscapeFraction:0.5,
+    smearingScalePc:150,
+    bulgeAcceptanceRadiusPc:1000,
+    thermalizationSurvivalFraction:0.8,
+    annihilationFraction:0.9,
+    positroniumFraction:0.95,
+    injectionEnergyMeV:1
+  });
+  assert.ok(pipe.productionRatePerSecond>=pipe.annihilationRatePerSecond);
+  assert.ok(pipe.spatialRetentionFraction>0&&pipe.spatialRetentionFraction<=1);
+  assert.ok(pipe.linePhotonRatePerSecond>=0);
+  assert.ok(pipe.lineFluxAtEarthPhCm2S>=0);
+  assert.equal(pipe.injectionEnergyCompatibleWithSmearingScenario,true);
+  assert.equal(pipe.smearingWithinOneSigma,true);
+}
+
+{
+  const highE=A.positronTransportPipeline(A.DEFAULTS,{
+    mode:"cme",
+    sourceKind:"mode-proxy",
+    injectionEnergyMeV:2,
+    smearingScalePc:250
+  });
+  assert.equal(highE.injectionEnergyCompatibleWithSmearingScenario,false);
+  assert.ok(highE.smearingOffsetSigma>=2);
+}
+
+{
+  const unresolved=A.positronProductionSourceAudit("cme",A.DEFAULTS,{
+    sourceKind:"gap-cascade",
+    gapOptions:{
+      plasmaInjectionFraction:1e-18,
+      softPhotonMinEv:1e-3,
+      softPhotonMaxEv:1e4,
+      softPhotonIndex:2,
+      softPhotonLuminosityErgS:1e36,
+      curvatureRadiusRg:1,
+      closureScanSteps:32
+    }
+  });
+  if(unresolved.status==="unresolved-gap-closure"){
+    assert.equal(unresolved.positronProductionRatePerSecond,0);
+  }else{
+    assert.ok(unresolved.positronProductionRatePerSecond>0);
+  }
+}
+
+{
+  const sweep=A.positronTransportSweep(A.DEFAULTS,{
+    mode:"cme",
+    sourceKind:"mode-proxy",
+    smearingValuesPc:[50,150,500]
+  });
+  assert.equal(sweep.points.length,3);
+  assert.ok(sweep.points[0].spatialRetentionFraction>=sweep.points[2].spatialRetentionFraction);
+}
+
+{
+  const report=A.modelValidityReport(A.DEFAULTS,"cme");
+  for(const id of ["positron_transport","annihilation_observable"]){
     assert.ok(report.layers.some((layer)=>layer.id===id));
   }
 }

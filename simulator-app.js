@@ -382,7 +382,7 @@
       ordered[key] = Number(p[key]);
     });
     const source = JSON.stringify({
-      model: "AxionBH-v8.7.0",
+      model: "AxionBH-v8.8.0",
       mode,
       parameters: ordered
     });
@@ -1052,7 +1052,7 @@
     if ($("mode").value !== "cme") {
       setAnalysisMeta(
         "Parameter Inference",
-        "v8.7 inverse solver сейчас определён для CVE closure"
+        "v8.8 inverse solver сейчас определён для CVE closure"
       );
       setAnalysisTable(
         '<div class="inference-empty">Переключи режим на CME, чтобы оценить дефицит и требуемые однопараметрические сдвиги.</div>'
@@ -1374,6 +1374,43 @@
       gapPhotonIndexValue().toFixed(2);
     $("gapSoftLumOut").textContent =
       A.formatScientific(gapSoftLuminosityValue(), 2);
+  }
+
+
+  function positronInjectionEnergyValue() {
+    return Math.pow(10, Number($("positronInjectionExp").value));
+  }
+
+  function currentPositronOptions() {
+    return {
+      mode: $("mode").value,
+      sourceKind: $("positronSourceKind").value,
+      gapOptions: currentGapOptions(),
+      sourceEscapeFraction: Number($("positronEscape").value),
+      smearingScalePc: Number($("positronSmearingPc").value),
+      bulgeAcceptanceRadiusPc: Number($("positronBulgeRadiusPc").value),
+      thermalizationSurvivalFraction: Number($("positronThermalization").value),
+      annihilationFraction: Number($("positronAnnihilation").value),
+      positroniumFraction: Number($("positroniumFraction").value),
+      injectionEnergyMeV: positronInjectionEnergyValue()
+    };
+  }
+
+  function updatePositronLabels() {
+    $("positronEscapeOut").textContent =
+      Number($("positronEscape").value).toFixed(2);
+    $("positronSmearingOut").textContent =
+      Number($("positronSmearingPc").value).toFixed(0);
+    $("positronBulgeRadiusOut").textContent =
+      Number($("positronBulgeRadiusPc").value).toFixed(0);
+    $("positronThermalizationOut").textContent =
+      Number($("positronThermalization").value).toFixed(2);
+    $("positronAnnihilationOut").textContent =
+      Number($("positronAnnihilation").value).toFixed(2);
+    $("positroniumFractionOut").textContent =
+      Number($("positroniumFraction").value).toFixed(2);
+    $("positronInjectionOut").textContent =
+      A.formatScientific(positronInjectionEnergyValue(), 2) + " MeV";
   }
 
 
@@ -1980,7 +2017,7 @@
         '</span><span>E_cost=' +
         A.formatScientific(audit.mu5ToPositrons.energyCostErg,3) +
         ' erg/e⁺; no microscopic pair-production rate is derived.</span></div>',
-      '<div class="missing-note"><strong>Observable correction:</strong> the Galactic ~10⁴³ quantity is an annihilation/injection rate in e⁺/s, not an energy luminosity in erg/s. v8.7 therefore audits the corrected rate ratio separately; the legacy numerical e⁺ budget ratio fields remain untouched for backward reproducibility.</div>'
+      '<div class="missing-note"><strong>Observable correction:</strong> the Galactic ~10⁴³ quantity is an annihilation/injection rate in e⁺/s, not an energy luminosity in erg/s. v8.8 therefore audits the corrected rate ratio separately; the legacy numerical e⁺ budget ratio fields remain untouched for backward reproducibility.</div>'
     ].join("");
     setAnalysisTable(html);
     if (!window.Plotly) return;
@@ -2079,6 +2116,71 @@
       {type:"scatter",mode:"lines",name:"IC cooling fraction",x:xs,y:yi}
     ],layout,{responsive:true,displaylogo:false});
   }
+
+  function renderAnnihilationPipeline() {
+    const options=currentPositronOptions();
+    const analysis=A.positronTransportPipeline(params(),options);
+    const source=analysis.source;
+    const ref=analysis.reference;
+    const sourceStatus=source.status==="available"||source.status==="zero"
+      ? source.status
+      : "UNRESOLVED";
+    setAnalysisMeta(
+      "511-keV Observable Pipeline",
+      "production → escape → transport → thermalisation → annihilation → positronium → line flux"
+    );
+
+    const html=[
+      '<div class="pair-summary">',
+      '<div><span>source</span><strong>'+source.sourceKind+'</strong></div>',
+      '<div><span>source status</span><strong>'+sourceStatus+'</strong></div>',
+      '<div><span>production e⁺</span><strong>'+A.formatScientific(analysis.productionRatePerSecond,3)+' s⁻¹</strong></div>',
+      '<div><span>escape fraction</span><strong>'+A.formatScientific(analysis.sourceEscapeFraction,3)+'</strong></div>',
+      '<div><span>bulge retention</span><strong>'+A.formatScientific(analysis.spatialRetentionFraction,3)+'</strong></div>',
+      '<div><span>thermalisation survival</span><strong>'+A.formatScientific(analysis.thermalizationSurvivalFraction,3)+'</strong></div>',
+      '<div><span>annihilation e⁺</span><strong>'+A.formatScientific(analysis.annihilationRatePerSecond,3)+' s⁻¹</strong></div>',
+      '<div><span>f_Ps</span><strong>'+A.formatScientific(analysis.positronium.positroniumFraction,3)+'</strong></div>',
+      '<div><span>511 photons / annihilation</span><strong>'+A.formatScientific(analysis.positronium.linePhotonsPerAnnihilation,3)+'</strong></div>',
+      '<div><span>511 line photons</span><strong>'+A.formatScientific(analysis.linePhotonRatePerSecond,3)+' s⁻¹</strong></div>',
+      '<div><span>predicted Earth flux</span><strong>'+A.formatScientific(analysis.lineFluxAtEarthPhCm2S,3)+' ph cm⁻² s⁻¹</strong></div>',
+      '<div><span>line / observed bulge</span><strong>'+A.formatScientific(analysis.lineFluxToBulgeReference,3)+'×</strong></div>',
+      '<div><span>smearing</span><strong>'+A.formatScientific(analysis.smearingScalePc,3)+' pc</strong></div>',
+      '<div><span>smearing offset</span><strong>'+analysis.smearingOffsetSigma.toFixed(2)+'σ</strong></div>',
+      '<div><span>injection energy</span><strong>'+A.formatScientific(analysis.injectionEnergyMeV,3)+' MeV</strong></div>',
+      '<div><span>≤1.4 MeV diagnostic</span><strong>'+(analysis.injectionEnergyCompatibleWithSmearingScenario?'compatible':'tension')+'</strong></div>',
+      '</div>',
+      '<div class="missing-note"><strong>Observable reference:</strong> bulge line flux '+
+        A.formatScientific(ref.lineFluxPhCm2S,3)+' ph cm⁻² s⁻¹ at an effective '+
+        ref.effectiveDistanceKpc.toFixed(1)+' kpc, corresponding to '+
+        A.formatScientific(ref.linePhotonRatePerSecond,3)+' photons/s. '+
+        'The escape, survival and annihilation factors remain explicit phenomenological transport terms; the 150±50 pc scale is used only as a morphology diagnostic.</div>'
+    ].join("");
+    setAnalysisTable(html);
+
+    if(!window.Plotly)return;
+    const sweep=A.positronTransportSweep(params(),{
+      ...options,
+      smearingValuesPc:A.linearSpace(25,600,72)
+    });
+    const colors=themeColors();
+    const layout=plotLayout("transport smearing, pc","fraction / observed ratio");
+    layout.shapes=[
+      {type:"line",x0:150,x1:150,y0:0,y1:1,line:{dash:"dash",color:colors.muted}}
+    ];
+    Plotly.react("plot",[
+      {
+        type:"scatter",mode:"lines",name:"bulge retention",
+        x:sweep.points.map(p=>p.smearingScalePc),
+        y:sweep.points.map(p=>p.spatialRetentionFraction)
+      },
+      {
+        type:"scatter",mode:"lines",name:"511 flux / observed",
+        x:sweep.points.map(p=>p.smearingScalePc),
+        y:sweep.points.map(p=>p.lineFluxToBulgeReference)
+      }
+    ],layout,{responsive:true,displaylogo:false});
+  }
+
 
   function renderValidity() {
     const p = params();
@@ -2488,6 +2590,7 @@
     $("explorerControls").classList.toggle("hidden", kind !== "explorer");
     $("chiralityControls").classList.toggle("hidden", kind !== "chirality");
     $("gapControls").classList.toggle("hidden", kind !== "gap");
+    $("annihilationControls").classList.toggle("hidden", kind !== "annihilation");
     $("missingPhysicsControls").classList.toggle("hidden", kind !== "missing");
     $("plot").classList.toggle("plot-tall", kind === "explorer");
 
@@ -2504,6 +2607,7 @@
         else if (kind === "micro") renderMicrophysicsAudit();
         else if (kind === "pairs") renderPairProduction();
         else if (kind === "gap") renderGapElectrodynamics();
+        else if (kind === "annihilation") renderAnnihilationPipeline();
         else if (kind === "validity") renderValidity();
         else if (kind === "chirality") renderChirality();
         else if (kind === "missing") renderMissingPhysics();
@@ -2552,7 +2656,7 @@
     const diagnostics = currentDiagnostics();
     const payload = {
       generatedAt: new Date().toISOString(),
-      model: "AxionBH research workbench v8.7.0",
+      model: "AxionBH research workbench v8.8.0",
       modelVersion: A.MODEL_VERSION,
       stateSchemaVersion: A.STATE_SCHEMA_VERSION,
       stateId: runStateId(state.lastMode, state.lastParams),
@@ -2610,6 +2714,11 @@
               currentGapOptions()
             )
           : null,
+      positronTransport:
+        A.positronTransportPipeline(
+          state.lastParams,
+          currentPositronOptions()
+        ),
       missingPhysics: {
         placement: $("missingPlacement").value,
         gainExp: Number($("missingGainExp").value),
@@ -2633,7 +2742,7 @@
     const lines = [
       "# AxionBH reproducibility report",
       "",
-      "- Model: AxionBH Research Workbench v8.7.0",
+      "- Model: AxionBH Research Workbench v8.8.0",
       "- Generated: " + new Date().toISOString(),
       "- State ID: " + stateId,
       "- Mode: " + modeNames[state.lastMode],
@@ -2817,6 +2926,16 @@
         photonIndex: Number($("gapPhotonIndex").value),
         softLumExp: Number($("gapSoftLumExp").value)
       },
+      annihilation: {
+        sourceKind: $("positronSourceKind").value,
+        escape: Number($("positronEscape").value),
+        smearingPc: Number($("positronSmearingPc").value),
+        bulgeRadiusPc: Number($("positronBulgeRadiusPc").value),
+        thermalization: Number($("positronThermalization").value),
+        annihilation: Number($("positronAnnihilation").value),
+        positronium: Number($("positroniumFraction").value),
+        injectionExp: Number($("positronInjectionExp").value)
+      },
       missingPhysics: {
         placement: $("missingPlacement").value,
         gainExp: Number($("missingGainExp").value)
@@ -2840,7 +2959,7 @@
       applyParameters(restored);
       if (modeNames[payload.mode]) $("mode").value = payload.mode;
 
-      if (["spin", "explorer", "sensitivity", "inference", "transport", "plasma", "calibration", "flow", "micro", "pairs", "gap", "validity", "chirality", "missing", "compare"].includes(payload.analysis)) {
+      if (["spin", "explorer", "sensitivity", "inference", "transport", "plasma", "calibration", "flow", "micro", "pairs", "gap", "annihilation", "validity", "chirality", "missing", "compare"].includes(payload.analysis)) {
         state.analysis = payload.analysis;
       }
 
@@ -2900,6 +3019,25 @@
         });
       }
 
+      if (payload.annihilation && typeof payload.annihilation === "object") {
+        if (["mode-proxy","gap-cascade","gap-schwinger"].includes(payload.annihilation.sourceKind)) {
+          $("positronSourceKind").value=payload.annihilation.sourceKind;
+        }
+        const transportRanges=[
+          ["positronEscape",payload.annihilation.escape,0,1],
+          ["positronSmearingPc",payload.annihilation.smearingPc,25,600],
+          ["positronBulgeRadiusPc",payload.annihilation.bulgeRadiusPc,100,3000],
+          ["positronThermalization",payload.annihilation.thermalization,0,1],
+          ["positronAnnihilation",payload.annihilation.annihilation,0,1],
+          ["positroniumFraction",payload.annihilation.positronium,0,1],
+          ["positronInjectionExp",payload.annihilation.injectionExp,-2,2]
+        ];
+        transportRanges.forEach(([id,value,min,max])=>{
+          const x=Number(value);
+          if(Number.isFinite(x)&&x>=min&&x<=max)$(id).value=x;
+        });
+      }
+
       if (payload.missingPhysics && typeof payload.missingPhysics === "object") {
         if (missingPlacementNames[payload.missingPhysics.placement]) {
           $("missingPlacement").value = payload.missingPhysics.placement;
@@ -2913,6 +3051,7 @@
       updateExplorerFaLabel();
       updateChiralityLabels();
       updateGapLabels();
+      updatePositronLabels();
       updateMissingGainLabel();
       $("preset").value = "custom";
       updateConditionalFields();
@@ -3041,6 +3180,20 @@
       });
     });
 
+    ["positronEscape","positronSmearingPc","positronBulgeRadiusPc","positronThermalization","positronAnnihilation","positroniumFraction","positronInjectionExp"].forEach((id)=>{
+      $(id).addEventListener("input",()=>{
+        updatePositronLabels();
+        if(state.analysis==="annihilation"&&state.lastResult){
+          renderAnalysis("annihilation");
+        }
+      });
+    });
+    $("positronSourceKind").addEventListener("change",()=>{
+      if(state.analysis==="annihilation"&&state.lastResult){
+        renderAnalysis("annihilation");
+      }
+    });
+
     $("missingGainExp").addEventListener("input", () => {
       updateMissingGainLabel();
       if (state.analysis === "missing" && state.lastResult) {
@@ -3057,6 +3210,7 @@
     updateExplorerFaLabel();
     updateChiralityLabels();
     updateGapLabels();
+    updatePositronLabels();
     updateMissingGainLabel();
     restoreSharedState();
     run();
