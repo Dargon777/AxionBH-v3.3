@@ -732,8 +732,8 @@ console.log("AxionBH simulator-core tests passed");
 
 
 {
-  assert.equal(A.MODEL_VERSION, "8.8.0");
-  assert.equal(A.STATE_SCHEMA_VERSION, 13);
+  assert.equal(A.MODEL_VERSION, "8.9.0");
+  assert.equal(A.STATE_SCHEMA_VERSION, 14);
 }
 
 {
@@ -800,8 +800,8 @@ console.log("AxionBH simulator-core tests passed");
     },
     "cme"
   );
-  assert.equal(report.modelVersion, "8.8.0");
-  assert.equal(report.stateSchemaVersion, 13);
+  assert.equal(report.modelVersion, "8.9.0");
+  assert.equal(report.stateSchemaVersion, 14);
   assert.equal(report.layers.length, A.MODEL_LAYERS.length);
   assert.ok(report.accretion);
   assert.ok(report.layers.some(
@@ -1002,7 +1002,7 @@ console.log("AxionBH simulator-core tests passed");
 {const a=A.gapParallelElectricField(A.DEFAULTS,{screeningFraction:.1}),b=A.gapParallelElectricField(A.DEFAULTS,{screeningFraction:1});assert.ok(a.parallelElectricFieldVcm<b.parallelElectricFieldVcm);}
 
 {
-  assert.equal(A.MODEL_VERSION,"8.8.0");
+  assert.equal(A.MODEL_VERSION,"8.9.0");
   assert.equal(A.CONSTANTS.POSITRON_RATE_OBS_511,2e43);
   assert.equal(A.CONSTANTS.POSITRON_RATE_GALAXY_511,5e43);
   const base=A.cme(A.DEFAULTS);
@@ -1324,6 +1324,127 @@ console.log("AxionBH simulator-core tests passed");
 {
   const report=A.modelValidityReport(A.DEFAULTS,"cme");
   for(const id of ["positron_transport","annihilation_observable"]){
+    assert.ok(report.layers.some((layer)=>layer.id===id));
+  }
+}
+
+
+{
+  const phase=A.resolveIsmPhase("warm-neutral");
+  assert.equal(phase.id,"warm-neutral");
+  assert.ok(phase.hydrogenDensityCm3>0);
+  assert.ok(phase.electronDensityCm3>0);
+  assert.ok(phase.electronDensityCm3<phase.hydrogenDensityCm3);
+}
+
+{
+  const beta=A.positronBetaFromKineticEnergy(1);
+  assert.ok(beta.gamma>1);
+  assert.ok(beta.beta>0&&beta.beta<1);
+  const sigma=A.inFlightAnnihilationCrossSectionCm2(1);
+  assert.ok(sigma>0);
+}
+
+{
+  const t=A.jeanCollisionalSlowingTimeSeconds(1,1);
+  const path=A.positronBetaFromKineticEnergy(1).beta*A.CONSTANTS.C*t/A.CONSTANTS.PC_TO_CM;
+  assert.ok(t/A.CONSTANTS.YEAR>9.9e4&&t/A.CONSTANTS.YEAR<1.01e5);
+  assert.ok(path>2.8e4&&path<3.2e4);
+}
+
+{
+  const d=A.positronDiffusionCoefficientCm2S(1,{D10GeVCm2S:1e28,delta:0.5});
+  assert.ok(Math.abs(d/1e26-1)<1e-12);
+}
+
+{
+  const a=A.ismPositronTransportAudit({
+    ismPhase:"warm-neutral",
+    propagationMode:"diffusion-advection",
+    injectionEnergyMeV:1,
+    bulgeAcceptanceRadiusPc:1000,
+    D10GeVCm2S:1e28,
+    diffusionDelta:0.5
+  });
+  assert.equal(a.status,"ism-timescale-proxy");
+  assert.ok(a.slowingTimeYears>3e5&&a.slowingTimeYears<3.5e5);
+  assert.ok(a.pathLengthPc>8e4);
+  assert.ok(a.diffusionSigmaPc>0);
+  assert.ok(a.effectiveSmearingPc>0);
+  assert.ok(a.inFlightSurvivalFraction>0&&a.inFlightSurvivalFraction<=1);
+  assert.ok(a.postThermalAnnihilationFraction>=0&&a.postThermalAnnihilationFraction<=1);
+}
+
+{
+  const diff=A.ismPositronTransportAudit({
+    ismPhase:"warm-neutral",
+    propagationMode:"diffusion-advection",
+    injectionEnergyMeV:1
+  });
+  const ballistic=A.ismPositronTransportAudit({
+    ismPhase:"warm-neutral",
+    propagationMode:"collisional-ballistic",
+    injectionEnergyMeV:1,
+    fieldLineDisplacementFraction:0.01
+  });
+  assert.notEqual(diff.effectiveSmearingPc,ballistic.effectiveSmearingPc);
+  assert.ok(ballistic.effectiveSmearingPc>diff.effectiveSmearingPc);
+}
+
+{
+  const pipeline=A.positronTransportPipeline(A.DEFAULTS,{
+    mode:"cme",
+    sourceKind:"mode-proxy",
+    transportModel:"ism-timescale",
+    ismPhase:"warm-neutral",
+    propagationMode:"diffusion-advection",
+    sourceEscapeFraction:1,
+    bulgeAcceptanceRadiusPc:1000,
+    injectionEnergyMeV:1,
+    D10GeVCm2S:1e28,
+    diffusionDelta:0.5,
+    positroniumFraction:0.95
+  });
+  assert.equal(pipeline.transportModel,"ism-timescale");
+  assert.ok(pipeline.ismTransport);
+  assert.equal(pipeline.smearingScalePc,pipeline.ismTransport.effectiveSmearingPc);
+  assert.equal(pipeline.thermalizationSurvivalFraction,pipeline.ismTransport.inFlightSurvivalFraction);
+  assert.equal(pipeline.annihilationFraction,pipeline.ismTransport.postThermalAnnihilationFraction);
+}
+
+{
+  const legacy=A.positronTransportPipeline(A.DEFAULTS,{
+    mode:"cme",
+    sourceKind:"mode-proxy",
+    transportModel:"legacy-factors",
+    smearingScalePc:150,
+    thermalizationSurvivalFraction:0.7,
+    annihilationFraction:0.6,
+    injectionEnergyMeV:1
+  });
+  assert.equal(legacy.transportModel,"legacy-factors");
+  assert.equal(legacy.ismTransport,null);
+  assert.equal(legacy.smearingScalePc,150);
+  assert.equal(legacy.thermalizationSurvivalFraction,0.7);
+  assert.equal(legacy.annihilationFraction,0.6);
+}
+
+{
+  const sweep=A.positronTransportSweep(A.DEFAULTS,{
+    mode:"cme",
+    sourceKind:"mode-proxy",
+    transportModel:"ism-timescale",
+    ismPhase:"warm-neutral",
+    injectionEnergyValuesMeV:[0.1,1,3]
+  });
+  assert.equal(sweep.xKey,"injectionEnergyMeV");
+  assert.equal(sweep.points.length,3);
+  assert.ok(sweep.points.every((p)=>p.effectiveSmearingPc>0));
+}
+
+{
+  const report=A.modelValidityReport(A.DEFAULTS,"cme");
+  for(const id of ["ism_energy_losses","ism_propagation"]){
     assert.ok(report.layers.some((layer)=>layer.id===id));
   }
 }
