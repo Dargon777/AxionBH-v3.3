@@ -674,3 +674,84 @@ console.log("AxionBH simulator-core tests passed");
     );
   }
 }
+
+
+{
+  assert.equal(A.MODEL_VERSION, "8.0.0");
+  assert.equal(A.STATE_SCHEMA_VERSION, 8);
+}
+
+{
+  const flow = A.accretionElectronDensity({
+    ...A.DEFAULTS,
+    electronDensityMode: 2
+  });
+  const p = A.DEFAULTS;
+  const geometry = A.kerrGeometry(
+    p.massSolar * A.CONSTANTS.MSUN,
+    p.spin
+  );
+  const r = p.accretionRadiusRg * geometry.rg;
+  const H = p.scaleHeightRatio * r;
+  const v = p.radialVelocityFracC * A.CONSTANTS.C;
+  const rho = p.mdot / (4 * Math.PI * r * H * v);
+  const expected =
+    p.electronFractionYe * rho / A.CONSTANTS.MP;
+  assert.ok(
+    Math.abs(
+      flow.netElectronDensityCm3 / expected - 1
+    ) < 1e-12
+  );
+  assert.ok(flow.inflowTimeSeconds > 0);
+}
+
+{
+  const p = {
+    ...A.DEFAULTS,
+    electronDensityMode: 2
+  };
+  const flow = A.accretionElectronDensity(p);
+  const resolved =
+    A.resolveElectronVectorChemicalPotential(p);
+  assert.equal(resolved.mode, "accretion");
+  assert.ok(resolved.muGeV > 0);
+  assert.ok(
+    Math.abs(
+      resolved.netDensityCm3 /
+      flow.netElectronDensityCm3 - 1
+    ) < 1e-7
+  );
+}
+
+{
+  const manual = A.cme(A.DEFAULTS);
+  const accretion = A.cme({
+    ...A.DEFAULTS,
+    electronDensityMode: 2
+  });
+  assert.ok(accretion.closure.accretion);
+  assert.ok(
+    accretion.closure.resolvedElectronDensityCm3 >
+    0
+  );
+  assert.ok(accretion.ratio511 > manual.ratio511);
+}
+
+{
+  const report = A.modelValidityReport(
+    {
+      ...A.DEFAULTS,
+      electronDensityMode: 2
+    },
+    "cme"
+  );
+  assert.equal(report.modelVersion, "8.0.0");
+  assert.equal(report.stateSchemaVersion, 8);
+  assert.equal(report.layers.length, A.MODEL_LAYERS.length);
+  assert.ok(report.accretion);
+  assert.ok(report.layers.some(
+    (layer) =>
+      layer.id === "positron_luminosity" &&
+      layer.category === "phenomenological"
+  ));
+}

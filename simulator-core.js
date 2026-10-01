@@ -5,6 +5,9 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
+  const MODEL_VERSION = "8.0.0";
+  const STATE_SCHEMA_VERSION = 8;
+
   const CONSTANTS = Object.freeze({
     G: 6.6743015e-8,
     C: 2.99792458e10,
@@ -49,6 +52,10 @@
     electronMuMeV: 0,
     electronDensityMode: 0,
     electronDensityCm3: 1e7,
+    accretionRadiusRg: 10,
+    radialVelocityFracC: 0.01,
+    scaleHeightRatio: 0.5,
+    electronFractionYe: 1,
     nProfile: 1.8,
     axionMassEv: 1e-17,
     burstEnergy: 1e55,
@@ -85,8 +92,10 @@
     const p = { ...DEFAULTS, ...(input || {}) };
     [
       "massSolar", "B0", "betaTurb", "faGev", "mEff", "mdot",
-      "temperature", "nProfile", "axionMassEv", "burstEnergy",
-      "burstIntervalYears", "burstDuration", "burstEfficiency"
+      "temperature", "accretionRadiusRg", "radialVelocityFracC",
+      "scaleHeightRatio", "electronFractionYe", "nProfile",
+      "axionMassEv", "burstEnergy", "burstIntervalYears",
+      "burstDuration", "burstEfficiency"
     ].forEach((key) => {
       p[key] = Number(p[key]);
       assertFinitePositive(p[key], key);
@@ -98,9 +107,9 @@
       true
     );
     p.electronDensityMode = Number(p.electronDensityMode);
-    if (![0, 1].includes(p.electronDensityMode)) {
+    if (![0, 1, 2].includes(p.electronDensityMode)) {
       throw new RangeError(
-        "electronDensityMode must be 0 (manual muV) or 1 (density closure)"
+        "electronDensityMode must be 0 (manual muV), 1 (density closure), or 2 (accretion closure)"
       );
     }
     p.electronDensityCm3 = Number(p.electronDensityCm3);
@@ -109,6 +118,16 @@
       "electronDensityCm3",
       true
     );
+    if (p.radialVelocityFracC > 1) {
+      throw new RangeError(
+        "radialVelocityFracC must not exceed 1"
+      );
+    }
+    if (p.electronFractionYe > 1) {
+      throw new RangeError(
+        "electronFractionYe must not exceed 1"
+      );
+    }
 
     p.spin = Number(p.spin);
     if (!Number.isFinite(p.spin) || p.spin < 0 || p.spin >= 1) {
@@ -639,6 +658,64 @@
   }
 
 
+
+  const electronMuDensityCache = new Map();
+
+  function accretionElectronDensity(input) {
+    const p = normalizeParams(input);
+    const geometry = kerrGeometry(
+      p.massSolar * CONSTANTS.MSUN,
+      p.spin
+    );
+    const horizonRg = geometry.rPlus / geometry.rg;
+    if (!(p.accretionRadiusRg > horizonRg)) {
+      throw new RangeError(
+        "accretionRadiusRg must lie outside the Kerr horizon"
+      );
+    }
+
+    const radiusCm =
+      p.accretionRadiusRg * geometry.rg;
+    const scaleHeightCm =
+      p.scaleHeightRatio * radiusCm;
+    const radialVelocityCmS =
+      p.radialVelocityFracC * CONSTANTS.C;
+    const inflowAreaCm2 =
+      4 * Math.PI * radiusCm * scaleHeightCm;
+    const massDensityGcm3 =
+      p.mdot /
+      Math.max(
+        inflowAreaCm2 * radialVelocityCmS,
+        1e-300
+      );
+    const baryonDensityCm3 =
+      massDensityGcm3 / CONSTANTS.MP;
+    const netElectronDensityCm3 =
+      p.electronFractionYe * baryonDensityCm3;
+    const inflowTimeSeconds =
+      radiusCm / radialVelocityCmS;
+
+    return {
+      model: "steady thick-disk continuity proxy",
+      radiusRg: p.accretionRadiusRg,
+      radiusCm,
+      horizonRg,
+      scaleHeightRatio: p.scaleHeightRatio,
+      scaleHeightCm,
+      radialVelocityFracC: p.radialVelocityFracC,
+      radialVelocityCmS,
+      inflowAreaCm2,
+      mdotGs: p.mdot,
+      massDensityGcm3,
+      baryonDensityCm3,
+      electronFractionYe: p.electronFractionYe,
+      netElectronDensityCm3,
+      inflowTimeSeconds,
+      continuity:
+        "mdot = 4*pi*r*H*rho*|v_r|"
+    };
+  }
+
   function fermiOccupation(value) {
     const x = Number(value);
     if (!Number.isFinite(x)) {
@@ -746,6 +823,15 @@
     }
     if (targetCm3 === 0) return 0;
 
+    const cacheKey = [
+      Number(temperature).toPrecision(12),
+      targetCm3.toPrecision(12),
+      Number(massGeV).toPrecision(12)
+    ].join("|");
+    if (electronMuDensityCache.has(cacheKey)) {
+      return electronMuDensityCache.get(cacheKey);
+    }
+
     const thermal = temperatureGeV(temperature);
     const mass = assertFinitePositive(massGeV, "massGeV");
     const target = densityCm3ToNatural(targetCm3);
@@ -796,12 +882,47 @@
       else high = mid;
     }
 
-    return (low + high) / 2;
+    const resolved = (low + high) / 2;
+    electronMuDensityCache.set(cacheKey, resolved);
+    if (electronMuDensityCache.size > 256) {
+      const first =
+        electronMuDensityCache.keys().next().value;
+      electronMuDensityCache.delete(first);
+    }
+    return resolved;
   }
 
   function resolveElectronVectorChemicalPotential(input) {
     const p = normalizeParams(input);
     const manualMuGeV = p.electronMuMeV * 1e-3;
+
+    if (p.electronDensityMode === 2) {
+      const accretion = accretionElectronDensity(p);
+      const muGeV =
+        electronChemicalPotentialFromDensity(
+          p.temperature,
+          accretion.netElectronDensityCm3
+        );
+      const pair = electronPairDensitiesNatural(
+        p.temperature,
+        muGeV
+      );
+      return {
+        mode: "accretion",
+        muGeV,
+        muMeV: muGeV * 1e3,
+        targetNetDensityCm3:
+          accretion.netElectronDensityCm3,
+        netDensityCm3: naturalDensityToCm3(
+          pair.electron - pair.positron
+        ),
+        electronDensityCm3:
+          naturalDensityToCm3(pair.electron),
+        positronDensityCm3:
+          naturalDensityToCm3(pair.positron),
+        accretion
+      };
+    }
 
     if (p.electronDensityMode !== 1) {
       const pair = electronPairDensitiesNatural(
@@ -819,7 +940,8 @@
         electronDensityCm3:
           naturalDensityToCm3(pair.electron),
         positronDensityCm3:
-          naturalDensityToCm3(pair.positron)
+          naturalDensityToCm3(pair.positron),
+        accretion: null
       };
     }
 
@@ -843,7 +965,8 @@
       electronDensityCm3:
         naturalDensityToCm3(pair.electron),
       positronDensityCm3:
-        naturalDensityToCm3(pair.positron)
+        naturalDensityToCm3(pair.positron),
+      accretion: null
     };
   }
 
@@ -1052,6 +1175,10 @@
       densityClosureMode: densityClosure.mode,
       densityClosureActive:
         densityClosure.mode === "density",
+      accretionClosureActive:
+        densityClosure.mode === "accretion",
+      accretion:
+        densityClosure.accretion || null,
       targetNetDensityCm3:
         densityClosure.targetNetDensityCm3,
       resolvedNetDensityCm3:
@@ -1179,6 +1306,8 @@
       electronMuGeV,
       electronMuMeV: electronMuGeV * 1e3,
       electronDensityMode: p.electronDensityMode,
+      accretion:
+        plasma.accretion || null,
       targetElectronDensityCm3:
         plasma.targetNetDensityCm3,
       resolvedElectronDensityCm3:
@@ -2204,6 +2333,11 @@
       "mdot",
       "temperature",
       "electronMuMeV",
+      "electronDensityCm3",
+      "accretionRadiusRg",
+      "radialVelocityFracC",
+      "scaleHeightRatio",
+      "electronFractionYe",
       "nProfile"
     ]),
     bosenova: Object.freeze([
@@ -2372,11 +2506,21 @@
       add(
         "info",
         "electron_density_closure",
-        plasma.densityClosureActive
-          ? "μ_V is solved from the selected net electron density n(e−)-n(e+) using a massive ideal Fermi gas."
-          : "μ_V is manual; the code reports the implied ideal-gas net electron density for comparison.",
+        plasma.accretionClosureActive
+          ? "μ_V is solved from an accretion-continuity estimate of net electron density, then inverted through a massive ideal Fermi gas."
+          : plasma.densityClosureActive
+            ? "μ_V is solved from the selected net electron density n(e−)-n(e+) using a massive ideal Fermi gas."
+            : "μ_V is manual; the code reports the implied ideal-gas net electron density for comparison.",
         plasma.resolvedNetDensityCm3
       );
+      if (plasma.accretionClosureActive && plasma.accretion) {
+        add(
+          "info",
+          "accretion_density_closure",
+          "Accretion density uses the steady thick-disk continuity proxy mdot = 4π r H rho |v_r|; H/r, v_r/c and Y_e are explicit model inputs.",
+          plasma.accretion.netElectronDensityCm3
+        );
+      }
       add(
         thermalToElectronMass >= 1 ? "info" : "warning",
         "massless_fermion_regime",
@@ -2483,6 +2627,124 @@
     };
   }
 
+
+  const MODEL_LAYERS = Object.freeze([
+    "geometry",
+    "accretion",
+    "electron_plasma",
+    "anomalous_transport",
+    "axion_chiral_coupling",
+    "stationary_closure",
+    "chirality_dynamics",
+    "positron_luminosity"
+  ]);
+
+  function modelValidityReport(
+    input,
+    mode = "cme",
+    result = null
+  ) {
+    const p = normalizeParams(input);
+    const r = result || simulate(mode, p);
+    const plasma =
+      mode === "cme"
+        ? finiteMassPlasmaDiagnostics(p)
+        : null;
+    const accretion =
+      plasma && plasma.accretionClosureActive
+        ? plasma.accretion
+        : null;
+
+    const layers = [
+      {
+        id: "geometry",
+        category: "analytic",
+        title: "Kerr geometry",
+        state: "implemented",
+        detail:
+          "r_g, r_+, ergosphere scale and Omega_H are algebraic Kerr relations."
+      },
+      {
+        id: "accretion",
+        category:
+          p.electronDensityMode === 2
+            ? "phenomenological"
+            : "external-input",
+        title: "Accretion plasma",
+        state:
+          p.electronDensityMode === 2
+            ? "active closure"
+            : "not closed from flow",
+        detail:
+          p.electronDensityMode === 2
+            ? "Steady thick-disk continuity proxy with explicit r/r_g, H/r, |v_r|/c and Y_e."
+            : "Electron density or chemical potential is supplied independently of an accretion-flow model."
+      },
+      {
+        id: "electron_plasma",
+        category: "idealized",
+        title: "Electron Fermi gas",
+        state: "implemented",
+        detail:
+          "Massive ideal Fermi-Dirac gas maps net electron density and vector chemical potential."
+      },
+      {
+        id: "anomalous_transport",
+        category: "literature-model",
+        title: "CVE / CME transport",
+        state: "implemented",
+        detail:
+          "Finite-mass free-Dirac axial CVE base coefficient; magnetic CME is reported separately."
+      },
+      {
+        id: "axion_chiral_coupling",
+        category: "phenomenological",
+        title: "Axion → μ5 coupling",
+        state: "model ansatz",
+        detail:
+          "The q_mu relation, turbulent enhancement and its normalization are AxionBH assumptions, not derived from the plasma closure."
+      },
+      {
+        id: "stationary_closure",
+        category: "phenomenological",
+        title: "Stationary CVE closure",
+        state: "model ansatz",
+        detail:
+          "Quadratic self-consistency and the a/M = 0.35 gate are implementation assumptions."
+      },
+      {
+        id: "chirality_dynamics",
+        category: "diagnostic-proxy",
+        title: "Chirality dynamics",
+        state: "diagnostic only",
+        detail:
+          "S_proxy = |J5,CVE|/L_eff and massless axial susceptibility are not a finite-mass kinetic derivation."
+      },
+      {
+        id: "positron_luminosity",
+        category: "phenomenological",
+        title: "μ5 → positron luminosity",
+        state: "model ansatz",
+        detail:
+          "kappa = mu5/m_p and L = kappa mdot c^2 are not a derived pair-production calculation."
+      }
+    ];
+
+    return {
+      modelVersion: MODEL_VERSION,
+      stateSchemaVersion: STATE_SCHEMA_VERSION,
+      legacyModeKey:
+        mode === "cme" ? "cme" : null,
+      mode,
+      activePlasmaClosure:
+        plasma ? plasma.densityClosureMode : null,
+      ratio511:
+        Number(r && r.ratio511),
+      accretion,
+      layers
+    };
+  }
+
   function formatScientific(value, digits = 3) {
     if (value === Number.POSITIVE_INFINITY) return "∞";
     if (!Number.isFinite(value)) return "—";
@@ -2501,6 +2763,9 @@
   }
 
   return Object.freeze({
+    MODEL_VERSION,
+    STATE_SCHEMA_VERSION,
+    MODEL_LAYERS,
     CONSTANTS,
     DEFAULTS,
     PRESETS,
@@ -2517,6 +2782,7 @@
     chiralDegeneracy,
     chiralConductivity,
     fermiDerivativeKernel,
+    accretionElectronDensity,
     fermiOccupation,
     naturalDensityToCm3,
     densityCm3ToNatural,
@@ -2578,6 +2844,7 @@
     sensitivityAnalysis,
     comparePresets,
     diagnoseRun,
+    modelValidityReport,
     SENSITIVITY_KEYS,
     formatScientific,
     formatDuration
