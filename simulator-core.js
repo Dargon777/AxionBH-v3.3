@@ -2283,7 +2283,8 @@
       voltageStatvolt:effectiveStatvolt,
       voltageV,
       averageParallelElectricFieldVcm:fieldVcm,
-      source:"Rieger & Katsoulakos 2017 gap-potential scalings: DeltaV~Phi0(h/rg)^2 or Phi0(h/rg)^3/6.",\n      caveat:"Multiplying the analytic potential by chargeDeficitFraction is a linear closure heuristic, not a GR Poisson solution."
+      source:"Rieger & Katsoulakos 2017 gap-potential scalings: DeltaV~Phi0(h/rg)^2 or Phi0(h/rg)^3/6.",
+      caveat:"Multiplying the analytic potential by chargeDeficitFraction is a linear closure heuristic, not a GR Poisson solution."
     };
   }
 
@@ -2386,7 +2387,8 @@
 
   function gapCascadeAudit(input,options={}){
     const p=normalizeParams(input);
-    const defaultGeometry=kerrGeometry(p.massSolar*CONSTANTS.MSUN,p.spin);\n    const radiusRg=Number(options.radiusRg??Math.max(2.1,1.05*defaultGeometry.rPlus/defaultGeometry.rg));
+    const defaultGeometry=kerrGeometry(p.massSolar*CONSTANTS.MSUN,p.spin);
+    const radiusRg=Number(options.radiusRg??Math.max(2.1,1.05*defaultGeometry.rPlus/defaultGeometry.rg));
     const starvation=gapChargeStarvationAudit(p,{
       radiusRg,
       plasmaInjectionFraction:options.plasmaInjectionFraction??1,
