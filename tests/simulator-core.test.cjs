@@ -427,3 +427,84 @@ console.log("AxionBH simulator-core tests passed");
     Number.isFinite(point.jCVE)
   ));
 }
+
+
+{
+  const T = A.DEFAULTS.temperature;
+  const mu = 1e-6;
+  const n5 = A.axialChargeDensity(mu, T);
+  const recovered = A.mu5FromAxialCharge(n5, T);
+  assert.ok(Math.abs(recovered / mu - 1) < 1e-10);
+  assert.ok(A.axialSusceptibility(mu, T) > 0);
+}
+
+{
+  const T = A.DEFAULTS.temperature;
+  const mu = -2e-6;
+  const n5 = A.axialChargeDensity(mu, T);
+  const recovered = A.mu5FromAxialCharge(n5, T);
+  assert.ok(recovered < 0);
+  assert.ok(Math.abs(recovered / mu - 1) < 1e-10);
+}
+
+{
+  const analysis = A.chiralityDynamics(A.DEFAULTS, {
+    flipRatePerSecond: 1e-6,
+    horizonSeconds: 1e6,
+    electricAlignment: 0
+  });
+  assert.ok(Number.isFinite(analysis.finalMu5));
+  assert.ok(Number.isFinite(analysis.equilibriumMu5));
+  assert.ok(analysis.sourceProxyGeV4 > 0);
+  assert.ok(analysis.temperatureToElectronMass < 0.01);
+  assert.equal(analysis.masslessRegime, "nonrelativistic");
+  assert.ok(analysis.electricAlignmentCrossover > 0);
+}
+
+{
+  const plus = A.chiralityDynamics(A.DEFAULTS, {
+    flipRatePerSecond: 1e-6,
+    horizonSeconds: 1e6,
+    electricAlignment: 1e-20
+  });
+  const minus = A.chiralityDynamics(A.DEFAULTS, {
+    flipRatePerSecond: 1e-6,
+    horizonSeconds: 1e6,
+    electricAlignment: -1e-20
+  });
+  assert.ok(plus.netSourceGeV4 > minus.netSourceGeV4);
+  assert.ok(plus.finalMu5 > minus.finalMu5);
+}
+
+{
+  const series = A.chiralityDynamicsSeries(
+    A.DEFAULTS,
+    {
+      flipRatePerSecond: 1e-6,
+      horizonSeconds: 1e6,
+      electricAlignment: 0
+    },
+    40
+  );
+  assert.ok(series.points.length >= 16);
+  assert.equal(series.points[0].timeSeconds, 0);
+  assert.ok(
+    series.points.every((point) =>
+      Number.isFinite(point.n5) &&
+      Number.isFinite(point.mu5)
+    )
+  );
+}
+
+{
+  const diagnostics = A.diagnoseRun(
+    "cme",
+    A.DEFAULTS,
+    A.cme(A.DEFAULTS)
+  );
+  const regime = diagnostics.checks.find(
+    (item) => item.code === "massless_fermion_regime"
+  );
+  assert.ok(regime);
+  assert.equal(regime.level, "warning");
+}
