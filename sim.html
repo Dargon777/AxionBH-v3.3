@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="AxionBH interactive browser simulator and parameter-analysis workbench.">
-  <title>AxionBH — Research Workbench v7.9</title>
+  <title>AxionBH — Research Workbench v7.10</title>
   <link rel="stylesheet" href="simulator.css">
   <script defer src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <script defer src="simulator-core.js"></script>
@@ -15,7 +15,7 @@
     <div class="topbar-inner">
       <a class="brand" href="index.html">
         <span class="brand-mark">A</span>
-        <span>AxionBH<small>research workbench · v7.9</small></span>
+        <span>AxionBH<small>research workbench · v7.10</small></span>
       </a>
       <nav class="nav">
         <a href="index.html">Теория</a>
@@ -39,14 +39,14 @@
     </section>
 
     <div class="notice">
-      <strong>Исследовательский калькулятор.</strong> AxionBH реализует текущие допущения модели и не является подтверждённым инструментом наблюдательной астрофизики. В v7.9 CVE closure считается в единой системе natural units; порог a/M = 0.35 остаётся феноменологическим gate, а не выведенным результатом.
+      <strong>Исследовательский калькулятор.</strong> AxionBH реализует текущие допущения модели и не является подтверждённым инструментом наблюдательной астрофизики. В v7.10 CVE closure считается в единой системе natural units; порог a/M = 0.35 остаётся феноменологическим gate, а не выведенным результатом.
     </div>
 
     <section class="workspace">
       <aside class="panel controls">
         <div class="panel-title">
           <h2>Параметры</h2>
-          <span class="muted">v7.9</span>
+          <span class="muted">v7.10</span>
         </div>
 
         <div class="field">
@@ -95,7 +95,15 @@
           <div class="field"><label>fₐ, GeV</label><input id="faGev" class="input" type="number" step="any"></div>
           <div class="field"><label>m_eff, cm⁻¹</label><input id="mEff" class="input" type="number" step="any"></div>
           <div class="field"><label>T, K</label><input id="temperature" class="input" type="number" step="any"></div>
+          <div class="field">
+            <label>Electron plasma closure</label>
+            <select id="electronDensityMode" class="select compact-select">
+              <option value="0">manual μ_V</option>
+              <option value="1">nₑ,net → μ_V</option>
+            </select>
+          </div>
           <div class="field"><label>μ_V(e), MeV</label><input id="electronMuMeV" class="input" type="number" min="0" step="any"></div>
+          <div class="field"><label>nₑ,net, cm⁻³</label><input id="electronDensityCm3" class="input" type="number" min="0" step="any"></div>
           <div class="field"><label>Профиль B(r), n</label><input id="nProfile" class="input" type="number" min="0.01" step="0.1"></div>
         </div>
 

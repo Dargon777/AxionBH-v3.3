@@ -123,8 +123,8 @@ for (const feature of [
   );
 }
 
-assert.ok(html.includes("v7.9"));
-assert.ok(app.includes("AxionBH research workbench v7.9"));
+assert.ok(html.includes("v7.10"));
+assert.ok(app.includes("AxionBH research workbench v7.10"));
 
 
 for (const feature of [
@@ -248,3 +248,26 @@ for (const feature of [
 }
 
 assert.ok(html.includes('data-analysis="plasma"'));
+
+
+for (const id of [
+  "electronDensityMode",
+  "electronDensityCm3"
+]) {
+  assert.ok(
+    html.includes('id="' + id + '"'),
+    "missing v7.10 density-closure UI id: " + id
+  );
+}
+
+for (const feature of [
+  "electronNetDensityCm3",
+  "electronChemicalPotentialFromDensity",
+  "resolveElectronVectorChemicalPotential",
+  "electronDensityClosureSweep"
+]) {
+  assert.ok(
+    core.includes(feature) || app.includes(feature),
+    "missing v7.10 density closure feature: " + feature
+  );
+}

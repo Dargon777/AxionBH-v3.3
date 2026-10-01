@@ -47,6 +47,8 @@
     mdot: 6.3e22,
     temperature: 1e7,
     electronMuMeV: 0,
+    electronDensityMode: 0,
+    electronDensityCm3: 1e7,
     nProfile: 1.8,
     axionMassEv: 1e-17,
     burstEnergy: 1e55,
@@ -93,6 +95,18 @@
     assertFinitePositive(
       p.electronMuMeV,
       "electronMuMeV",
+      true
+    );
+    p.electronDensityMode = Number(p.electronDensityMode);
+    if (![0, 1].includes(p.electronDensityMode)) {
+      throw new RangeError(
+        "electronDensityMode must be 0 (manual muV) or 1 (density closure)"
+      );
+    }
+    p.electronDensityCm3 = Number(p.electronDensityCm3);
+    assertFinitePositive(
+      p.electronDensityCm3,
+      "electronDensityCm3",
       true
     );
 
@@ -624,6 +638,270 @@
     return sum * h / 3;
   }
 
+
+  function fermiOccupation(value) {
+    const x = Number(value);
+    if (!Number.isFinite(x)) {
+      if (x === Number.POSITIVE_INFINITY) return 0;
+      if (x === Number.NEGATIVE_INFINITY) return 1;
+      return Number.NaN;
+    }
+    if (x > 50) return Math.exp(-x);
+    if (x < -50) return 1 - Math.exp(x);
+    return 1 / (Math.exp(x) + 1);
+  }
+
+  function naturalDensityToCm3(value) {
+    const density = Number(value);
+    if (!Number.isFinite(density)) return Number.NaN;
+    return density * Math.pow(CONSTANTS.CM_TO_GEV_INV, 3);
+  }
+
+  function densityCm3ToNatural(value) {
+    const density = Number(value);
+    if (!Number.isFinite(density)) return Number.NaN;
+    return density / Math.pow(CONSTANTS.CM_TO_GEV_INV, 3);
+  }
+
+  function electronPairDensitiesNatural(
+    temperature,
+    vectorMuGeV,
+    massGeV = CONSTANTS.ELECTRON_MASS_GEV
+  ) {
+    const thermal = temperatureGeV(temperature);
+    const mass = assertFinitePositive(massGeV, "massGeV");
+    const mu = Number(vectorMuGeV);
+    if (!Number.isFinite(mu) || mu < 0) {
+      throw new RangeError(
+        "vectorMuGeV must be finite and non-negative"
+      );
+    }
+
+    const a = mass / thermal;
+    const b = mu / thermal;
+    const upperExtra = Math.max(60, b - a + 40);
+    const tMax = Math.sqrt(upperExtra);
+
+    function integrate(sign) {
+      const integral = simpson1D((t) => {
+        const x = a + t * t;
+        const p = Math.sqrt(
+          Math.max(0, x * x - a * a)
+        );
+        const occupation = fermiOccupation(
+          x + sign * b
+        );
+        return x * p * occupation * 2 * t;
+      }, 0, tMax, 1200);
+      return (
+        thermal * thermal * thermal /
+        (Math.PI * Math.PI) *
+        integral
+      );
+    }
+
+    return {
+      electron: integrate(-1),
+      positron: integrate(1)
+    };
+  }
+
+  function electronNetDensityNatural(
+    temperature,
+    vectorMuGeV,
+    massGeV = CONSTANTS.ELECTRON_MASS_GEV
+  ) {
+    const pair = electronPairDensitiesNatural(
+      temperature,
+      vectorMuGeV,
+      massGeV
+    );
+    return pair.electron - pair.positron;
+  }
+
+  function electronNetDensityCm3(
+    temperature,
+    vectorMuGeV,
+    massGeV = CONSTANTS.ELECTRON_MASS_GEV
+  ) {
+    return naturalDensityToCm3(
+      electronNetDensityNatural(
+        temperature,
+        vectorMuGeV,
+        massGeV
+      )
+    );
+  }
+
+  function electronChemicalPotentialFromDensity(
+    temperature,
+    netDensityCm3,
+    massGeV = CONSTANTS.ELECTRON_MASS_GEV
+  ) {
+    const targetCm3 = Number(netDensityCm3);
+    if (!Number.isFinite(targetCm3) || targetCm3 < 0) {
+      throw new RangeError(
+        "netDensityCm3 must be finite and non-negative"
+      );
+    }
+    if (targetCm3 === 0) return 0;
+
+    const thermal = temperatureGeV(temperature);
+    const mass = assertFinitePositive(massGeV, "massGeV");
+    const target = densityCm3ToNatural(targetCm3);
+    const ultraGuess = Math.cbrt(
+      3 * Math.PI * Math.PI * target
+    );
+    let low = 0;
+    let high = Math.max(
+      mass + 60 * thermal,
+      2 * ultraGuess,
+      thermal
+    );
+
+    let highDensity = electronNetDensityNatural(
+      temperature,
+      high,
+      mass
+    );
+    let guard = 0;
+    while (
+      highDensity < target &&
+      high < 1e6 &&
+      guard < 80
+    ) {
+      high *= 2;
+      highDensity = electronNetDensityNatural(
+        temperature,
+        high,
+        mass
+      );
+      guard += 1;
+    }
+
+    if (!(highDensity >= target)) {
+      throw new RangeError(
+        "density closure could not bracket electron chemical potential"
+      );
+    }
+
+    for (let i = 0; i < 90; i += 1) {
+      const mid = (low + high) / 2;
+      const density = electronNetDensityNatural(
+        temperature,
+        mid,
+        mass
+      );
+      if (density < target) low = mid;
+      else high = mid;
+    }
+
+    return (low + high) / 2;
+  }
+
+  function resolveElectronVectorChemicalPotential(input) {
+    const p = normalizeParams(input);
+    const manualMuGeV = p.electronMuMeV * 1e-3;
+
+    if (p.electronDensityMode !== 1) {
+      const pair = electronPairDensitiesNatural(
+        p.temperature,
+        manualMuGeV
+      );
+      return {
+        mode: "manual",
+        muGeV: manualMuGeV,
+        muMeV: manualMuGeV * 1e3,
+        targetNetDensityCm3: null,
+        netDensityCm3: naturalDensityToCm3(
+          pair.electron - pair.positron
+        ),
+        electronDensityCm3:
+          naturalDensityToCm3(pair.electron),
+        positronDensityCm3:
+          naturalDensityToCm3(pair.positron)
+      };
+    }
+
+    const muGeV = electronChemicalPotentialFromDensity(
+      p.temperature,
+      p.electronDensityCm3
+    );
+    const pair = electronPairDensitiesNatural(
+      p.temperature,
+      muGeV
+    );
+
+    return {
+      mode: "density",
+      muGeV,
+      muMeV: muGeV * 1e3,
+      targetNetDensityCm3: p.electronDensityCm3,
+      netDensityCm3: naturalDensityToCm3(
+        pair.electron - pair.positron
+      ),
+      electronDensityCm3:
+        naturalDensityToCm3(pair.electron),
+      positronDensityCm3:
+        naturalDensityToCm3(pair.positron)
+    };
+  }
+
+  function electronDensityClosureSweep(
+    input,
+    {
+      minDensityCm3 = 1,
+      maxDensityCm3 = 1e30,
+      points = 64
+    } = {}
+  ) {
+    const p = normalizeParams(input);
+    const minDensity = assertFinitePositive(
+      Number(minDensityCm3),
+      "minDensityCm3"
+    );
+    const maxDensity = assertFinitePositive(
+      Number(maxDensityCm3),
+      "maxDensityCm3"
+    );
+    if (!(maxDensity > minDensity)) {
+      throw new RangeError(
+        "maxDensityCm3 must exceed minDensityCm3"
+      );
+    }
+
+    const count = Math.max(
+      16,
+      Math.min(100, Math.trunc(points))
+    );
+    const densities = logSpace(
+      minDensity,
+      maxDensity,
+      count
+    );
+
+    return {
+      points: densities.map((netDensityCm3) => {
+        const muGeV =
+          electronChemicalPotentialFromDensity(
+            p.temperature,
+            netDensityCm3
+          );
+        const plasma = finiteMassPlasmaDiagnostics({
+          ...p,
+          electronDensityMode: 0,
+          electronMuMeV: muGeV * 1e3
+        });
+        return {
+          netDensityCm3,
+          muGeV,
+          muMeV: muGeV * 1e3,
+          suppression: plasma.suppression
+        };
+      })
+    };
+  }
+
   function massiveCveDimensionlessIntegral(
     massOverT,
     muOverT
@@ -721,7 +999,9 @@
   function finiteMassPlasmaDiagnostics(input) {
     const p = normalizeParams(input);
     const thermal = temperatureGeV(p.temperature);
-    const muVectorGeV = p.electronMuMeV * 1e-3;
+    const densityClosure =
+      resolveElectronVectorChemicalPotential(p);
+    const muVectorGeV = densityClosure.muGeV;
     const mass = CONSTANTS.ELECTRON_MASS_GEV;
     const sigmaMassive =
       massiveAxialVorticalConductivity(
@@ -767,7 +1047,24 @@
       massGeV: mass,
       massOverT: mass / thermal,
       vectorMuGeV: muVectorGeV,
+      vectorMuMeV: muVectorGeV * 1e3,
       vectorMuOverT: muVectorGeV / thermal,
+      densityClosureMode: densityClosure.mode,
+      densityClosureActive:
+        densityClosure.mode === "density",
+      targetNetDensityCm3:
+        densityClosure.targetNetDensityCm3,
+      resolvedNetDensityCm3:
+        densityClosure.netDensityCm3,
+      electronDensityCm3:
+        densityClosure.electronDensityCm3,
+      positronDensityCm3:
+        densityClosure.positronDensityCm3,
+      positronFraction:
+        densityClosure.electronDensityCm3 > 0
+          ? densityClosure.positronDensityCm3 /
+            densityClosure.electronDensityCm3
+          : null,
       sigmaMassive,
       sigmaMassless,
       suppression,
@@ -808,6 +1105,7 @@
       points: values.map((electronMuMeV) => {
         const plasma = finiteMassPlasmaDiagnostics({
           ...p,
+          electronDensityMode: 0,
           electronMuMeV
         });
         return {
@@ -850,22 +1148,15 @@
       p.faGev,
       p.betaTurb
     );
-    const electronMuGeV = p.electronMuMeV * 1e-3;
+    const plasma =
+      finiteMassPlasmaDiagnostics(p);
+    const electronMuGeV = plasma.vectorMuGeV;
     const cveBaseCoefficient =
-      massiveAxialVorticalConductivity(
-        p.temperature,
-        electronMuGeV,
-        CONSTANTS.ELECTRON_MASS_GEV
-      );
+      plasma.sigmaMassive;
     const cveMasslessReference =
-      masslessAxialVorticalReference(
-        p.temperature,
-        electronMuGeV
-      );
+      plasma.sigmaMassless;
     const finiteMassSuppression =
-      cveMasslessReference > 0
-        ? cveBaseCoefficient / cveMasslessReference
-        : null;
+      plasma.suppression;
 
     // v7.9: the source term uses the exact free massive-Dirac
     // bulk axial-CVE coefficient at vector chemical potential mu_V.
@@ -886,6 +1177,18 @@
       effectiveLengthGeVInv: effectiveLength,
       qMu,
       electronMuGeV,
+      electronMuMeV: electronMuGeV * 1e3,
+      electronDensityMode: p.electronDensityMode,
+      targetElectronDensityCm3:
+        plasma.targetNetDensityCm3,
+      resolvedElectronDensityCm3:
+        plasma.resolvedNetDensityCm3,
+      electronDensityCm3:
+        plasma.electronDensityCm3,
+      positronDensityCm3:
+        plasma.positronDensityCm3,
+      positronFraction:
+        plasma.positronFraction,
       cveBaseCoefficient,
       cveMasslessReference,
       finiteMassSuppression,
@@ -1316,7 +1619,8 @@
       mEff: Object.freeze({ min: 1e-60, max: 1e2, scale: "log" }),
       mdot: Object.freeze({ min: 1e5, max: 1e90, scale: "log" }),
       temperature: Object.freeze({ min: 1, max: 1e40, scale: "log" }),
-      electronMuMeV: Object.freeze({ min: 1e-9, max: 1e9, scale: "log" })
+      electronMuMeV: Object.freeze({ min: 1e-9, max: 1e9, scale: "log" }),
+      electronDensityCm3: Object.freeze({ min: 1, max: 1e40, scale: "log" })
     })
   });
 
@@ -2062,8 +2366,16 @@
       add(
         "info",
         "finite_mass_cve",
-        "CVE source uses the free massive-Dirac bulk coefficient at the selected electron vector chemical potential μ_V.",
+        "CVE source uses the free massive-Dirac bulk coefficient at the resolved electron vector chemical potential μ_V.",
         plasma.suppression
+      );
+      add(
+        "info",
+        "electron_density_closure",
+        plasma.densityClosureActive
+          ? "μ_V is solved from the selected net electron density n(e−)-n(e+) using a massive ideal Fermi gas."
+          : "μ_V is manual; the code reports the implied ideal-gas net electron density for comparison.",
+        plasma.resolvedNetDensityCm3
       );
       add(
         thermalToElectronMass >= 1 ? "info" : "warning",
@@ -2205,6 +2517,15 @@
     chiralDegeneracy,
     chiralConductivity,
     fermiDerivativeKernel,
+    fermiOccupation,
+    naturalDensityToCm3,
+    densityCm3ToNatural,
+    electronPairDensitiesNatural,
+    electronNetDensityNatural,
+    electronNetDensityCm3,
+    electronChemicalPotentialFromDensity,
+    resolveElectronVectorChemicalPotential,
+    electronDensityClosureSweep,
     massiveCveDimensionlessIntegral,
     massiveAxialVorticalConductivity,
     masslessAxialVorticalReference,

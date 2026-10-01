@@ -417,7 +417,7 @@ input[type="range"]{width:100%;accent-color:var(--accent)}
 
 .plasma-summary{
   display:grid;
-  grid-template-columns:repeat(6,minmax(0,1fr));
+  grid-template-columns:repeat(8,minmax(0,1fr));
   border:1px solid var(--border);
   border-radius:12px 12px 0 0;
   overflow:hidden;

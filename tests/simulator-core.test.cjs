@@ -582,3 +582,95 @@ console.log("AxionBH simulator-core tests passed");
   assert.ok(ceiling.criticalUpstreamProduct > 1e150);
   assert.ok(ceiling.log10DiscriminantFactor < -300);
 }
+
+
+{
+  assert.equal(
+    A.electronNetDensityCm3(
+      A.DEFAULTS.temperature,
+      0
+    ),
+    0
+  );
+}
+
+{
+  const density = 1e7;
+  const mu = A.electronChemicalPotentialFromDensity(
+    A.DEFAULTS.temperature,
+    density
+  );
+  const recovered = A.electronNetDensityCm3(
+    A.DEFAULTS.temperature,
+    mu
+  );
+  assert.ok(mu > 0);
+  assert.ok(mu < A.CONSTANTS.ELECTRON_MASS_GEV);
+  assert.ok(Math.abs(recovered / density - 1) < 1e-7);
+}
+
+{
+  const manual = A.resolveElectronVectorChemicalPotential(
+    A.DEFAULTS
+  );
+  assert.equal(manual.mode, "manual");
+  assert.equal(manual.muGeV, 0);
+  assert.equal(manual.netDensityCm3, 0);
+}
+
+{
+  const p = {
+    ...A.DEFAULTS,
+    electronDensityMode: 1,
+    electronDensityCm3: 1e7
+  };
+  const closure =
+    A.resolveElectronVectorChemicalPotential(p);
+  assert.equal(closure.mode, "density");
+  assert.ok(closure.muMeV > 0);
+  assert.ok(
+    Math.abs(
+      closure.netDensityCm3 /
+      p.electronDensityCm3 - 1
+    ) < 1e-7
+  );
+
+  const plasma =
+    A.finiteMassPlasmaDiagnostics(p);
+  assert.ok(plasma.densityClosureActive);
+  assert.ok(plasma.suppression >
+    A.finiteMassPlasmaDiagnostics(A.DEFAULTS)
+      .suppression);
+}
+
+{
+  const manual = A.cme(A.DEFAULTS);
+  const density = A.cme({
+    ...A.DEFAULTS,
+    electronDensityMode: 1,
+    electronDensityCm3: 1e7
+  });
+  assert.ok(density.closure.electronMuMeV > 0);
+  assert.ok(
+    density.closure.resolvedElectronDensityCm3 > 0
+  );
+  assert.ok(density.ratio511 > manual.ratio511);
+}
+
+{
+  const sweep = A.electronDensityClosureSweep(
+    A.DEFAULTS,
+    {
+      minDensityCm3: 1e4,
+      maxDensityCm3: 1e10,
+      points: 20
+    }
+  );
+  assert.equal(sweep.points.length, 20);
+  for (let i = 1; i < sweep.points.length; i += 1) {
+    assert.ok(
+      sweep.points[i].muMeV >
+      sweep.points[i - 1].muMeV
+    );
+  }
+}
