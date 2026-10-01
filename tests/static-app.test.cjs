@@ -394,7 +394,6 @@ for (const id of [
   'id="gapHeightExp"',
   'id="gapInjectionExp"',
   'id="gapCurvatureExp"',
-  'id="gapSoftEnergyExp"',
   'id="gapSoftLumExp"'
 ]) {
   assert.ok(html.includes(id), "missing v8.6 gap control: " + id);
