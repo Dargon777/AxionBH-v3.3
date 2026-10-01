@@ -5,7 +5,7 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  const MODEL_VERSION = "8.1.0";
+  const MODEL_VERSION = "8.2.0";
   const STATE_SCHEMA_VERSION = 8;
 
   const CONSTANTS = Object.freeze({
@@ -106,6 +106,46 @@
         "https://arxiv.org/abs/astro-ph/0611791",
       caveat:
         "Conditional on magnetic-field strength, ordering and geometry; not a model-independent interval."
+    })
+  });
+
+  const FLOW_GEOMETRY_CONTEXT = Object.freeze({
+    source: Object.freeze({
+      label: "ADAF / RIAF geometry and kinematics",
+      citation:
+        "Narayan & McClintock 2008, arXiv:0803.0322",
+      sourceUrl:
+        "https://arxiv.org/abs/0803.0322",
+      statement:
+        "Geometrically thick flow with H of order R and v_r ~ alpha v_K (H/R)^2; review quotes alpha ~ 0.1-0.3."
+    }),
+    radiusRg: Object.freeze({
+      min: 3,
+      max: 30,
+      kind: "exploratory-horizon-scale",
+      caveat:
+        "Chosen as a broad horizon-scale scan, not an observational confidence interval."
+    }),
+    scaleHeightRatio: Object.freeze({
+      min: 0.3,
+      max: 1,
+      kind: "RIAF-envelope",
+      caveat:
+        "H/R ~ 1 is literature-motivated for ADAF/RIAF; 0.3 is an intentionally broad lower exploratory edge."
+    }),
+    alpha: Object.freeze({
+      min: 0.1,
+      max: 0.3,
+      kind: "literature-context",
+      caveat:
+        "Viscosity-parameter interval quoted in the ADAF review."
+    }),
+    electronFractionYe: Object.freeze({
+      min: 0.5,
+      max: 1,
+      kind: "composition-envelope",
+      caveat:
+        "Fully ionized He-to-H electron-per-baryon envelope; not a measured Sgr A* composition."
     })
   });
 
@@ -2687,6 +2727,296 @@
     };
   }
 
+
+  function riafRadialVelocityFracC(
+    radiusRg,
+    scaleHeightRatio,
+    alpha
+  ) {
+    const radius = assertFinitePositive(
+      Number(radiusRg),
+      "radiusRg"
+    );
+    const h = assertFinitePositive(
+      Number(scaleHeightRatio),
+      "scaleHeightRatio"
+    );
+    const viscosity = assertFinitePositive(
+      Number(alpha),
+      "alpha"
+    );
+    const value =
+      viscosity * h * h / Math.sqrt(radius);
+    if (!(value > 0 && value < 1)) {
+      throw new RangeError(
+        "RIAF radial-velocity proxy must satisfy 0 < |v_r|/c < 1"
+      );
+    }
+    return value;
+  }
+
+  function flowGeometryCalibrationPoint(
+    input,
+    {
+      radiusRg,
+      scaleHeightRatio,
+      alpha,
+      electronFractionYe,
+      mdotMsunPerYear,
+      id = "flow-point",
+      label = "flow point"
+    }
+  ) {
+    const p = normalizeParams(input);
+    const radialVelocityFracC =
+      riafRadialVelocityFracC(
+        radiusRg,
+        scaleHeightRatio,
+        alpha
+      );
+    const parameters = normalizeParams({
+      ...p,
+      mdot: mdotGsFromMsunPerYear(
+        mdotMsunPerYear
+      ),
+      electronDensityMode: 2,
+      accretionRadiusRg: radiusRg,
+      scaleHeightRatio,
+      radialVelocityFracC,
+      electronFractionYe
+    });
+    const flow = accretionElectronDensity(parameters);
+    const plasma =
+      finiteMassPlasmaDiagnostics(parameters);
+    const result = cme(parameters);
+
+    return {
+      id,
+      label,
+      mdotMsunPerYear,
+      radiusRg,
+      scaleHeightRatio,
+      alpha,
+      radialVelocityFracC,
+      electronFractionYe,
+      parameters,
+      flow,
+      plasma,
+      result,
+      ratio511: result.ratio511,
+      deficitDex: deficitOrders(
+        result.ratio511,
+        1
+      )
+    };
+  }
+
+  function flowGeometryCalibrationAnalysis(
+    input,
+    {
+      mdotMsunPerYear = Math.sqrt(
+        ACCRETION_CALIBRATIONS.eht2023
+          .minMsunPerYear *
+        ACCRETION_CALIBRATIONS.eht2023
+          .maxMsunPerYear
+      ),
+      mapResolution = 7
+    } = {}
+  ) {
+    const p = normalizeParams(input);
+    const context = FLOW_GEOMETRY_CONTEXT;
+    const radii = [
+      context.radiusRg.min,
+      context.radiusRg.max
+    ];
+    const heights = [
+      context.scaleHeightRatio.min,
+      context.scaleHeightRatio.max
+    ];
+    const alphas = [
+      context.alpha.min,
+      context.alpha.max
+    ];
+    const electronFractions = [
+      context.electronFractionYe.min,
+      context.electronFractionYe.max
+    ];
+
+    const corners = [];
+    for (const radiusRg of radii) {
+      for (const scaleHeightRatio of heights) {
+        for (const alpha of alphas) {
+          for (const electronFractionYe of electronFractions) {
+            corners.push(
+              flowGeometryCalibrationPoint(
+                p,
+                {
+                  radiusRg,
+                  scaleHeightRatio,
+                  alpha,
+                  electronFractionYe,
+                  mdotMsunPerYear,
+                  id:
+                    "r" + radiusRg +
+                    "-h" + scaleHeightRatio +
+                    "-a" + alpha +
+                    "-ye" + electronFractionYe,
+                  label: "RIAF envelope corner"
+                }
+              )
+            );
+          }
+        }
+      }
+    }
+
+    const finiteCorners = corners.filter(
+      (point) =>
+        Number.isFinite(point.ratio511) &&
+        point.ratio511 > 0 &&
+        Number.isFinite(point.deficitDex)
+    );
+    finiteCorners.sort(
+      (a, b) => a.deficitDex - b.deficitDex
+    );
+    const best = finiteCorners[0] || null;
+    const worst =
+      finiteCorners[finiteCorners.length - 1] ||
+      null;
+
+    const reference =
+      flowGeometryCalibrationPoint(
+        p,
+        {
+          radiusRg: 10,
+          scaleHeightRatio: 1,
+          alpha: 0.2,
+          electronFractionYe: 0.85,
+          mdotMsunPerYear,
+          id: "riaf-reference",
+          label: "RIAF reference"
+        }
+      );
+
+    const currentGeometry = {
+      ...p,
+      mdot: mdotGsFromMsunPerYear(
+        mdotMsunPerYear
+      ),
+      electronDensityMode: 2
+    };
+    const currentResult = cme(currentGeometry);
+    const currentFlow =
+      accretionElectronDensity(currentGeometry);
+    const currentPlasma =
+      finiteMassPlasmaDiagnostics(currentGeometry);
+    const current = {
+      id: "current-geometry",
+      label: "Current explicit geometry",
+      mdotMsunPerYear,
+      radiusRg: p.accretionRadiusRg,
+      scaleHeightRatio:
+        p.scaleHeightRatio,
+      alpha: null,
+      radialVelocityFracC:
+        p.radialVelocityFracC,
+      electronFractionYe:
+        p.electronFractionYe,
+      parameters: normalizeParams(
+        currentGeometry
+      ),
+      flow: currentFlow,
+      plasma: currentPlasma,
+      result: currentResult,
+      ratio511: currentResult.ratio511,
+      deficitDex: deficitOrders(
+        currentResult.ratio511,
+        1
+      )
+    };
+
+    const count = Math.max(
+      4,
+      Math.min(12, Math.trunc(mapResolution))
+    );
+    const mapRadii = logSpace(
+      context.radiusRg.min,
+      context.radiusRg.max,
+      count
+    );
+    const mapHeights = linearSpace(
+      context.scaleHeightRatio.min,
+      context.scaleHeightRatio.max,
+      count
+    );
+    const mapAlpha =
+      Math.sqrt(
+        context.alpha.min *
+        context.alpha.max
+      );
+    const mapYe = 0.85;
+    const map = [];
+
+    for (const scaleHeightRatio of mapHeights) {
+      const row = [];
+      for (const radiusRg of mapRadii) {
+        row.push(
+          flowGeometryCalibrationPoint(
+            p,
+            {
+              radiusRg,
+              scaleHeightRatio,
+              alpha: mapAlpha,
+              electronFractionYe: mapYe,
+              mdotMsunPerYear,
+              id: "map",
+              label: "RIAF map"
+            }
+          )
+        );
+      }
+      map.push(row);
+    }
+
+    return {
+      mdotMsunPerYear,
+      context,
+      reference,
+      current,
+      corners,
+      best,
+      worst,
+      geometryLeverageDex:
+        best && worst
+          ? worst.deficitDex - best.deficitDex
+          : null,
+      densityLeverageDex:
+        best && worst
+          ? Math.abs(
+              Math.log10(
+                best.flow.netElectronDensityCm3 /
+                worst.flow.netElectronDensityCm3
+              )
+            )
+          : null,
+      map: {
+        radiusRg: mapRadii,
+        scaleHeightRatio: mapHeights,
+        alpha: mapAlpha,
+        electronFractionYe: mapYe,
+        deficitDex: map.map((row) =>
+          row.map((point) => point.deficitDex)
+        ),
+        densityCm3: map.map((row) =>
+          row.map(
+            (point) =>
+              point.flow.netElectronDensityCm3
+          )
+        )
+      }
+    };
+  }
+
   function diagnoseRun(mode, input, result = null) {
     const p = normalizeParams(input);
     const r = result || simulate(mode, p);
@@ -3000,6 +3330,7 @@
     STATE_SCHEMA_VERSION,
     MODEL_LAYERS,
     ACCRETION_CALIBRATIONS,
+    FLOW_GEOMETRY_CONTEXT,
     CONSTANTS,
     DEFAULTS,
     PRESETS,
@@ -3008,6 +3339,9 @@
     classifyAccretionRate,
     accretionCalibrationPoint,
     accretionCalibrationAnalysis,
+    riafRadialVelocityFracC,
+    flowGeometryCalibrationPoint,
+    flowGeometryCalibrationAnalysis,
     normalizeParams,
     kerrGeometry,
     turbulentFactor,

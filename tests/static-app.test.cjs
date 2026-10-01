@@ -123,8 +123,8 @@ for (const feature of [
   );
 }
 
-assert.ok(html.includes("v8.1"));
-assert.ok(app.includes("AxionBH research workbench v8.1"));
+assert.ok(html.includes("v8.2"));
+assert.ok(app.includes("AxionBH research workbench v8.2"));
 
 
 for (const feature of [
@@ -313,8 +313,24 @@ for (const feature of [
 ]) {
   assert.ok(
     core.includes(feature) || app.includes(feature),
-    "missing v8.1 calibration feature: " + feature
+    "missing v8.2 calibration feature: " + feature
   );
 }
 
 assert.ok(html.includes('data-analysis="calibration"'));
+
+
+for (const feature of [
+  "FLOW_GEOMETRY_CONTEXT",
+  "riafRadialVelocityFracC",
+  "flowGeometryCalibrationPoint",
+  "flowGeometryCalibrationAnalysis",
+  "renderFlowGeometryCalibration"
+]) {
+  assert.ok(
+    core.includes(feature) || app.includes(feature),
+    "missing v8.2 flow feature: " + feature
+  );
+}
+
+assert.ok(html.includes('data-analysis="flow"'));
