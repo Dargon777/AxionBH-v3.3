@@ -149,3 +149,46 @@ console.log("AxionBH simulator-core tests passed");
     /xValues/
   );
 }
+
+
+{
+  assert.equal(A.relativeDifferencePercent(120, 100), 20);
+  assert.equal(A.relativeDifferencePercent(80, 100), -20);
+  assert.equal(A.relativeDifferencePercent(1, 0), null);
+}
+
+{
+  const comparison = A.compareParameterMaps(
+    A.DEFAULTS,
+    A.PRESETS.breakthrough,
+    {
+      xValues: [0.2, 0.6, 0.9],
+      yValues: [10, 1000],
+      metric: "ratio511"
+    }
+  );
+
+  assert.equal(comparison.mapA.z.length, 2);
+  assert.equal(comparison.mapB.z.length, 2);
+  assert.equal(comparison.differencePercent.length, 2);
+  assert.equal(comparison.differencePercent[0].length, 3);
+  assert.ok(
+    comparison.differencePercent.flat().every(
+      (value) => value === null || Number.isFinite(value)
+    )
+  );
+}
+
+{
+  const slices = A.parameterSlices(A.DEFAULTS, {
+    sliceValues: [1e15, 1e16],
+    xValues: [0.4, 0.8],
+    yValues: [100, 1000]
+  });
+
+  assert.equal(slices.sliceKey, "faGev");
+  assert.equal(slices.slices.length, 2);
+  assert.equal(slices.slices[0].sliceValue, 1e15);
+  assert.equal(slices.slices[1].map.z.length, 2);
+  assert.equal(slices.slices[1].map.z[0].length, 2);
+}
