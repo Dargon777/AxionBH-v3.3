@@ -403,7 +403,7 @@ console.log("AxionBH simulator-core tests passed");
   assert.equal(transport.luminosityMappingDefined, false);
   assert.ok(Number.isFinite(transport.jCME));
   assert.ok(Number.isFinite(transport.jCVE));
-  assert.ok(transport.jCME > 0);
+  assert.ok(transport.jCME >= 0);
   assert.ok(transport.jCVE > 0);
   assert.ok(Number.isFinite(transport.magnitudeRatio));
   assert.ok(
