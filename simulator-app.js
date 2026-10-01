@@ -322,7 +322,7 @@
       ordered[key] = Number(p[key]);
     });
     const source = JSON.stringify({
-      model: "AxionBH-v7.4",
+      model: "AxionBH-v7.5",
       mode,
       parameters: ordered
     });
@@ -817,28 +817,106 @@
     }, { responsive: true, displaylogo: false });
   }
 
+
+  function explorerDeficitSummary(data) {
+    const deficits = data.comparison.mapA.z.flat()
+      .filter((value) => Number.isFinite(value) && value > 0)
+      .map((value) => A.deficitOrders(value, 1))
+      .filter((value) => Number.isFinite(value))
+      .sort((a, b) => a - b);
+
+    const minimum = deficits.length ? deficits[0] : null;
+    const median = deficits.length
+      ? deficits[Math.floor(deficits.length / 2)]
+      : null;
+    const maximum = deficits.length ? deficits[deficits.length - 1] : null;
+
+    return [
+      '<div class="explorer-summary">',
+      '<div><span>Карта</span><strong>Дефицит до L₅₁₁</strong></div>',
+      '<div><span>Модель</span><strong>Текущие параметры</strong></div>',
+      '<div><span>fₐ slice</span><strong>' +
+        A.formatScientific(data.faGev, 2) + ' GeV</strong></div>',
+      '<div><span>Best gap</span><strong>' +
+        (minimum === null ? "—" : minimum.toFixed(2) + ' dex') +
+        '</strong></div>',
+      '<div><span>Median gap</span><strong>' +
+        (median === null ? "—" : median.toFixed(2) + ' dex') +
+        '</strong></div>',
+      '<div><span>Worst finite</span><strong>' +
+        (maximum === null ? "—" : maximum.toFixed(2) + ' dex') +
+        '</strong></div>',
+      '</div>'
+    ].join("");
+  }
+
+  function renderExplorerDeficit(data) {
+    const { comparison } = data;
+    const deficit = comparison.mapA.z.map((row) =>
+      row.map((value) =>
+        Number.isFinite(value) && value > 0
+          ? A.deficitOrders(value, 1)
+          : null
+      )
+    );
+    const values = finiteValues(deficit);
+    const zmin = values.length ? Math.min(...values) : 0;
+    const zmax = values.length ? Math.max(...values) : 1;
+    const colors = themeColors();
+    const layout = plotLayout("spin a/M", "B₀, G");
+    layout.yaxis.type = "log";
+    layout.margin.l = 78;
+
+    Plotly.react("plot", [{
+      type: "heatmap",
+      x: comparison.xValues,
+      y: comparison.yValues,
+      z: deficit,
+      customdata: comparison.mapA.z,
+      zmin,
+      zmax,
+      colorscale: "Viridis",
+      reversescale: true,
+      colorbar: { title: "orders short" },
+      hovertemplate:
+        "a/M=%{x:.3f}<br>B₀=%{y:.3e} G" +
+        "<br>L/L₅₁₁=%{customdata:.3e}" +
+        "<br>gap=%{z:.2f} dex<extra></extra>"
+    }], {
+      ...layout,
+      font: { color: colors.text }
+    }, { responsive: true, displaylogo: false });
+  }
+
   function renderParameterExplorer() {
+    const view = $("explorerView").value;
     setAnalysisMeta(
-      "3D Parameter Explorer",
-      "CME · spin × B₀ · fₐ задаёт логарифмический срез; A и B используют один fₐ"
+      view === "deficit" ? "CME deficit map" : "3D Parameter Explorer",
+      view === "deficit"
+        ? "Сколько порядков величины отделяет L/L₅₁₁ от единицы; нулевые точки не имеют конечного log-gap"
+        : "CME · spin × B₀ · fₐ задаёт логарифмический срез; A и B используют один fₐ"
     );
 
     const data = getExplorerComparison();
     setAnalysisTable(
-      explorerSummary(
-        data.referenceKey,
-        data.faGev,
-        data.resolution,
-        data.comparison.differencePercent
-      )
+      view === "deficit"
+        ? explorerDeficitSummary(data)
+        : explorerSummary(
+            data.referenceKey,
+            data.faGev,
+            data.resolution,
+            data.comparison.differencePercent
+          )
     );
+
+    $("explorerReference").disabled = view === "deficit";
 
     if (!window.Plotly) {
       return toast("Plotly не загрузился; сетка рассчитана, но не может быть нарисована.");
     }
 
-    const view = $("explorerView").value;
-    if (view === "difference") renderExplorerDifference(data);
+    if (view === "deficit") renderExplorerDeficit(data);
+    else if (view === "difference") renderExplorerDifference(data);
     else if (view === "contour") renderExplorerContour(data);
     else renderExplorerSurface(data);
   }
@@ -878,6 +956,118 @@
       y: rows.map((row) => row.impact * 100),
       marker: { color: themeColors().accent },
       hovertemplate: "%{x}<br>impact=%{y:.2f}%<extra></extra>"
+    }], layout, { responsive: true, displaylogo: false });
+  }
+
+
+  function inferenceStatus(row) {
+    if (row.status === "solved") {
+      return '<span class="inference-status solved">TARGET</span>';
+    }
+    return '<span class="inference-status unreachable">UNREACHED</span>';
+  }
+
+  function inferenceResultValue(row) {
+    const value =
+      row.status === "solved" ? row.requiredValue : row.bestValue;
+    return value === null ? "—" : A.formatScientific(value, 3);
+  }
+
+  function inferenceFactor(row) {
+    const factor =
+      row.status === "solved" ? row.requiredFactor : row.bestFactor;
+    if (!Number.isFinite(factor) || factor <= 0) return "—";
+    return A.formatScientific(factor, 3) + "×";
+  }
+
+  function renderInference() {
+    if ($("mode").value !== "cme") {
+      setAnalysisMeta(
+        "Parameter Inference",
+        "v7.5 inverse solver сейчас определён для CME closure"
+      );
+      setAnalysisTable(
+        '<div class="inference-empty">Переключи режим на CME, чтобы оценить дефицит и требуемые однопараметрические сдвиги.</div>'
+      );
+      if (window.Plotly) Plotly.purge("plot");
+      return;
+    }
+
+    const analysis = A.parameterInference("cme", params(), {
+      target: 1,
+      metric: "ratio511",
+      steps: 280
+    });
+
+    setAnalysisMeta(
+      "Parameter Inference",
+      "Однопараметрический inverse scan до L/L₅₁₁ = 1 · диапазоны диагностические, не физические priors"
+    );
+
+    const deficit = analysis.deficitOrders;
+    const gain = analysis.requiredGain;
+    const rows = analysis.rows;
+
+    const summary = [
+      '<div class="inference-summary">',
+      '<div><span>Current L/L₅₁₁</span><strong>' +
+        A.formatScientific(analysis.currentMetric, 3) + '</strong></div>',
+      '<div><span>Deficit</span><strong>' +
+        (Number.isFinite(deficit) ? deficit.toFixed(2) + ' dex' : '∞') +
+        '</strong></div>',
+      '<div><span>Generic gain needed</span><strong>' +
+        (Number.isFinite(gain) ? A.formatScientific(gain, 3) + '×' : '∞') +
+        '</strong></div>',
+      '</div>'
+    ].join("");
+
+    const table = [
+      '<div class="analysis-row analysis-row-head inference"><span>Параметр</span><span>Сейчас</span><span>Required / best</span><span>Сдвиг</span><span>Итог</span></div>',
+      ...rows.map((row) => {
+        const remaining = row.status === "solved"
+          ? "0 dex"
+          : (Number.isFinite(row.remainingDeficitOrders)
+              ? row.remainingDeficitOrders.toFixed(2) + " dex short"
+              : "∞");
+        return '<div class="analysis-row inference"><strong>' +
+          (parameterLabels[row.key] || row.key) +
+          '</strong><span>' + A.formatScientific(row.currentValue, 3) +
+          '</span><span>' + inferenceResultValue(row) +
+          '</span><span>' + inferenceFactor(row) +
+          '</span><span>' + inferenceStatus(row) + ' ' + remaining +
+          '</span></div>';
+      })
+    ].join("");
+
+    setAnalysisTable(summary + table);
+
+    if (!window.Plotly) return;
+    const layout = plotLayout(
+      "один изменяемый параметр",
+      "оставшийся дефицит, dex"
+    );
+    layout.yaxis.rangemode = "tozero";
+    Plotly.react("plot", [{
+      type: "bar",
+      x: rows.map((row) => parameterLabels[row.key] || row.key),
+      y: rows.map((row) =>
+        row.status === "solved"
+          ? 0
+          : (Number.isFinite(row.remainingDeficitOrders)
+              ? Math.max(0, row.remainingDeficitOrders)
+              : null)
+      ),
+      customdata: rows.map((row) => [
+        row.status,
+        row.status === "solved" ? row.requiredValue : row.bestValue,
+        row.status === "solved" ? row.requiredFactor : row.bestFactor
+      ]),
+      marker: { color: themeColors().accent2 },
+      hovertemplate:
+        "%{x}<br>remaining=%{y:.2f} dex" +
+        "<br>status=%{customdata[0]}" +
+        "<br>value=%{customdata[1]:.3e}" +
+        "<br>factor=%{customdata[2]:.3e}×<extra></extra>"
     }], layout, { responsive: true, displaylogo: false });
   }
 
@@ -943,6 +1133,7 @@
       try {
         if (kind === "explorer") renderParameterExplorer();
         else if (kind === "sensitivity") renderSensitivity();
+        else if (kind === "inference") renderInference();
         else if (kind === "compare") renderComparison();
         else renderSpinAnalysis();
       } catch (error) {
@@ -988,7 +1179,7 @@
     const diagnostics = currentDiagnostics();
     const payload = {
       generatedAt: new Date().toISOString(),
-      model: "AxionBH research workbench v7.4",
+      model: "AxionBH research workbench v7.5",
       stateId: runStateId(state.lastMode, state.lastParams),
       mode: state.lastMode,
       parameters: state.lastParams,
@@ -1016,7 +1207,7 @@
     const lines = [
       "# AxionBH reproducibility report",
       "",
-      "- Model: AxionBH Research Workbench v7.4",
+      "- Model: AxionBH Research Workbench v7.5",
       "- Generated: " + new Date().toISOString(),
       "- State ID: " + stateId,
       "- Mode: " + modeNames[state.lastMode],
@@ -1088,7 +1279,8 @@
       "reference_B",
       "ratio511_A",
       "ratio511_B",
-      "delta_percent"
+      "delta_percent",
+      "deficit_orders_A"
     ]];
 
     data.comparison.yValues.forEach((b0, rowIndex) => {
@@ -1100,7 +1292,14 @@
           referenceNames[data.referenceKey] || data.referenceKey,
           data.comparison.mapA.z[rowIndex][columnIndex],
           data.comparison.mapB.z[rowIndex][columnIndex],
-          data.comparison.differencePercent[rowIndex][columnIndex]
+          data.comparison.differencePercent[rowIndex][columnIndex],
+          Number.isFinite(data.comparison.mapA.z[rowIndex][columnIndex]) &&
+          data.comparison.mapA.z[rowIndex][columnIndex] > 0
+            ? A.deficitOrders(
+                data.comparison.mapA.z[rowIndex][columnIndex],
+                1
+              )
+            : null
         ]);
       });
     });
@@ -1178,12 +1377,12 @@
       applyParameters(restored);
       if (modeNames[payload.mode]) $("mode").value = payload.mode;
 
-      if (["spin", "explorer", "sensitivity", "compare"].includes(payload.analysis)) {
+      if (["spin", "explorer", "sensitivity", "inference", "compare"].includes(payload.analysis)) {
         state.analysis = payload.analysis;
       }
 
       if (payload.explorer && typeof payload.explorer === "object") {
-        if (["surface", "contour", "difference"].includes(payload.explorer.view)) {
+        if (["surface", "contour", "difference", "deficit"].includes(payload.explorer.view)) {
           $("explorerView").value = payload.explorer.view;
         }
         if (referenceNames[payload.explorer.reference]) {
