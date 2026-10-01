@@ -732,8 +732,8 @@ console.log("AxionBH simulator-core tests passed");
 
 
 {
-  assert.equal(A.MODEL_VERSION, "8.6.0");
-  assert.equal(A.STATE_SCHEMA_VERSION, 11);
+  assert.equal(A.MODEL_VERSION, "8.7.0");
+  assert.equal(A.STATE_SCHEMA_VERSION, 12);
 }
 
 {
@@ -1002,7 +1002,7 @@ console.log("AxionBH simulator-core tests passed");
 {const a=A.gapParallelElectricField(A.DEFAULTS,{screeningFraction:.1}),b=A.gapParallelElectricField(A.DEFAULTS,{screeningFraction:1});assert.ok(a.parallelElectricFieldVcm<b.parallelElectricFieldVcm);}
 
 {
-  assert.equal(A.MODEL_VERSION,"8.6.0");
+  assert.equal(A.MODEL_VERSION,"8.7.0");
   assert.equal(A.CONSTANTS.POSITRON_RATE_OBS_511,2e43);
   assert.equal(A.CONSTANTS.POSITRON_RATE_GALAXY_511,5e43);
   const base=A.cme(A.DEFAULTS);
@@ -1123,6 +1123,103 @@ console.log("AxionBH simulator-core tests passed");
     "gap_potential",
     "pair_cascade"
   ]){
+    assert.ok(report.layers.some((layer)=>layer.id===id));
+  }
+}
+
+
+{
+  const spectrum=A.powerLawSoftPhotonSpectrum(A.DEFAULTS,{
+    softPhotonMinEv:1e-3,
+    softPhotonMaxEv:1e4,
+    softPhotonIndex:2,
+    softPhotonLuminosityErgS:1e36,
+    softPhotonBins:48
+  });
+  assert.equal(spectrum.bins.length,48);
+  assert.ok(spectrum.totalEnergyDensityErgCm3>0);
+  const fraction=spectrum.bins.reduce((sum,bin)=>sum+bin.energyFraction,0);
+  assert.ok(Math.abs(fraction-1)<1e-12);
+  assert.ok(spectrum.totalNumberDensityCm3>0);
+}
+
+{
+  const spectrum=A.powerLawSoftPhotonSpectrum(A.DEFAULTS,{
+    softPhotonMinEv:1e-3,
+    softPhotonMaxEv:1e4,
+    softPhotonIndex:2
+  });
+  const low=A.inverseComptonCoolingAudit(A.DEFAULTS,{gamma:10,spectrum});
+  const high=A.inverseComptonCoolingAudit(A.DEFAULTS,{gamma:1e8,spectrum});
+  assert.ok(low.powerErgS>0);
+  assert.ok(high.powerErgS>0);
+  assert.ok(low.effectiveKleinNishinaSuppression<=1);
+  assert.ok(high.effectiveKleinNishinaSuppression<low.effectiveKleinNishinaSuppression);
+}
+
+{
+  const spectrum=A.powerLawSoftPhotonSpectrum(A.DEFAULTS,{
+    softPhotonMinEv:1e-3,
+    softPhotonMaxEv:1e4,
+    softPhotonIndex:2,
+    softPhotonLuminosityErgS:1e36
+  });
+  const below=A.spectralGammaGammaAudit(A.DEFAULTS,{
+    gammaPhotonEnergyEv:1e6,
+    spectrum,
+    pathLengthCm:1e12
+  });
+  const above=A.spectralGammaGammaAudit(A.DEFAULTS,{
+    gammaPhotonEnergyEv:1e12,
+    spectrum,
+    pathLengthCm:1e12
+  });
+  assert.ok(below.opticalDepth>=0);
+  assert.ok(above.opticalDepth>below.opticalDepth);
+  assert.ok(above.conversionProbability>0);
+}
+
+{
+  const audit=A.radiativeGapCascadeAudit(A.DEFAULTS,{
+    gapHeightRg:1,
+    plasmaInjectionFraction:1e-18,
+    curvatureRadiusRg:1,
+    softPhotonMinEv:1e-3,
+    softPhotonMaxEv:1e4,
+    softPhotonIndex:2,
+    softPhotonLuminosityErgS:1e36
+  });
+  assert.equal(audit.starvation.starved,true);
+  assert.ok(audit.radiationBalance.gamma>1);
+  assert.ok(audit.radiationBalance.inverseCompton.powerErgS>=0);
+  assert.ok(audit.curvaturePairMultiplicity>=0);
+  assert.ok(audit.icPairMultiplicity>=0);
+  assert.ok(audit.multiplicityOneGeneration>=audit.curvaturePairMultiplicity);
+  assert.ok(audit.cappedPairRatePerSecond<=audit.energyLimitedPairRatePerSecond);
+}
+
+{
+  const closure=A.solveGapClosure(A.DEFAULTS,{
+    plasmaInjectionFraction:1e-18,
+    curvatureRadiusRg:1,
+    softPhotonMinEv:1e-3,
+    softPhotonMaxEv:1e4,
+    softPhotonIndex:2,
+    softPhotonLuminosityErgS:1e36,
+    closureScanSteps:32
+  });
+  assert.ok(["closure-found","closure-not-found"].includes(closure.status));
+  assert.equal(closure.points.length,32);
+  assert.ok(closure.multiplicityClosure);
+  if(closure.closureAudit){
+    assert.ok(closure.closureAudit.multiplicityOneGeneration>=1);
+    assert.ok(closure.closureAudit.closureSupplyRatio>=1);
+  }
+}
+
+{
+  const report=A.modelValidityReport(A.DEFAULTS,"cme");
+  for(const id of ["soft_photon_spectrum","inverse_compton","gap_closure"]){
     assert.ok(report.layers.some((layer)=>layer.id===id));
   }
 }
