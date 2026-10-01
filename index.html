@@ -299,7 +299,7 @@
                     \mathbf j_{\rm CME}=\frac{e^2}{2\pi^2}\mu_5\mathbf B
                     =\frac{2\alpha_F}{\pi}\mu_5\mathbf B.
                     $
-                    В v8.3 оба тока вычисляются отдельно в natural units. CVE является
+                    В v8.4 оба тока вычисляются отдельно в natural units. CVE является
                     аксиальным током вдоль $\omega$, CME — vector/electric током вдоль $B$;
                     программа не складывает их и не переводит $j_{\rm CME}$ в 511-кэВ
                     светимость без дополнительной кинетической модели.
@@ -307,7 +307,7 @@
 
                 <h3>4.8 Finite-mass electron CVE</h3>
                 <p>
-                    В v8.3 базовый коэффициент axial CVE больше не аппроксимируется
+                    В v8.4 базовый коэффициент axial CVE больше не аппроксимируется
                     безмассовым $T^2/6$ при любых температурах. Для свободного massive
                     Dirac-поля в bulk linear response используется одномерный
                     Fermi–Dirac integral при конечных $m_e/T$ и vector chemical
@@ -331,7 +331,7 @@
 
                 <h3>4.9 Electron density → chemical potential</h3>
                 <p>
-                    В v8.3 chemical potential электронов может быть не входным параметром,
+                    В v8.4 chemical potential электронов может быть не входным параметром,
                     а решением number-conservation closure. Для ideal massive Fermi gas
                     используется net electron density
                     $
@@ -356,7 +356,7 @@
 
                 <h3>4.10 Accretion plasma closure</h3>
                 <p>
-                    В v8.3 добавлен явный мост от accretion-rate к electron plasma.
+                    В v8.4 добавлен явный мост от accretion-rate к electron plasma.
                     В режиме accretion closure используется прозрачная stationary
                     continuity-оценка толстого диска
                     $
@@ -378,7 +378,7 @@
 
                 <h3>4.11 Динамика хирального заряда</h3>
                 <p>
-                    Для отдельной диагностической ветки v8.3 вводится плотность аксиального
+                    Для отдельной диагностической ветки v8.4 вводится плотность аксиального
                     заряда $n_5$. В massless free-Dirac приближении при нулевом vector chemical
                     potential используется
                     $
@@ -427,9 +427,9 @@
                 </p>
 
                 <!-- 5. Численная реализация -->
-                <h2 id="numerics">5. Численная реализация (AxionBH Research Workbench v8.3)</h2>
+                <h2 id="numerics">5. Численная реализация (AxionBH Research Workbench v8.4)</h2>
                 <p>
-                    Актуальный Research Workbench v8.3 реализован как браузерное приложение: вычислительное ядро
+                    Актуальный Research Workbench v8.4 реализован как браузерное приложение: вычислительное ядро
                     находится в <code>simulator-core.js</code>, интерфейс — в <code>simulator-app.js</code>.
                     Расчёты выполняются локально в браузере и не требуют Python, Pyodide или серверной части.
                 </p>
@@ -440,10 +440,10 @@
                     суперрадиантный и гибридный режимы, график $\kappa(a/M)$,
                     3D/contour explorer по $(a/M, B_0)$ с логарифмическими срезами $f_a$,
                     A/B-сравнение сценариев, карту относительной разницы и one-at-a-time
-                    анализ чувствительности результата к изменению входных параметров. В v8.3 также добавлены
+                    анализ чувствительности результата к изменению входных параметров. В v8.4 также добавлены
                     диагностический residual самосогласованного CME-корня, детерминированный state ID,
                     Markdown-отчёт воспроизводимости и CSV-экспорт сетки Parameter Explorer.
-                    В v8.3 добавлены inverse inference по одному параметру за раз и карта
+                    В v8.4 добавлены inverse inference по одному параметру за раз и карта
                     дефицита $\log_{10}(L_{\rm obs}/L_{e^+})$.
                 </p>
                 <p>
@@ -462,7 +462,7 @@
                     Это устраняет зависимость результата от произвольного диапазона логарифмического сканирования.
                 </p>
                 <p>
-                    Вкладка Plasma v8.3 теперь умеет два режима: manual $\mu_V(e)$
+                    Вкладка Plasma v8.4 теперь умеет два режима: manual $\mu_V(e)$
                     и density closure $n_{e,\rm net}\to\mu_V$. Она показывает exact
                     finite-mass free-Dirac CVE suppression и строит зависимость resolved
                     $\mu_V$ от net electron density и сравнивает его с massless
@@ -471,7 +471,7 @@
                     остаётся отдельно помеченным phenomenological ansatz.
                 </p>
                 <p>
-                    Вкладка Anomalous Transport v8.3 дополнительно показывает отдельно
+                    Вкладка Anomalous Transport v8.4 дополнительно показывает отдельно
                     величины axial CVE и magnetic CME токов, их направления и отношение
                     модулей как функцию магнитного поля. Она является диагностикой транспорта,
                     а не новым каналом светимости. Вкладка Chirality Dynamics строит
@@ -480,7 +480,7 @@
                     massless approximation через $T/m_e$.
                 </p>
                 <p>
-                    Inference-инструмент v8.3 решает обратную задачу: при фиксированных остальных
+                    Inference-инструмент v8.4 решает обратную задачу: при фиксированных остальных
                     параметрах он ищет значение одного параметра, для которого
                     $L_{e^+}/L_{\rm obs}=1$. Поиск ведётся в намеренно широких диагностических
                     диапазонах. Если пересечения нет, интерфейс показывает лучшую найденную точку
@@ -488,7 +488,7 @@
                     а результат не является статистической подгонкой.
                 </p>
                 <p>
-                    В v8.3 введена отдельная Missing Physics Lab. Феноменологический множитель
+                    В v8.4 введена отдельная Missing Physics Lab. Феноменологический множитель
                     $g_{\rm extra}$ можно поместить в источник самосогласования, в эффективную
                     связь $a\to\mu_5$ или после closure на стадии позитронной конверсии.
                     Основной расчёт при этом остаётся с $g_{\rm extra}=1$.
@@ -507,7 +507,7 @@
                 <div class="alert alert-warning">
                     <strong>Статус модели:</strong> симулятор является исследовательской реализацией
                     текущих допущений AxionBH, а не подтверждённым инструментом наблюдательной астрофизики.
-                    Unit-аудит v8.3 исправляет внутреннюю размерностную согласованность CVE-ветки,
+                    Unit-аудит v8.4 исправляет внутреннюю размерностную согласованность CVE-ветки,
                     а Missing Physics Lab показывает её внутренние пределы. Ни один из этих инструментов
                     сам по себе не подтверждает физическую корректность выбранной closure-модели.
                 </div>
@@ -528,7 +528,7 @@
                     инкремент роста $\Gamma \approx 1.7 \times 10^{-3} M^{-1}$ ($\sim 4.8 \times 10^{-5}$ с$^{-1}$). 
                     Время насыщения облака до $0.1 M_{\text{ЧД}}$ составляет $\sim 15$ лет.</li>
                     <li><strong>Спиновый gate:</strong> в текущей реализации CME включается при $a/M \ge 0.35$.
-                    После unit-аудита v8.3 этот порог трактуется как феноменологическое допущение модели,
+                    После unit-аудита v8.4 этот порог трактуется как феноменологическое допущение модели,
                     а не как величина, выведенная из quadratic closure.</li>
                     <li><strong>Bosenova-вспышки:</strong> при нелинейном насыщении облака возможны 
                     коллапсы (bosenova), создающие ударные волны в аккреционном диске. 
@@ -608,9 +608,9 @@
 </html>
 
 <section id="v8-validity">
-  <h2>AxionBH v8.3: архитектура допущений</h2>
+  <h2>AxionBH v8.4: архитектура допущений</h2>
   <p>
-    v8.3 не объединяет все уровни модели под одним словом «CME».
+    v8.4 не объединяет все уровни модели под одним словом «CME».
     Интерфейс Validity показывает отдельно Kerr geometry, accretion
     closure, massive electron Fermi gas, anomalous transport,
     axion-to-chiral coupling, stationary closure, chirality proxy и
@@ -620,9 +620,9 @@
 </section>
 
 <section id="v81-accretion-calibration">
-  <h2>AxionBH v8.3: Sgr A* accretion calibration</h2>
+  <h2>AxionBH v8.4: Sgr A* accretion calibration</h2>
   <p>
-    v8.3 сохраняет legacy accretion rate как воспроизводимый исторический
+    v8.4 сохраняет legacy accretion rate как воспроизводимый исторический
     параметр, но отдельно сравнивает его с опубликованными диапазонами.
     В EHT Sgr A* Paper V перспективный кластер MAD-моделей с малым
     inclination имеет
@@ -648,7 +648,7 @@
 </section>
 
 <section id="v82-flow-geometry">
-  <h2>AxionBH v8.3: flow geometry calibration</h2>
+  <h2>AxionBH v8.4: flow geometry calibration</h2>
   <p>
     После калибровки $\dot M$ остаётся неопределённость continuity-слоя:
     радиус оценки, толщина потока, radial inflow velocity и composition.
@@ -673,7 +673,8 @@
 </section>
 
 <section id="v83-microphysics-audit">
-<h2>AxionBH v8.3: microphysics and observable audit</h2>
+<h2>AxionBH v8.4: microphysics and observable audit</h2>
 <p>Наблюдаемая величина порядка $10^{43}$ для Galactic 511-keV problem — это positron annihilation/injection rate в $e^+/s$, а не $erg/s$. Поэтому прямое сравнение model power с числом $1.07\times10^{43}$ было размерностно некорректным.</p>
-<p>v8.3 вводит отдельный rate observable $\dot N_{e^+}=L_{model}/E_{cost}$ и явно маркирует этот переход как phenomenological energy proxy. Переход axion field $\to\mu_5$ также остаётся phenomenological: derivative current couplings не являются выводом конкретной stationary local relation, использованной в AxionBH.</p>
+<p>v8.4 вводит отдельный rate observable $\dot N_{e^+}=L_{model}/E_{cost}$ и явно маркирует этот переход как phenomenological energy proxy. Переход axion field $\to\mu_5$ также остаётся phenomenological: derivative current couplings не являются выводом конкретной stationary local relation, использованной в AxionBH.</p>
 </section>
+<section id="v84-pairs"><h2>AxionBH v8.4: explicit pair production</h2><p>Добавлен idealized Schwinger channel с $E_{crit}\simeq1.32\times10^{16}$ V/cm. Local E-field, screening, backreaction и active volume остаются нерешёнными слоями.</p></section>

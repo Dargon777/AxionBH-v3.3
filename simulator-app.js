@@ -358,7 +358,7 @@
       ordered[key] = Number(p[key]);
     });
     const source = JSON.stringify({
-      model: "AxionBH-v8.3",
+      model: "AxionBH-v8.4",
       mode,
       parameters: ordered
     });
@@ -1020,7 +1020,7 @@
     if ($("mode").value !== "cme") {
       setAnalysisMeta(
         "Parameter Inference",
-        "v8.3 inverse solver сейчас определён для CVE closure"
+        "v8.4 inverse solver сейчас определён для CVE closure"
       );
       setAnalysisTable(
         '<div class="inference-empty">Переключи режим на CME, чтобы оценить дефицит и требуемые однопараметрические сдвиги.</div>'
@@ -1877,7 +1877,7 @@
         '</span><span>E_cost=' +
         A.formatScientific(audit.mu5ToPositrons.energyCostErg,3) +
         ' erg/e⁺; no microscopic pair-production rate is derived.</span></div>',
-      '<div class="missing-note"><strong>Observable correction:</strong> the Galactic ~10⁴³ quantity is an annihilation/injection rate in e⁺/s, not an energy luminosity in erg/s. v8.3 therefore audits the corrected rate ratio separately; the legacy numerical L/L₅₁₁ fields remain untouched for backward reproducibility.</div>'
+      '<div class="missing-note"><strong>Observable correction:</strong> the Galactic ~10⁴³ quantity is an annihilation/injection rate in e⁺/s, not an energy luminosity in erg/s. v8.4 therefore audits the corrected rate ratio separately; the legacy numerical L/L₅₁₁ fields remain untouched for backward reproducibility.</div>'
     ].join("");
     setAnalysisTable(html);
     if (!window.Plotly) return;
@@ -1890,6 +1890,16 @@
       marker:{color:colors.accent2},
       hovertemplate:"%{x}<br>%{y:.2f} dex<extra></extra>"
     }],layout,{responsive:true,displaylogo:false});
+  }
+
+
+  function renderPairProduction() {
+    if ($("mode").value !== "cme") {setAnalysisMeta("Pair Production","Schwinger diagnostic");setAnalysisTable('<div class="inference-empty">Переключи режим на CVE closure.</div>');if(window.Plotly)Plotly.purge("plot");return;}
+    const audit=A.pairProductionAudit(params()),req=audit.required;
+    setAnalysisMeta("Explicit Pair Production","idealized constant-field Schwinger channel · 1 r_g shell");
+    setAnalysisTable(['<div class="pair-summary">','<div><span>Ecrit</span><strong>'+A.formatScientific(audit.criticalFieldVcm,3)+' V/cm</strong></div>','<div><span>Required E/Ecrit</span><strong>'+A.formatScientific(req.electricFieldOverCritical,3)+'</strong></div>','<div><span>Required E</span><strong>'+A.formatScientific(req.electricFieldVcm,3)+' V/cm</strong></div>','<div><span>Min pair power</span><strong>'+A.formatScientific(audit.minimumObservedPairPowerErgS,3)+' erg/s</strong></div>','<div><span>Ṁc² / min pair power</span><strong>'+A.formatScientific(audit.energyBudgetRatio,3)+'×</strong></div>','</div>','<div class="missing-note"><strong>Interpretation:</strong> Schwinger production is explicit QED, but AxionBH does not yet predict the required local electric field. Plasma screening, backreaction and active volume remain unresolved. The power check is necessary, not sufficient.</div>'].join(""));
+    if(!window.Plotly)return;const xs=[],ys=[];for(let i=-4;i<=0.3;i+=0.08){const x=10**i,r=A.schwingerPairProduction(params(),{electricFieldVcm:x*audit.criticalFieldVcm});xs.push(x);ys.push(Math.log10(Math.max(r.rawRatio511,1e-320)));}
+    const layout=plotLayout("E / Ecrit","log10(pair rate / observed)");layout.xaxis.type="log";Plotly.react("plot",[{type:"scatter",mode:"lines",x:xs,y:ys},{type:"scatter",mode:"markers",x:[req.electricFieldOverCritical],y:[0],marker:{size:11,color:themeColors().accent},name:"required"}],layout,{responsive:true,displaylogo:false});
   }
 
   function renderValidity() {
@@ -2313,6 +2323,7 @@
         else if (kind === "calibration") renderAccretionCalibration();
         else if (kind === "flow") renderFlowGeometryCalibration();
         else if (kind === "micro") renderMicrophysicsAudit();
+        else if (kind === "pairs") renderPairProduction();
         else if (kind === "validity") renderValidity();
         else if (kind === "chirality") renderChirality();
         else if (kind === "missing") renderMissingPhysics();
@@ -2361,7 +2372,7 @@
     const diagnostics = currentDiagnostics();
     const payload = {
       generatedAt: new Date().toISOString(),
-      model: "AxionBH research workbench v8.3",
+      model: "AxionBH research workbench v8.4",
       modelVersion: A.MODEL_VERSION,
       stateSchemaVersion: A.STATE_SCHEMA_VERSION,
       stateId: runStateId(state.lastMode, state.lastParams),
@@ -2408,6 +2419,10 @@
         state.lastMode === "cme"
           ? A.microphysicsAudit(state.lastParams)
           : null,
+      pairProductionAudit:
+        state.lastMode === "cme"
+          ? A.pairProductionAudit(state.lastParams)
+          : null,
       missingPhysics: {
         placement: $("missingPlacement").value,
         gainExp: Number($("missingGainExp").value),
@@ -2431,7 +2446,7 @@
     const lines = [
       "# AxionBH reproducibility report",
       "",
-      "- Model: AxionBH Research Workbench v8.3",
+      "- Model: AxionBH Research Workbench v8.4",
       "- Generated: " + new Date().toISOString(),
       "- State ID: " + stateId,
       "- Mode: " + modeNames[state.lastMode],
@@ -2627,7 +2642,7 @@
       applyParameters(restored);
       if (modeNames[payload.mode]) $("mode").value = payload.mode;
 
-      if (["spin", "explorer", "sensitivity", "inference", "transport", "plasma", "calibration", "flow", "micro", "validity", "chirality", "missing", "compare"].includes(payload.analysis)) {
+      if (["spin", "explorer", "sensitivity", "inference", "transport", "plasma", "calibration", "flow", "micro", "pairs", "validity", "chirality", "missing", "compare"].includes(payload.analysis)) {
         state.analysis = payload.analysis;
       }
 
