@@ -23,3 +23,35 @@ const duplicates = ids.filter((id, index) => ids.indexOf(id) !== index);
 assert.deepEqual(duplicates, []);
 
 console.log("AxionBH static integrity checks passed");
+
+
+assert.doesNotThrow(() => new Function(app));
+assert.doesNotThrow(() => new Function(core));
+
+for (const id of [
+  "savePresetBtn",
+  "deletePresetBtn",
+  "shareBtn",
+  "analysisTitle",
+  "analysisTable",
+  "analysisBusy",
+  "plot"
+]) {
+  assert.ok(html.includes('id="' + id + '"'), "missing UI id: " + id);
+}
+
+for (const feature of [
+  "parameterMap",
+  "sensitivityAnalysis",
+  "comparePresets",
+  "shareCurrentState",
+  "USER_PRESETS_KEY"
+]) {
+  assert.ok(
+    core.includes(feature) || app.includes(feature),
+    "missing workbench feature: " + feature
+  );
+}
+
+assert.ok(!app.includes("fetch("));
+assert.ok(!app.includes("XMLHttpRequest"));
