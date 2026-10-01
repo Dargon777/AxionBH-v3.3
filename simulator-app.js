@@ -31,6 +31,8 @@
     mdot: "Ṁ",
     temperature: "T",
     electronMuMeV: "μ_V(e)",
+    electronDensityMode: "plasma closure",
+    electronDensityCm3: "nₑ,net",
     nProfile: "n",
     axionMassEv: "mₐ",
     burstEnergy: "E_burst",
@@ -41,7 +43,8 @@
 
   const parameterIds = [
     "massSolar", "spin", "B0", "betaTurb", "faGev", "mEff", "mdot",
-    "temperature", "electronMuMeV", "nProfile", "axionMassEv", "burstEnergy",
+    "temperature", "electronMuMeV", "electronDensityMode",
+    "electronDensityCm3", "nProfile", "axionMassEv", "burstEnergy",
     "burstIntervalYears", "burstDuration", "burstEfficiency"
   ];
 
@@ -218,6 +221,11 @@
       !["superradiant", "hybrid"].includes(mode)
     );
     $("burstManualFields").classList.toggle("hidden", mode !== "bosenova");
+
+    const densityClosure =
+      Number($("electronDensityMode").value) === 1;
+    $("electronMuMeV").disabled = densityClosure;
+    $("electronDensityCm3").disabled = !densityClosure;
   }
 
   function formatRatio(value) {
@@ -276,7 +284,10 @@
         ["ā", A.formatScientific(result.aBar) + " GeV"],
         ["μ₅", A.formatScientific(result.mu5) + " GeV"],
         ["η₅ = μ₅/T", A.formatScientific(result.eta5)],
-        ["μ_V(e)", result.closure ? A.formatScientific(result.closure.electronMuGeV * 1e3) + " MeV" : "—"],
+        ["Electron plasma closure", result.closure && result.closure.electronDensityMode === 1 ? "nₑ,net → μ_V" : "manual μ_V"],
+        ["μ_V(e), resolved", result.closure ? A.formatScientific(result.closure.electronMuMeV) + " MeV" : "—"],
+        ["nₑ,net, resolved", result.closure ? A.formatScientific(result.closure.resolvedElectronDensityCm3) + " cm⁻³" : "—"],
+        ["e⁺ / e⁻", result.closure ? A.formatScientific(result.closure.positronFraction) : "—"],
         ["Finite-mass CVE suppression", result.closure ? A.formatScientific(result.closure.finiteMassSuppression) : "—"],
         ["σ_CVE,base", result.closure ? A.formatScientific(result.closure.cveBaseCoefficient) + " GeV²" : "—"],
         ["Closure D", result.closure ? A.formatScientific(result.closure.discriminant) : "—"],
@@ -326,7 +337,7 @@
       ordered[key] = Number(p[key]);
     });
     const source = JSON.stringify({
-      model: "AxionBH-v7.9",
+      model: "AxionBH-v7.10",
       mode,
       parameters: ordered
     });
@@ -988,7 +999,7 @@
     if ($("mode").value !== "cme") {
       setAnalysisMeta(
         "Parameter Inference",
-        "v7.9 inverse solver сейчас определён для CVE closure"
+        "v7.10 inverse solver сейчас определён для CVE closure"
       );
       setAnalysisTable(
         '<div class="inference-empty">Переключи режим на CME, чтобы оценить дефицит и требуемые однопараметрические сдвиги.</div>'
@@ -1268,6 +1279,9 @@
 
     const p = params();
     const plasma = A.finiteMassPlasmaDiagnostics(p);
+    const closureMode = plasma.densityClosureActive
+      ? "density closure"
+      : "manual μ_V";
     const suppressionDex =
       plasma.suppression > 0
         ? Math.log10(plasma.suppression)
@@ -1288,6 +1302,13 @@
         A.formatScientific(plasma.massOverT, 3) + '</strong></div>',
       '<div><span>μ_V/T</span><strong>' +
         A.formatScientific(plasma.vectorMuOverT, 3) + '</strong></div>',
+      '<div><span>closure</span><strong>' +
+        closureMode + '</strong></div>',
+      '<div><span>nₑ,net</span><strong>' +
+        A.formatScientific(
+          plasma.resolvedNetDensityCm3,
+          3
+        ) + ' cm⁻³</strong></div>',
       '<div><span>σ massive</span><strong>' +
         A.formatScientific(plasma.sigmaMassive, 3) +
         ' GeV²</strong></div>',
@@ -1300,16 +1321,26 @@
         (Number.isFinite(suppressionDex)
           ? suppressionDex.toFixed(2)
           : "−∞") + ' dex</strong></div>',
+      '<div><span>e⁺ / e⁻</span><strong>' +
+        A.formatScientific(
+          plasma.positronFraction,
+          3
+        ) + '</strong></div>',
       '</div>'
     ].join("");
 
     const table = [
       '<div class="analysis-row analysis-row-head plasma"><span>Case</span><span>μ_V(e)</span><span>Suppression</span><span>Interpretation</span></div>',
       '<div class="analysis-row plasma"><strong>Selected</strong><span>' +
-        A.formatScientific(p.electronMuMeV, 3) +
+        A.formatScientific(plasma.vectorMuMeV, 3) +
         ' MeV</span><span>' +
         A.formatScientific(plasma.suppression, 3) +
-        '</span><span>used by the closure</span></div>',
+        '</span><span>' +
+        closureMode + '; nₑ,net=' +
+        A.formatScientific(
+          plasma.resolvedNetDensityCm3,
+          3
+        ) + ' cm⁻³</span></div>',
       '<div class="analysis-row plasma"><strong>Pair-symmetric</strong><span>0 MeV</span><span>' +
         A.formatScientific(
           plasma.pairSymmetricSuppression,
@@ -1329,45 +1360,60 @@
 
     if (!window.Plotly) return;
 
-    const maxMu = Math.max(2, p.electronMuMeV * 1.25);
-    const sweep = A.finiteMassPlasmaSweep(p, {
-      maxMuMeV: maxMu,
-      points: 110
-    });
+    const selectedDensity =
+      plasma.resolvedNetDensityCm3 > 0
+        ? plasma.resolvedNetDensityCm3
+        : 1e7;
+    const minDensity = Math.max(
+      1e-6,
+      selectedDensity / 1e8
+    );
+    const maxDensity = Math.max(
+      1e20,
+      selectedDensity * 1e8
+    );
+    const sweep = A.electronDensityClosureSweep(
+      p,
+      {
+        minDensityCm3: minDensity,
+        maxDensityCm3: Math.min(1e40, maxDensity),
+        points: 56
+      }
+    );
     const valid = sweep.points.filter((point) =>
-      Number.isFinite(point.suppression) &&
-      point.suppression > 0
+      Number.isFinite(point.muMeV) &&
+      point.muMeV >= 0
     );
     const colors = themeColors();
     const layout = plotLayout(
-      "μ_V(e), MeV",
-      "log₁₀(σ_massive / σ_massless)"
+      "nₑ,net, cm⁻³",
+      "μ_V(e), MeV"
     );
-    layout.shapes = [{
-      type: "line",
-      x0: A.CONSTANTS.ELECTRON_MASS_GEV * 1e3,
-      x1: A.CONSTANTS.ELECTRON_MASS_GEV * 1e3,
-      y0: valid.length
-        ? Math.min(...valid.map((point) =>
-            Math.log10(point.suppression)
-          ))
-        : -1,
-      y1: 0,
-      line: { color: colors.muted, dash: "dash", width: 1 }
-    }];
+    layout.xaxis.type = "log";
 
     Plotly.react("plot", [{
       type: "scatter",
       mode: "lines",
-      x: valid.map((point) => point.electronMuMeV),
-      y: valid.map((point) =>
-        Math.log10(point.suppression)
+      x: valid.map((point) => point.netDensityCm3),
+      y: valid.map((point) => point.muMeV),
+      customdata: valid.map((point) =>
+        point.suppression
       ),
       line: { color: colors.accent2, width: 2 },
       hovertemplate:
-        "μ_V=%{x:.4f} MeV" +
-        "<br>log₁₀ suppression=%{y:.2f}" +
+        "nₑ,net=%{x:.3e} cm⁻³" +
+        "<br>μ_V=%{y:.6f} MeV" +
+        "<br>suppression=%{customdata:.3e}" +
         "<extra></extra>"
+    }, {
+      type: "scatter",
+      mode: "markers",
+      x: [selectedDensity],
+      y: [plasma.vectorMuMeV],
+      marker: { size: 10, color: colors.accent },
+      hovertemplate:
+        "selected<br>nₑ,net=%{x:.3e} cm⁻³" +
+        "<br>μ_V=%{y:.6f} MeV<extra></extra>"
     }], layout, {
       responsive: true,
       displaylogo: false
@@ -1778,7 +1824,7 @@
     const diagnostics = currentDiagnostics();
     const payload = {
       generatedAt: new Date().toISOString(),
-      model: "AxionBH research workbench v7.9",
+      model: "AxionBH research workbench v7.10",
       stateId: runStateId(state.lastMode, state.lastParams),
       mode: state.lastMode,
       parameters: state.lastParams,
@@ -1825,7 +1871,7 @@
     const lines = [
       "# AxionBH reproducibility report",
       "",
-      "- Model: AxionBH Research Workbench v7.9",
+      "- Model: AxionBH Research Workbench v7.10",
       "- Generated: " + new Date().toISOString(),
       "- State ID: " + stateId,
       "- Mode: " + modeNames[state.lastMode],
@@ -2147,6 +2193,11 @@
     $("explorerView").addEventListener("change", () => scheduleExplorerRender(0));
     $("explorerReference").addEventListener("change", () => scheduleExplorerRender(0));
     $("explorerResolution").addEventListener("change", () => scheduleExplorerRender(0));
+
+    $("electronDensityMode").addEventListener("change", () => {
+      updateConditionalFields();
+      markCustom();
+    });
 
     ["chiralityFlipExp", "chiralityTimeExp", "chiralityEExp"].forEach((id) => {
       $(id).addEventListener("input", () => {
