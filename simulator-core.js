@@ -328,8 +328,8 @@
 
     if (!sr.active || !Number.isFinite(sr.saturationTime)) {
       return {
-        mode: "hybrid",
         ...sr,
+        mode: "hybrid",
         burstEnergy: 0,
         convertedEnergy: 0,
         averageLuminosity: 0,
@@ -346,8 +346,8 @@
     const burstLuminosity = convertedEnergy / p.burstDuration;
 
     return {
-      mode: "hybrid",
       ...sr,
+      mode: "hybrid",
       burstEnergy,
       convertedEnergy,
       averageLuminosity,
