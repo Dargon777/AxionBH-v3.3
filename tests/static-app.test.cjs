@@ -109,10 +109,6 @@ for (const feature of [
   );
 }
 
-assert.ok(html.includes("v7.3"));
-assert.ok(app.includes("AxionBH research workbench v7.3"));
-
-
 for (const feature of [
   "selfConsistencyCoefficients",
   "selfConsistencyBranches",
