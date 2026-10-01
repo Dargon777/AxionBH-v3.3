@@ -800,7 +800,7 @@ console.log("AxionBH simulator-core tests passed");
     },
     "cme"
   );
-  assert.equal(report.modelVersion, "8.6.0");
+  assert.equal(report.modelVersion, "8.7.0");
   assert.equal(report.stateSchemaVersion, 11);
   assert.equal(report.layers.length, A.MODEL_LAYERS.length);
   assert.ok(report.accretion);
