@@ -358,7 +358,7 @@
       ordered[key] = Number(p[key]);
     });
     const source = JSON.stringify({
-      model: "AxionBH-v8.2",
+      model: "AxionBH-v8.3",
       mode,
       parameters: ordered
     });
@@ -1020,7 +1020,7 @@
     if ($("mode").value !== "cme") {
       setAnalysisMeta(
         "Parameter Inference",
-        "v8.2 inverse solver сейчас определён для CVE closure"
+        "v8.3 inverse solver сейчас определён для CVE closure"
       );
       setAnalysisTable(
         '<div class="inference-empty">Переключи режим на CME, чтобы оценить дефицит и требуемые однопараметрические сдвиги.</div>'
@@ -1843,6 +1843,55 @@
     });
   }
 
+
+  function renderMicrophysicsAudit() {
+    if ($("mode").value !== "cme") {
+      setAnalysisMeta("Microphysics Audit", "stationary CVE closure only");
+      setAnalysisTable('<div class="inference-empty">Переключи режим на CVE closure.</div>');
+      if (window.Plotly) Plotly.purge("plot");
+      return;
+    }
+    const audit = A.microphysicsAudit(params());
+    setAnalysisMeta(
+      "Microphysics Audit",
+      "dimensional observable fix + explicit phenomenological bridges"
+    );
+    const html = [
+      '<div class="micro-summary">',
+      '<div><span>Observed 511 quantity</span><strong>' +
+        A.formatScientific(audit.observed511.valuePerSecond,3) +
+        ' e⁺/s</strong></div>',
+      '<div><span>Historical deficit</span><strong>' +
+        audit.historicalDeficitDex.toFixed(2) + ' dex</strong></div>',
+      '<div><span>Corrected deficit</span><strong>' +
+        audit.correctedDeficitDex.toFixed(2) + ' dex</strong></div>',
+      '<div><span>Dimensional correction</span><strong>' +
+        audit.dimensionalCorrectionDex.toFixed(2) + ' dex</strong></div>',
+      '</div>',
+      '<div class="analysis-row analysis-row-head micro"><span>Bridge</span><span>Status</span><span>Current relation</span><span>Meaning</span></div>',
+      '<div class="analysis-row micro"><strong>axion → μ₅</strong><span>phenomenological</span><span>' +
+        audit.axionToMu5.modelRelation +
+        '</span><span>' + audit.axionToMu5.warning + '</span></div>',
+      '<div class="analysis-row micro"><strong>μ₅ → e⁺</strong><span>phenomenological energy proxy</span><span>' +
+        audit.mu5ToPositrons.modelRelation +
+        '</span><span>E_cost=' +
+        A.formatScientific(audit.mu5ToPositrons.energyCostErg,3) +
+        ' erg/e⁺; no microscopic pair-production rate is derived.</span></div>',
+      '<div class="missing-note"><strong>Observable correction:</strong> the Galactic ~10⁴³ quantity is an annihilation/injection rate in e⁺/s, not an energy luminosity in erg/s. v8.3 therefore audits the corrected rate ratio separately; the legacy numerical L/L₅₁₁ fields remain untouched for backward reproducibility.</div>'
+    ].join("");
+    setAnalysisTable(html);
+    if (!window.Plotly) return;
+    const colors=themeColors();
+    const layout=plotLayout("comparison","remaining deficit, dex");
+    Plotly.react("plot",[{
+      type:"bar",
+      x:["legacy dimensional mismatch","rate-corrected proxy"],
+      y:[audit.historicalDeficitDex,audit.correctedDeficitDex],
+      marker:{color:colors.accent2},
+      hovertemplate:"%{x}<br>%{y:.2f} dex<extra></extra>"
+    }],layout,{responsive:true,displaylogo:false});
+  }
+
   function renderValidity() {
     const p = params();
     const mode = $("mode").value;
@@ -2263,6 +2312,7 @@
         else if (kind === "plasma") renderPlasma();
         else if (kind === "calibration") renderAccretionCalibration();
         else if (kind === "flow") renderFlowGeometryCalibration();
+        else if (kind === "micro") renderMicrophysicsAudit();
         else if (kind === "validity") renderValidity();
         else if (kind === "chirality") renderChirality();
         else if (kind === "missing") renderMissingPhysics();
@@ -2311,7 +2361,7 @@
     const diagnostics = currentDiagnostics();
     const payload = {
       generatedAt: new Date().toISOString(),
-      model: "AxionBH research workbench v8.2",
+      model: "AxionBH research workbench v8.3",
       modelVersion: A.MODEL_VERSION,
       stateSchemaVersion: A.STATE_SCHEMA_VERSION,
       stateId: runStateId(state.lastMode, state.lastParams),
@@ -2354,6 +2404,10 @@
               state.lastParams
             )
           : null,
+      microphysicsAudit:
+        state.lastMode === "cme"
+          ? A.microphysicsAudit(state.lastParams)
+          : null,
       missingPhysics: {
         placement: $("missingPlacement").value,
         gainExp: Number($("missingGainExp").value),
@@ -2377,7 +2431,7 @@
     const lines = [
       "# AxionBH reproducibility report",
       "",
-      "- Model: AxionBH Research Workbench v8.2",
+      "- Model: AxionBH Research Workbench v8.3",
       "- Generated: " + new Date().toISOString(),
       "- State ID: " + stateId,
       "- Mode: " + modeNames[state.lastMode],
@@ -2573,7 +2627,7 @@
       applyParameters(restored);
       if (modeNames[payload.mode]) $("mode").value = payload.mode;
 
-      if (["spin", "explorer", "sensitivity", "inference", "transport", "plasma", "calibration", "flow", "validity", "chirality", "missing", "compare"].includes(payload.analysis)) {
+      if (["spin", "explorer", "sensitivity", "inference", "transport", "plasma", "calibration", "flow", "micro", "validity", "chirality", "missing", "compare"].includes(payload.analysis)) {
         state.analysis = payload.analysis;
       }
 
