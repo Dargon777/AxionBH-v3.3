@@ -123,8 +123,8 @@ for (const feature of [
   );
 }
 
-assert.ok(html.includes("v8.7.0"));
-assert.ok(app.includes("AxionBH research workbench v8.7.0"));
+assert.ok(html.includes("v8.8.0"));
+assert.ok(app.includes("AxionBH research workbench v8.8.0"));
 
 
 for (const feature of [
@@ -423,3 +423,35 @@ for (const id of [
 }
 assert.ok(app.includes("dominant cooling"));
 assert.ok(app.includes("GJ refill"));
+
+
+for (const feature of [
+  "bulge511Reference",
+  "positroniumLineYield",
+  "gaussianTransportRetentionFraction",
+  "positronProductionSourceAudit",
+  "positronTransportPipeline",
+  "positronTransportSweep",
+  "renderAnnihilationPipeline"
+]) {
+  assert.ok(
+    core.includes(feature) || app.includes(feature),
+    "missing v8.8 positron transport feature: " + feature
+  );
+}
+for (const id of [
+  'data-analysis="annihilation"',
+  'id="annihilationControls"',
+  'id="positronSourceKind"',
+  'id="positronEscape"',
+  'id="positronSmearingPc"',
+  'id="positronBulgeRadiusPc"',
+  'id="positronThermalization"',
+  'id="positronAnnihilation"',
+  'id="positroniumFraction"',
+  'id="positronInjectionExp"'
+]) {
+  assert.ok(html.includes(id), "missing v8.8 511-pipeline UI: " + id);
+}
+assert.ok(app.includes("511-keV Observable Pipeline"));
+assert.ok(app.includes("updatePositronLabels"));
