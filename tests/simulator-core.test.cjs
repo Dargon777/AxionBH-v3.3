@@ -200,6 +200,20 @@ console.log("AxionBH simulator-core tests passed");
   assert.equal(diagnostics.mode, "cme");
   assert.ok(Array.isArray(diagnostics.checks));
   assert.ok(!diagnostics.checks.some((item) => item.level === "error"));
+  assert.ok(diagnostics.checks.some((item) => item.code === "cloud_root"));
+}
+
+{
+  const p = {
+    ...A.DEFAULTS,
+    spin: 0.9,
+    B0: 10,
+    mEff: 1,
+    faGev: 1e16
+  };
+  const result = A.cme(p);
+  assert.ok(result.aBar > 0);
+  const diagnostics = A.diagnoseRun("cme", p, result);
   const residual = diagnostics.checks.find((item) => item.code === "root_residual");
   assert.ok(residual);
   assert.ok(Number.isFinite(residual.value));
