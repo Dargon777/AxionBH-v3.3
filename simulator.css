@@ -249,3 +249,41 @@ input[type="range"]{width:100%;accent-color:var(--accent)}
   .diag-item{grid-template-columns:54px 1fr}
   .diag-value{grid-column:2}
 }
+
+
+.analysis-row.inference{
+  grid-template-columns:minmax(110px,1.1fr) repeat(3,minmax(90px,1fr)) minmax(150px,1.35fr);
+}
+.inference-summary{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  border-bottom:1px solid var(--border);
+  background:var(--panel-2);
+}
+.inference-summary>div{padding:11px 12px;border-right:1px solid var(--border)}
+.inference-summary>div:last-child{border-right:none}
+.inference-summary span{
+  display:block;
+  color:var(--muted);
+  font-size:9px;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+}
+.inference-summary strong{display:block;margin-top:4px;font-size:12px}
+.inference-status{
+  display:inline-block;
+  margin-right:6px;
+  font-family:inherit;
+  font-size:9px;
+  font-weight:800;
+  letter-spacing:.05em;
+}
+.inference-status.solved{color:var(--ok)}
+.inference-status.unreachable{color:var(--warn)}
+.inference-empty{padding:14px;color:var(--muted);font-size:12px;line-height:1.5}
+@media(max-width:760px){
+  .analysis-row.inference{grid-template-columns:1fr 1fr}
+  .inference-summary{grid-template-columns:1fr}
+  .inference-summary>div{border-right:none;border-bottom:1px solid var(--border)}
+  .inference-summary>div:last-child{border-bottom:none}
+}

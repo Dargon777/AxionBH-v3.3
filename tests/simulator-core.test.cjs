@@ -257,3 +257,58 @@ console.log("AxionBH simulator-core tests passed");
   assert.equal(diagnostics.status, "warning");
   assert.ok(diagnostics.checks.some((item) => item.code === "overlapping_bursts"));
 }
+
+
+{
+  const baseline = A.cme(A.DEFAULTS);
+  const deficit = A.deficitOrders(baseline.ratio511, 1);
+  assert.ok(Number.isFinite(deficit));
+  assert.ok(deficit > 50 && deficit < 52);
+}
+
+{
+  const map = A.parameterDeficitMap(A.DEFAULTS, {
+    xValues: [0.2, 0.5, 0.9],
+    yValues: [10, 1000],
+    target: 1
+  });
+  assert.equal(map.z.length, 2);
+  assert.equal(map.z[0].length, 3);
+  assert.equal(map.z[0][0], null);
+  assert.ok(Number.isFinite(map.z[0][1]));
+}
+
+{
+  const mdot = A.inferParameterTarget(
+    "cme",
+    A.DEFAULTS,
+    "mdot",
+    { target: 1, steps: 220 }
+  );
+  assert.equal(mdot.status, "solved");
+  assert.ok(mdot.requiredValue > A.DEFAULTS.mdot);
+  assert.ok(mdot.requiredFactor > 1e40);
+  assert.ok(Math.abs(Math.log10(mdot.achievedMetric)) < 1e-8);
+}
+
+{
+  const field = A.inferParameterTarget(
+    "cme",
+    A.DEFAULTS,
+    "B0",
+    { target: 1, steps: 220 }
+  );
+  assert.equal(field.status, "unreachable");
+  assert.ok(field.bestMetric > A.cme(A.DEFAULTS).ratio511);
+  assert.ok(field.remainingDeficitOrders > 0);
+}
+
+{
+  const inference = A.parameterInference("cme", A.DEFAULTS, {
+    keys: ["B0", "mdot"],
+    steps: 180
+  });
+  assert.equal(inference.rows.length, 2);
+  assert.ok(inference.deficitOrders > 50);
+  assert.ok(inference.requiredGain > 1e50);
+}

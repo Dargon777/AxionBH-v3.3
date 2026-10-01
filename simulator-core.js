@@ -637,6 +637,287 @@
     };
   }
 
+
+  const INFERENCE_BOUNDS = Object.freeze({
+    cme: Object.freeze({
+      spin: Object.freeze({
+        min: CONSTANTS.SPIN_THRESHOLD + 1e-6,
+        max: 0.998,
+        scale: "linear"
+      }),
+      B0: Object.freeze({ min: 1e-3, max: 1e60, scale: "log" }),
+      betaTurb: Object.freeze({ min: 1e-8, max: 1e60, scale: "log" }),
+      faGev: Object.freeze({ min: 1e-30, max: 1e30, scale: "log" }),
+      mEff: Object.freeze({ min: 1e-60, max: 1e2, scale: "log" }),
+      mdot: Object.freeze({ min: 1e5, max: 1e90, scale: "log" }),
+      temperature: Object.freeze({ min: 1, max: 1e40, scale: "log" })
+    })
+  });
+
+  function deficitOrders(value, target = 1) {
+    const metric = Number(value);
+    const goal = Number(target);
+    if (!Number.isFinite(goal) || goal <= 0) {
+      throw new RangeError("target must be positive");
+    }
+    if (!Number.isFinite(metric) || metric <= 0) {
+      return Number.POSITIVE_INFINITY;
+    }
+    return Math.log10(goal / metric);
+  }
+
+  function parameterDeficitMap(
+    input,
+    {
+      target = 1,
+      xKey = "spin",
+      yKey = "B0",
+      xValues = linearSpace(0.05, 0.998, 28),
+      yValues = logSpace(1, 2e5, 22)
+    } = {}
+  ) {
+    const map = parameterMap(input, {
+      mode: "cme",
+      xKey,
+      yKey,
+      xValues,
+      yValues,
+      metric: "ratio511"
+    });
+
+    return {
+      ...map,
+      target,
+      z: map.z.map((row) =>
+        row.map((value) =>
+          Number.isFinite(value) && value > 0
+            ? deficitOrders(value, target)
+            : null
+        )
+      )
+    };
+  }
+
+  function inferenceValues(rule, steps) {
+    const count = Math.max(24, Math.min(600, Math.trunc(steps)));
+    return rule.scale === "linear"
+      ? linearSpace(rule.min, rule.max, count)
+      : logSpace(rule.min, rule.max, count);
+  }
+
+  function inferParameterTarget(
+    mode,
+    input,
+    key,
+    {
+      target = 1,
+      metric = "ratio511",
+      steps = 280,
+      bounds = null
+    } = {}
+  ) {
+    const base = normalizeParams(input);
+    const configured =
+      bounds ||
+      (INFERENCE_BOUNDS[mode] && INFERENCE_BOUNDS[mode][key]);
+
+    if (!configured) {
+      throw new RangeError(
+        "No inference bounds configured for " + mode + ":" + key
+      );
+    }
+
+    const rule = {
+      min: Number(configured.min),
+      max: Number(configured.max),
+      scale: configured.scale === "linear" ? "linear" : "log"
+    };
+
+    if (
+      !Number.isFinite(rule.min) ||
+      !Number.isFinite(rule.max) ||
+      rule.max <= rule.min ||
+      (rule.scale === "log" && rule.min <= 0)
+    ) {
+      throw new RangeError("Invalid inference bounds for " + key);
+    }
+
+    const goal = Number(target);
+    if (!Number.isFinite(goal) || goal <= 0) {
+      throw new RangeError("target must be positive");
+    }
+
+    const currentResult = simulate(mode, base);
+    const currentMetric = extractMetric(currentResult, metric);
+    const currentValue = Number(base[key]);
+    const values = inferenceValues(rule, steps);
+    if (currentValue >= rule.min && currentValue <= rule.max) {
+      values.push(currentValue);
+      values.sort((a, b) => a - b);
+    }
+
+    const samples = [];
+    let best = null;
+
+    function evaluate(value) {
+      try {
+        const result = simulate(mode, { ...base, [key]: value });
+        const measured = extractMetric(result, metric);
+        if (measured === null || measured < 0) return null;
+        return { value, metric: measured };
+      } catch {
+        return null;
+      }
+    }
+
+    values.forEach((value) => {
+      const sample = evaluate(value);
+      if (!sample) return;
+      samples.push(sample);
+      if (!best || sample.metric > best.metric) best = sample;
+    });
+
+    const brackets = [];
+    let previous = null;
+    for (const sample of samples) {
+      if (!(sample.metric > 0)) continue;
+      const objective = Math.log(sample.metric / goal);
+      if (!Number.isFinite(objective)) continue;
+      const point = { ...sample, objective };
+      if (Math.abs(objective) < 1e-12) {
+        brackets.push([point, point]);
+      } else if (
+        previous &&
+        Math.sign(previous.objective) !== Math.sign(objective)
+      ) {
+        brackets.push([previous, point]);
+      }
+      previous = point;
+    }
+
+    function coordinate(value) {
+      return rule.scale === "log" ? Math.log10(value) : value;
+    }
+
+    function fromCoordinate(value) {
+      return rule.scale === "log" ? Math.pow(10, value) : value;
+    }
+
+    const roots = [];
+    for (const [leftPoint, rightPoint] of brackets) {
+      if (leftPoint.value === rightPoint.value) {
+        roots.push(leftPoint);
+        continue;
+      }
+
+      let lo = coordinate(leftPoint.value);
+      let hi = coordinate(rightPoint.value);
+      let flo = leftPoint.objective;
+      let candidate = null;
+
+      for (let i = 0; i < 72; i += 1) {
+        const midCoordinate = (lo + hi) / 2;
+        const midValue = fromCoordinate(midCoordinate);
+        const mid = evaluate(midValue);
+        if (!mid || !(mid.metric > 0)) break;
+        const fm = Math.log(mid.metric / goal);
+        if (!Number.isFinite(fm)) break;
+        candidate = { ...mid, objective: fm };
+
+        if (Math.abs(fm) < 1e-10) break;
+        if (Math.sign(fm) === Math.sign(flo)) {
+          lo = midCoordinate;
+          flo = fm;
+        } else {
+          hi = midCoordinate;
+        }
+      }
+
+      if (candidate) roots.push(candidate);
+    }
+
+    const validRoots = roots.filter((root) =>
+      Number.isFinite(root.value) &&
+      root.value > 0 &&
+      Number.isFinite(root.metric)
+    );
+
+    validRoots.sort((a, b) =>
+      Math.abs(Math.log(a.value / currentValue)) -
+      Math.abs(Math.log(b.value / currentValue))
+    );
+
+    const solution = validRoots[0] || null;
+    const bestMetric = best ? best.metric : null;
+    const bestValue = best ? best.value : null;
+    const currentDeficit = deficitOrders(currentMetric, goal);
+    const remainingDeficit =
+      solution
+        ? 0
+        : deficitOrders(bestMetric, goal);
+
+    return {
+      mode,
+      key,
+      metric,
+      target: goal,
+      status: solution ? "solved" : "unreachable",
+      currentValue,
+      currentMetric,
+      currentDeficitOrders: currentDeficit,
+      requiredValue: solution ? solution.value : null,
+      requiredFactor:
+        solution && currentValue > 0
+          ? solution.value / currentValue
+          : null,
+      achievedMetric: solution ? solution.metric : null,
+      bestValue,
+      bestMetric,
+      bestFactor:
+        bestValue !== null && currentValue > 0
+          ? bestValue / currentValue
+          : null,
+      remainingDeficitOrders: remainingDeficit,
+      bounds: { ...rule },
+      samplesEvaluated: samples.length
+    };
+  }
+
+  function parameterInference(
+    mode,
+    input,
+    {
+      target = 1,
+      metric = "ratio511",
+      keys = Object.keys(INFERENCE_BOUNDS[mode] || {}),
+      steps = 280
+    } = {}
+  ) {
+    const base = normalizeParams(input);
+    const result = simulate(mode, base);
+    const currentMetric = extractMetric(result, metric);
+    const rows = keys.map((key) =>
+      inferParameterTarget(mode, base, key, {
+        target,
+        metric,
+        steps
+      })
+    );
+
+    return {
+      mode,
+      metric,
+      target,
+      currentMetric,
+      deficitOrders: deficitOrders(currentMetric, target),
+      requiredGain:
+        currentMetric && currentMetric > 0
+          ? target / currentMetric
+          : Number.POSITIVE_INFINITY,
+      rows
+    };
+  }
+
   const SENSITIVITY_KEYS = Object.freeze({
     cme: Object.freeze([
       "massSolar",
@@ -951,6 +1232,11 @@
     relativeDifferencePercent,
     compareParameterMaps,
     parameterSlices,
+    deficitOrders,
+    parameterDeficitMap,
+    inferParameterTarget,
+    parameterInference,
+    INFERENCE_BOUNDS,
     sensitivityAnalysis,
     comparePresets,
     diagnoseRun,

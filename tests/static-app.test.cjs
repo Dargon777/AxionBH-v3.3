@@ -123,5 +123,23 @@ for (const feature of [
   );
 }
 
-assert.ok(html.includes("v7.4"));
-assert.ok(app.includes("AxionBH research workbench v7.4"));
+assert.ok(html.includes("v7.5"));
+assert.ok(app.includes("AxionBH research workbench v7.5"));
+
+
+for (const feature of [
+  "deficitOrders",
+  "parameterDeficitMap",
+  "inferParameterTarget",
+  "parameterInference",
+  "renderInference",
+  "renderExplorerDeficit"
+]) {
+  assert.ok(
+    core.includes(feature) || app.includes(feature),
+    "missing v7.5 inference feature: " + feature
+  );
+}
+
+assert.ok(html.includes('data-analysis="inference"'));
+assert.ok(html.includes('<option value="deficit">'));
