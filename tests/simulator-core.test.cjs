@@ -312,3 +312,62 @@ console.log("AxionBH simulator-core tests passed");
   assert.ok(inference.deficitOrders > 50);
   assert.ok(inference.requiredGain > 1e50);
 }
+
+
+{
+  const baseline = A.cme(A.DEFAULTS);
+  const gained = A.cmeWithGains(A.DEFAULTS);
+  assert.ok(Math.abs(gained.ratio511 / baseline.ratio511 - 1) < 1e-12);
+  assert.ok(gained.closureValid);
+}
+
+{
+  const ceiling = A.cmeClosureCeiling(A.DEFAULTS);
+  const t = A.temperatureGeV(A.DEFAULTS.temperature);
+  const expectedMu = Math.PI * t / Math.sqrt(3);
+  assert.ok(Math.abs(ceiling.mu5Max / expectedMu - 1) < 1e-12);
+  assert.ok(ceiling.ratioMax > A.cme(A.DEFAULTS).ratio511);
+  assert.ok(ceiling.ratioMax > 8e-6 && ceiling.ratioMax < 1e-5);
+  assert.ok(
+    ceiling.ceilingDeficitOrders > 5 &&
+    ceiling.ceilingDeficitOrders < 5.1
+  );
+  assert.ok(ceiling.requiredPostGainAtCeiling > 1e5);
+}
+
+{
+  const ceiling = A.cmeClosureCeiling(A.DEFAULTS);
+  const gain = ceiling.criticalUpstreamProduct * (1 - 1e-10);
+  const source = A.missingPhysicsPoint(A.DEFAULTS, "source", gain);
+  const chiral = A.missingPhysicsPoint(A.DEFAULTS, "chiral", gain);
+  assert.ok(source.closureValid);
+  assert.ok(chiral.closureValid);
+  assert.ok(Math.abs(source.ratio511 / ceiling.ratioMax - 1) < 1e-4);
+  assert.ok(Math.abs(chiral.ratio511 / ceiling.ratioMax - 1) < 1e-4);
+  assert.ok(Math.abs(source.ratio511 / chiral.ratio511 - 1) < 1e-10);
+}
+
+{
+  const ceiling = A.cmeClosureCeiling(A.DEFAULTS);
+  const invalid = A.missingPhysicsPoint(
+    A.DEFAULTS,
+    "source",
+    ceiling.criticalUpstreamProduct * 1.001
+  );
+  assert.equal(invalid.closureValid, false);
+  assert.ok(invalid.closure.discriminant < 0);
+}
+
+{
+  const analysis = A.missingPhysicsAnalysis(A.DEFAULTS, 1);
+  const source = analysis.rows.find((row) => row.placement === "source");
+  const chiral = analysis.rows.find((row) => row.placement === "chiral");
+  const conversion = analysis.rows.find(
+    (row) => row.placement === "conversion"
+  );
+  assert.equal(source.status, "ceiling-limited");
+  assert.equal(chiral.status, "ceiling-limited");
+  assert.equal(conversion.status, "solved");
+  assert.ok(conversion.requiredGain > 1e50);
+  assert.ok(Math.abs(Math.log10(conversion.achievedMetric)) < 1e-8);
+}
