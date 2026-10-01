@@ -5,8 +5,8 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  const MODEL_VERSION = "8.5.2";
-  const STATE_SCHEMA_VERSION = 10;
+  const MODEL_VERSION = "8.6.0";
+  const STATE_SCHEMA_VERSION = 11;
 
   const CONSTANTS = Object.freeze({
     G: 6.6743015e-8,
@@ -52,7 +52,11 @@
     GAUSS_TO_GEV2: 1.95e-20,
     CM_TO_GEV_INV: 5.067730716e13,
     S_INV_TO_GEV: 6.582119569e-25,
-    K_TO_GEV: 8.617333262e-14
+    K_TO_GEV: 8.617333262e-14,
+    ELECTRON_CHARGE_ESU: 4.803204712570263e-10,
+    ELECTRON_MASS_G: 9.1093837139e-28,
+    ELECTRON_REST_ENERGY_EV: 510998.95,
+    THOMSON_CROSS_SECTION_CM2: 6.6524587321e-25
   });
 
   const DEFAULTS = Object.freeze({
@@ -2175,6 +2179,7 @@
 
 
   function statvoltPerCmToVoltPerCm(value){return Number(value)*299.792458;}
+
   function blackHoleRotationalField(input,{radiusRg=1,fieldG=null,fieldLineOmegaFraction=0.5}={}){
     const p=normalizeParams(input),geometry=kerrGeometry(p.massSolar*CONSTANTS.MSUN,p.spin),radius=assertFinitePositive(Number(radiusRg),"radiusRg")*geometry.rg;
     const B=fieldG===null?averageMagneticField(p.B0,geometry,p.nProfile):assertFinitePositive(Number(fieldG),"fieldG");
@@ -2182,11 +2187,317 @@
     const omegaF=geometry.omegaH*fraction,eStat=Math.abs(omegaF*radius/CONSTANTS.C)*B;
     return {radiusRg:Number(radiusRg),radiusCm:radius,fieldG:B,omegaHPerSecond:geometry.omegaH,fieldLineOmegaFraction:fraction,omegaFPerSecond:omegaF,electricFieldStatvoltCm:eStat,electricFieldVcm:statvoltPerCmToVoltPerCm(eStat),interpretation:"rotation-induced unscreened field scale; not a self-consistent E_parallel solution"};
   }
-  function gapParallelElectricField(input,options={}){const u=blackHoleRotationalField(input,options),s=options.screeningFraction==null?1:Number(options.screeningFraction);if(!(s>=0&&s<=1))throw new RangeError("screeningFraction must be in [0,1]");return {...u,screeningFraction:s,parallelElectricFieldVcm:u.electricFieldVcm*s};}
+
+  function gapParallelElectricField(input,options={}){
+    const u=blackHoleRotationalField(input,options);
+    const fraction=options.parallelFieldFraction==null
+      ? (options.screeningFraction==null?1:Number(options.screeningFraction))
+      : Number(options.parallelFieldFraction);
+    if(!(fraction>=0&&fraction<=1))throw new RangeError("parallelFieldFraction must be in [0,1]");
+    return {...u,parallelFieldFraction:fraction,screeningFraction:fraction,parallelElectricFieldVcm:u.electricFieldVcm*fraction};
+  }
+
+  function goldreichJulianDensityScale(input,{radiusRg=2,fieldG=null,fieldLineOmegaFraction=0.5}={}){
+    const p=normalizeParams(input);
+    const geometry=kerrGeometry(p.massSolar*CONSTANTS.MSUN,p.spin);
+    const radius=assertFinitePositive(Number(radiusRg),"radiusRg");
+    const B=fieldG===null?averageMagneticField(p.B0,geometry,p.nProfile):assertFinitePositive(Number(fieldG),"fieldG");
+    const fraction=Number(fieldLineOmegaFraction);
+    if(!(fraction>=0&&fraction<=1))throw new RangeError("fieldLineOmegaFraction must be in [0,1]");
+    const omegaF=geometry.omegaH*fraction;
+    const density=Math.abs(omegaF*B)/(2*Math.PI*CONSTANTS.ELECTRON_CHARGE_ESU*CONSTANTS.C);
+    return {
+      model:"classical Goldreich-Julian density scale",
+      radiusRg:radius,
+      fieldG:B,
+      omegaFPerSecond:omegaF,
+      numberDensityCm3:density,
+      note:"Order-of-magnitude n_GJ ~= |Omega_F B|/(2 pi e c); the full Kerr rho_GJ is geometry dependent and changes sign across the null surface."
+    };
+  }
+
+  function gapChargeStarvationAudit(input,options={}){
+    const p=normalizeParams(input);
+    const geometry=kerrGeometry(p.massSolar*CONSTANTS.MSUN,p.spin);
+    const radiusRg=options.radiusRg==null?2:Number(options.radiusRg);
+    if(!(radiusRg>geometry.rPlus/geometry.rg))throw new RangeError("gap radius must lie outside the Kerr horizon");
+    const injectionFraction=options.plasmaInjectionFraction==null?1:Number(options.plasmaInjectionFraction);
+    if(!(injectionFraction>=0&&injectionFraction<=1))throw new RangeError("plasmaInjectionFraction must be in [0,1]");
+    const gj=goldreichJulianDensityScale(p,{radiusRg,fieldG:options.fieldG??null,fieldLineOmegaFraction:options.fieldLineOmegaFraction??0.5});
+    const accretion=accretionElectronDensity({...p,accretionRadiusRg:radiusRg});
+    const available=options.availableChargeDensityCm3==null
+      ? accretion.netElectronDensityCm3*injectionFraction
+      : Number(options.availableChargeDensityCm3);
+    if(!Number.isFinite(available)||available<0)throw new RangeError("availableChargeDensityCm3 must be non-negative");
+    const supplyRatio=gj.numberDensityCm3>0?available/gj.numberDensityCm3:Number.POSITIVE_INFINITY;
+    const chargeDeficitFraction=Math.max(0,Math.min(1,1-supplyRatio));
+    const requiredInjectionFractionForScreening=accretion.netElectronDensityCm3>0
+      ? gj.numberDensityCm3/accretion.netElectronDensityCm3
+      : Number.POSITIVE_INFINITY;
+    return {
+      status:supplyRatio<1?"charge-starved":"screened-by-supply-proxy",
+      radiusRg,
+      plasmaInjectionFraction:injectionFraction,
+      goldreichJulian:gj,
+      accretion,
+      availableChargeDensityCm3:available,
+      supplyRatio,
+      chargeDeficitFraction,
+      requiredInjectionFractionForScreening,
+      starved:supplyRatio<1,
+      caveat:"This compares a classical n_GJ scale with a continuity-based accretion charge-supply proxy. Funnel injection, pair loading and GR geometry are not solved self-consistently."
+    };
+  }
+
+  function gapPotentialDrop(input,options={}){
+    const p=normalizeParams(input);
+    const geometry=kerrGeometry(p.massSolar*CONSTANTS.MSUN,p.spin);
+    const heightRg=assertFinitePositive(Number(options.gapHeightRg??0.1),"gapHeightRg");
+    const model=options.potentialModel||"vacuum-h2";
+    if(!["vacuum-h2","near-gj-h3"].includes(model))throw new RangeError("Unknown gap potential model");
+    const B=options.fieldG==null?averageMagneticField(p.B0,geometry,p.nProfile):assertFinitePositive(Number(options.fieldG),"fieldG");
+    const omegaFraction=Number(options.fieldLineOmegaFraction??0.5);
+    if(!(omegaFraction>=0&&omegaFraction<=1))throw new RangeError("fieldLineOmegaFraction must be in [0,1]");
+    const omegaF=geometry.omegaH*omegaFraction;
+    const phi0Statvolt=Math.abs(omegaF*geometry.rg*geometry.rg*B/CONSTANTS.C);
+    const baseStatvolt=model==="vacuum-h2"
+      ? phi0Statvolt*heightRg*heightRg
+      : (phi0Statvolt/6)*heightRg*heightRg*heightRg;
+    const deficit=options.chargeDeficitFraction==null?1:Number(options.chargeDeficitFraction);
+    if(!(deficit>=0&&deficit<=1))throw new RangeError("chargeDeficitFraction must be in [0,1]");
+    const effectiveStatvolt=baseStatvolt*deficit;
+    const heightCm=heightRg*geometry.rg;
+    const voltageV=effectiveStatvolt*299.792458;
+    const fieldVcm=heightCm>0?voltageV/heightCm:0;
+    return {
+      status:"idealized-gap-potential",
+      potentialModel:model,
+      gapHeightRg:heightRg,
+      gapHeightCm:heightCm,
+      fieldG:B,
+      fieldLineOmegaFraction:omegaFraction,
+      omegaFPerSecond:omegaF,
+      phi0Statvolt,
+      baseVoltageStatvolt:baseStatvolt,
+      chargeDeficitFraction:deficit,
+      voltageStatvolt:effectiveStatvolt,
+      voltageV,
+      averageParallelElectricFieldVcm:fieldVcm,
+      source:"Rieger & Katsoulakos 2017 gap-potential scalings: DeltaV~Phi0(h/rg)^2 or Phi0(h/rg)^3/6."
+    };
+  }
+
+  function curvatureRadiationAudit(input,options={}){
+    const p=normalizeParams(input);
+    const potential=options.potential||gapPotentialDrop(p,options);
+    const geometry=kerrGeometry(p.massSolar*CONSTANTS.MSUN,p.spin);
+    const curvatureRadiusRg=assertFinitePositive(Number(options.curvatureRadiusRg??1),"curvatureRadiusRg");
+    const curvatureRadiusCm=curvatureRadiusRg*geometry.rg;
+    const voltage=Math.max(0,potential.voltageV);
+    const potentialLimitedGamma=1+voltage/CONSTANTS.ELECTRON_REST_ENERGY_EV;
+    const eStat=potential.averageParallelElectricFieldVcm/299.792458;
+    const radiationReactionGamma=eStat>0
+      ? Math.pow((3*eStat*curvatureRadiusCm*curvatureRadiusCm)/(2*CONSTANTS.ELECTRON_CHARGE_ESU),0.25)
+      : 1;
+    const gamma=Math.max(1,Math.min(potentialLimitedGamma,radiationReactionGamma));
+    const powerErgS=(2*CONSTANTS.ELECTRON_CHARGE_ESU**2*CONSTANTS.C*gamma**4)/(3*curvatureRadiusCm**2);
+    const photonEnergyErg=(3/2)*CONSTANTS.HBAR*CONSTANTS.C*gamma**3/curvatureRadiusCm;
+    const photonEnergyEv=photonEnergyErg/CONSTANTS.ERG_PER_EV;
+    const crossingTimeSeconds=potential.gapHeightCm/CONSTANTS.C;
+    const photonsPerPrimary=photonEnergyErg>0
+      ? powerErgS*crossingTimeSeconds/photonEnergyErg
+      : 0;
+    return {
+      potential,
+      curvatureRadiusRg,
+      curvatureRadiusCm,
+      potentialLimitedGamma,
+      radiationReactionGamma,
+      gamma,
+      limitingRegime:potentialLimitedGamma<=radiationReactionGamma?"potential":"curvature-radiation-reaction",
+      curvaturePowerErgS:powerErgS,
+      characteristicPhotonEnergyErg:photonEnergyErg,
+      characteristicPhotonEnergyEv:photonEnergyEv,
+      crossingTimeSeconds,
+      photonsPerPrimary
+    };
+  }
+
+  function breitWheelerCrossSection(gammaEnergyEv,softPhotonEnergyEv,collisionCosine=-1){
+    const e1=Number(gammaEnergyEv),e2=Number(softPhotonEnergyEv),mu=Number(collisionCosine);
+    if(!Number.isFinite(e1)||e1<0||!Number.isFinite(e2)||e2<0)throw new RangeError("photon energies must be non-negative");
+    if(!Number.isFinite(mu)||mu<-1||mu>1)throw new RangeError("collisionCosine must be in [-1,1]");
+    const x=(e1*e2*(1-mu))/(2*CONSTANTS.ELECTRON_REST_ENERGY_EV**2);
+    if(!(x>1))return {thresholdParameter:x,beta:0,crossSectionCm2:0,aboveThreshold:false};
+    const beta=Math.min(1-1e-15,Math.sqrt(1-1/x));
+    const logTerm=Math.log((1+beta)/(1-beta));
+    const sigma=(3/16)*CONSTANTS.THOMSON_CROSS_SECTION_CM2*(1-beta*beta)*
+      ((3-beta**4)*logTerm-2*beta*(2-beta*beta));
+    return {
+      thresholdParameter:x,
+      beta,
+      crossSectionCm2:Number.isFinite(sigma)&&sigma>0?sigma:0,
+      aboveThreshold:true
+    };
+  }
+
+  function softPhotonFieldAudit(input,options={}){
+    const p=normalizeParams(input);
+    const geometry=kerrGeometry(p.massSolar*CONSTANTS.MSUN,p.spin);
+    const radiusRg=assertFinitePositive(Number(options.softPhotonRadiusRg??2),"softPhotonRadiusRg");
+    const luminosity=assertFinitePositive(Number(options.softPhotonLuminosityErgS??1e36),"softPhotonLuminosityErgS");
+    const energyEv=assertFinitePositive(Number(options.softPhotonEnergyEv??1),"softPhotonEnergyEv");
+    const radiusCm=radiusRg*geometry.rg;
+    const energyErg=energyEv*CONSTANTS.ERG_PER_EV;
+    const energyDensityErgCm3=luminosity/(4*Math.PI*radiusCm*radiusCm*CONSTANTS.C);
+    const numberDensityCm3=energyDensityErgCm3/energyErg;
+    return {
+      model:"isotropic monoenergetic soft-photon proxy",
+      radiusRg,
+      radiusCm,
+      luminosityErgS:luminosity,
+      photonEnergyEv:energyEv,
+      photonEnergyErg:energyErg,
+      energyDensityErgCm3,
+      numberDensityCm3
+    };
+  }
+
+  function gammaGammaPairAudit(input,options={}){
+    const p=normalizeParams(input);
+    const photonEnergyEv=Number(options.gammaPhotonEnergyEv??0);
+    if(!Number.isFinite(photonEnergyEv)||photonEnergyEv<0)throw new RangeError("gammaPhotonEnergyEv must be non-negative");
+    const field=options.softPhotonField||softPhotonFieldAudit(p,options);
+    const pathLengthCm=assertFinitePositive(Number(options.pathLengthCm??kerrGeometry(p.massSolar*CONSTANTS.MSUN,p.spin).rg),"pathLengthCm");
+    const bw=breitWheelerCrossSection(photonEnergyEv,field.photonEnergyEv,options.collisionCosine??-1);
+    const opticalDepth=field.numberDensityCm3*bw.crossSectionCm2*pathLengthCm;
+    const conversionProbability=opticalDepth>700?1:-Math.expm1(-opticalDepth);
+    const headOnThresholdGammaEnergyEv=CONSTANTS.ELECTRON_REST_ENERGY_EV**2/field.photonEnergyEv;
+    return {
+      gammaPhotonEnergyEv:photonEnergyEv,
+      softPhotonField:field,
+      pathLengthCm,
+      breitWheeler:bw,
+      opticalDepth,
+      conversionProbability,
+      headOnThresholdGammaEnergyEv
+    };
+  }
+
+  function gapCascadeAudit(input,options={}){
+    const p=normalizeParams(input);
+    const radiusRg=Number(options.radiusRg??2);
+    const starvation=gapChargeStarvationAudit(p,{
+      radiusRg,
+      plasmaInjectionFraction:options.plasmaInjectionFraction??1,
+      fieldG:options.fieldG??null,
+      fieldLineOmegaFraction:options.fieldLineOmegaFraction??0.5
+    });
+    const potential=gapPotentialDrop(p,{
+      gapHeightRg:options.gapHeightRg??0.1,
+      potentialModel:options.potentialModel??"vacuum-h2",
+      fieldG:options.fieldG??null,
+      fieldLineOmegaFraction:options.fieldLineOmegaFraction??0.5,
+      chargeDeficitFraction:starvation.chargeDeficitFraction
+    });
+    const curvature=curvatureRadiationAudit(p,{
+      potential,
+      curvatureRadiusRg:options.curvatureRadiusRg??1
+    });
+    const softPhotonField=softPhotonFieldAudit(p,{
+      softPhotonRadiusRg:options.softPhotonRadiusRg??radiusRg,
+      softPhotonLuminosityErgS:options.softPhotonLuminosityErgS??1e36,
+      softPhotonEnergyEv:options.softPhotonEnergyEv??1
+    });
+    const gammaGamma=gammaGammaPairAudit(p,{
+      gammaPhotonEnergyEv:curvature.characteristicPhotonEnergyEv,
+      softPhotonField,
+      pathLengthCm:potential.gapHeightCm,
+      collisionCosine:options.collisionCosine??-1
+    });
+    const geometry=kerrGeometry(p.massSolar*CONSTANTS.MSUN,p.spin);
+    const coveringFraction=Number(options.coveringFraction??1);
+    if(!(coveringFraction>0&&coveringFraction<=1))throw new RangeError("coveringFraction must satisfy 0 < f <= 1");
+    const areaCm2=4*Math.PI*(radiusRg*geometry.rg)**2*coveringFraction;
+    const primaryDensityCm3=Math.min(
+      starvation.availableChargeDensityCm3,
+      starvation.goldreichJulian.numberDensityCm3
+    );
+    const primaryFluxPerSecond=primaryDensityCm3*CONSTANTS.C*areaCm2;
+    const gammaRatePerSecond=primaryFluxPerSecond*curvature.photonsPerPrimary;
+    const rawPairRatePerSecond=gammaRatePerSecond*gammaGamma.conversionProbability;
+    const multiplicityOneGeneration=curvature.photonsPerPrimary*gammaGamma.conversionProbability;
+    const electricalPowerErgS=primaryFluxPerSecond*potential.voltageV*CONSTANTS.ERG_PER_EV;
+    const energyLimitedPairRatePerSecond=electricalPowerErgS/CONSTANTS.PAIR_REST_ENERGY_ERG;
+    const cappedPairRatePerSecond=Math.min(rawPairRatePerSecond,energyLimitedPairRatePerSecond);
+    const closureChargeFluxPerSecond=2*cappedPairRatePerSecond;
+    const gjChargeFluxPerSecond=starvation.goldreichJulian.numberDensityCm3*CONSTANTS.C*areaCm2;
+    const closureSupplyRatio=gjChargeFluxPerSecond>0?closureChargeFluxPerSecond/gjChargeFluxPerSecond:0;
+    const schwinger=schwingerPairProduction(p,{
+      electricFieldVcm:potential.averageParallelElectricFieldVcm,
+      radiusRg,
+      thicknessRg:potential.gapHeightRg,
+      fillingFactor:coveringFraction,
+      availablePowerErgS:electricalPowerErgS
+    });
+    return {
+      status:starvation.starved?"charge-starved-gap-candidate":"screened-by-charge-supply-proxy",
+      radiusRg,
+      coveringFraction,
+      starvation,
+      potential,
+      curvature,
+      softPhotonField,
+      gammaGamma,
+      areaCm2,
+      primaryDensityCm3,
+      primaryFluxPerSecond,
+      gammaRatePerSecond,
+      multiplicityOneGeneration,
+      cascadeSelfSustaining:multiplicityOneGeneration>=1,
+      rawPairRatePerSecond,
+      electricalPowerErgS,
+      energyLimitedPairRatePerSecond,
+      cappedPairRatePerSecond,
+      pairRateToBulgeTarget:cappedPairRatePerSecond/CONSTANTS.POSITRON_RATE_OBS_511,
+      gjChargeFluxPerSecond,
+      closureChargeFluxPerSecond,
+      closureSupplyRatio,
+      canRefillGoldreichJulian:closureSupplyRatio>=1,
+      schwinger,
+      caveats:[
+        "n_GJ is a classical order-of-magnitude scale, not the full Kerr rho_GJ.",
+        "The accretion density is only a charge-supply proxy; funnel injection is parameterized by plasmaInjectionFraction.",
+        "The gap-potential scaling is analytic and one-dimensional, not a GR Poisson solution.",
+        "Curvature emission is represented by one characteristic photon energy.",
+        "The soft photon bath is isotropic and monoenergetic; inverse-Compton emission and spectral transport are omitted.",
+        "A one-generation multiplicity >= 1 is only a cascade-closure diagnostic, not a time-dependent PIC solution.",
+        "pairRateToBulgeTarget is a production-rate comparison only; it does not imply that near-BH pairs feed the Galactic 511-keV morphology."
+      ]
+    };
+  }
+
   function gapElectrodynamicsAudit(input,options={}){
-    const p=normalizeParams(input),field=gapParallelElectricField(p,options),required=inferSchwingerFieldForObservedRate(p,{radiusRg:options.activeRadiusRg||1,thicknessRg:options.activeThicknessRg||1,fillingFactor:options.fillingFactor||1}),ratio=field.parallelElectricFieldVcm/required.electricFieldVcm;
-    const rawPairs=schwingerPairProduction(p,{electricFieldVcm:field.parallelElectricFieldVcm,radiusRg:options.activeRadiusRg||1,thicknessRg:options.activeThicknessRg||1,fillingFactor:options.fillingFactor||1});
-    return {status:"upper-bound-scale",field,required,fieldToRequiredRatio:ratio,fieldDeficitDex:ratio>0?-Math.log10(ratio):Number.POSITIVE_INFINITY,schwingerAtGapField:rawPairs,caveats:["E~(Omega_F r/c)B is an unscreened rotational scale, not a GR gap Poisson solution.","Force-free plasma screens E_parallel; screeningFraction=1 is therefore an optimistic ceiling.","Real black-hole gaps are regulated by pair cascades, radiation and soft-photon fields.","Schwinger vacuum production is distinct from gamma-gamma pair cascades usually studied in BH gaps."]};
+    const p=normalizeParams(input);
+    const legacyField=gapParallelElectricField(p,options);
+    const required=inferSchwingerFieldForObservedRate(p,{radiusRg:options.activeRadiusRg||1,thicknessRg:options.activeThicknessRg||1,fillingFactor:options.fillingFactor||1});
+    const ratio=legacyField.parallelElectricFieldVcm/required.electricFieldVcm;
+    const rawPairs=schwingerPairProduction(p,{electricFieldVcm:legacyField.parallelElectricFieldVcm,radiusRg:options.activeRadiusRg||1,thicknessRg:options.activeThicknessRg||1,fillingFactor:options.fillingFactor||1});
+    const cascade=gapCascadeAudit(p,options);
+    return {
+      status:"gap-cascade-audit",
+      field:legacyField,
+      required,
+      fieldToRequiredRatio:ratio,
+      fieldDeficitDex:ratio>0?-Math.log10(ratio):Number.POSITIVE_INFINITY,
+      schwingerAtGapField:rawPairs,
+      cascade,
+      caveats:[
+        "The legacy E~(Omega_F r/c)B value is retained only as an unscreened comparison scale.",
+        "v8.6 evaluates charge starvation, an analytic gap potential, curvature photons and gamma-gamma conversion separately.",
+        "The cascade layer remains diagnostic; full gap electrodynamics requires time-dependent GR kinetic/PIC modelling."
+      ]
+    };
   }
 
   function deficitOrders(value, target = 1) {
@@ -3781,6 +4092,14 @@
     statvoltPerCmToVoltPerCm,
     blackHoleRotationalField,
     gapParallelElectricField,
+    goldreichJulianDensityScale,
+    gapChargeStarvationAudit,
+    gapPotentialDrop,
+    curvatureRadiationAudit,
+    breitWheelerCrossSection,
+    softPhotonFieldAudit,
+    gammaGammaPairAudit,
+    gapCascadeAudit,
     gapElectrodynamicsAudit,
     PRESETS,
     mdotGsFromMsunPerYear,
