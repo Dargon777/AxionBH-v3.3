@@ -1,85 +1,99 @@
 <!doctype html>
-<html lang="ru" data-theme="dark">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="AxionBH interactive browser simulator and parameter-analysis workbench.">
-  <title>AxionBH — Research Workbench v8.9.0</title>
+  <meta name="description" content="AxionBH v8.9.1 interactive browser workbench for black-hole, plasma, pair-production and Galactic 511-keV model diagnostics.">
+  <meta name="theme-color" content="#070b12">
+  <meta name="color-scheme" content="dark light">
+  <link rel="canonical" href="https://dargon777.github.io/AxionBH-v3.3/sim.html">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="site.webmanifest">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="AxionBH — Research Workbench v8.9.1">
+  <meta property="og:description" content="Interactive exploratory workbench for AxionBH model diagnostics and reproducible parameter studies.">
+  <meta property="og:url" content="https://dargon777.github.io/AxionBH-v3.3/sim.html">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="AxionBH — Research Workbench v8.9.1">
+  <meta name="twitter:description" content="Interactive exploratory workbench for black-hole, plasma, pair-production and 511-keV diagnostics.">
+  <title>AxionBH — Research Workbench v8.9.1</title>
   <link rel="stylesheet" href="simulator.css">
   <script defer src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <script defer src="simulator-core.js"></script>
   <script defer src="simulator-app.js"></script>
 </head>
 <body>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
   <header class="topbar">
     <div class="topbar-inner">
       <a class="brand" href="index.html">
         <span class="brand-mark">A</span>
-        <span>AxionBH<small>research workbench · v8.9.0</small></span>
+        <span>AxionBH<small>research workbench · v8.9.1</small></span>
       </a>
       <nav class="nav">
-        <a href="index.html">Теория</a>
-        <a href="sim.html">Симулятор</a>
-        <button id="themeBtn" class="ghost-btn" type="button">◐ Тема</button>
+        <a href="index.html">Overview</a>
+        <a href="sim.html" aria-current="page">Workbench</a>
+        <button id="themeBtn" class="ghost-btn" type="button">◐ Theme</button>
       </nav>
     </div>
   </header>
 
-  <main class="shell">
+  <main id="main-content" class="shell">
     <section class="hero">
       <div>
         <div class="eyebrow">AxionBH · research workbench</div>
-        <h1>Аксионное облако вокруг вращающейся чёрной дыры</h1>
-        <p>Локальный интерактивный расчёт CVE closure, Bosenova, суперрадиантного и гибридного режимов — теперь со сравнением сценариев, картой параметров, анализом чувствительности, inverse inference, картой дефицита и accretion→plasma closure, Sgr A* accretion/geometry calibration, finite-mass transport, Chirality, Missing Physics и явной картой validity слоёв.</p>
+        <h1>AxionBH model explorer for rotating black-hole environments</h1>
+        <p>A local interactive workbench for the stationary CVE closure, Bosenova, scalar superradiance and hybrid branches, with scenario comparison, parameter maps, sensitivity analysis, inverse diagnostics, accretion→plasma closure, gap and pair-cascade diagnostics, positron transport, and explicit model-validity layers.</p>
       </div>
       <div class="status-stack">
-        <span class="badge"><span id="runStatusDot" class="dot"></span><span id="runStatus">Движок готов</span></span>
+        <span class="badge"><span id="runStatusDot" class="dot"></span><span id="runStatus" role="status" aria-live="polite">Engine ready</span></span>
         <span class="badge">local-only · reproducible</span>
       </div>
     </section>
 
     <div class="notice">
-      <strong>Исследовательский калькулятор.</strong> AxionBH реализует текущие допущения модели и не является подтверждённым инструментом наблюдательной астрофизики. В v8.9.0 модель разбита на явные слои; CVE closure считается в natural units, порог a/M = 0.35 остаётся феноменологическим gate, а не выведенным результатом.
+      <strong>Exploratory research calculator.</strong> AxionBH implements the current assumptions of the model; it is not a validated observational-astrophysics inference tool. In v8.9.1 the model is split into explicit layers. The stationary CVE closure is evaluated in natural units, while the a/M = 0.35 switch remains a phenomenological gate rather than a derived threshold.
     </div>
 
     <section class="workspace">
       <aside class="panel controls">
         <div class="panel-title">
-          <h2>Параметры</h2>
+          <h2>Parameters</h2>
           <span class="muted">v8.9.0</span>
         </div>
 
         <div class="field">
-          <label for="preset">Сценарий</label>
+          <label for="preset">Scenario</label>
           <select id="preset" class="select">
-            <option value="baseline">Sgr A* baseline</option>
+            <option value="baseline">Sgr A* · EHT-context baseline</option>
+            <option value="legacy">Legacy AxionBH baseline</option>
             <option value="breakthrough">High-B breakthrough</option>
             <option value="optimistic">Optimistic</option>
-            <option value="custom">Пользовательский</option>
+            <option value="custom">Custom</option>
           </select>
           <div class="preset-actions">
-            <button id="savePresetBtn" class="mini-btn" type="button">+ Сохранить</button>
-            <button id="deletePresetBtn" class="mini-btn" type="button" disabled>Удалить</button>
+            <button id="savePresetBtn" class="mini-btn" type="button">+ Save</button>
+            <button id="deletePresetBtn" class="mini-btn" type="button" disabled>Delete</button>
           </div>
         </div>
 
         <div class="field">
-          <label for="mode">Режим</label>
+          <label for="mode">Mode</label>
           <select id="mode" class="select">
-            <option value="cme">CVE closure / стационарное облако</option>
-            <option value="bosenova">Bosenova / ручные вспышки</option>
-            <option value="superradiant">Суперрадиантный рост</option>
+            <option value="cme">CVE closure / stationary cloud</option>
+            <option value="bosenova">Bosenova / manual bursts</option>
+            <option value="superradiant">Scalar superradiant growth</option>
             <option value="hybrid">Superradiant + Bosenova</option>
           </select>
         </div>
 
         <div class="grid-2">
-          <div class="field"><label>Масса, M☉</label><input id="massSolar" class="input" type="number" step="any"></div>
+          <div class="field"><label>Mass, M☉</label><input id="massSolar" class="input" type="number" step="any"></div>
           <div class="field"><label>Ṁ, g/s</label><input id="mdot" class="input" type="number" step="any"></div>
         </div>
 
         <div class="field">
-          <label>Спин a/M</label>
+          <label>Spin a/M</label>
           <div class="range-row"><input id="spin" type="range" min="0" max="0.998" step="0.001"><span id="spinOut" class="range-value"></span></div>
         </div>
         <div class="field">
@@ -109,11 +123,11 @@
           <div class="field accretion-closure-field"><label>|v_r| / c</label><input id="radialVelocityFracC" class="input" type="number" min="0.000001" max="1" step="any"></div>
           <div class="field accretion-closure-field"><label>H / r</label><input id="scaleHeightRatio" class="input" type="number" min="0.000001" step="any"></div>
           <div class="field accretion-closure-field"><label>Y_e</label><input id="electronFractionYe" class="input" type="number" min="0.000001" max="1" step="any"></div>
-          <div class="field"><label>Профиль B(r), n</label><input id="nProfile" class="input" type="number" min="0.01" step="0.1"></div>
+          <div class="field"><label>B(r) profile, n</label><input id="nProfile" class="input" type="number" min="0.01" step="0.1"></div>
         </div>
 
         <div id="axionMassField" class="field hidden">
-          <label>Масса аксиона mₐ, eV</label>
+          <label>Axion mass mₐ, eV</label>
           <input id="axionMassEv" class="input" type="number" step="any">
         </div>
 
@@ -131,38 +145,39 @@
           <div class="section-divider"></div>
           <div class="panel-title"><h3>Bosenova</h3><span class="muted">burst model</span></div>
           <div id="burstManualFields" class="grid-2">
-            <div class="field"><label>Энергия вспышки, erg</label><input id="burstEnergy" class="input" type="number" step="any"></div>
-            <div class="field"><label>Интервал, лет</label><input id="burstIntervalYears" class="input" type="number" step="any"></div>
+            <div class="field"><label>Burst energy, erg</label><input id="burstEnergy" class="input" type="number" step="any"></div>
+            <div class="field"><label>Interval, years</label><input id="burstIntervalYears" class="input" type="number" step="any"></div>
           </div>
-          <div class="field"><label>Длительность, s</label><input id="burstDuration" class="input" type="number" step="any"></div>
+          <div class="field"><label>Duration, s</label><input id="burstDuration" class="input" type="number" step="any"></div>
         </div>
 
         <div id="conversionEfficiencyField" class="field hidden">
           <div class="section-divider"></div>
           <label>Phenomenological pair-conversion efficiency ε_pair</label>
           <input id="burstEfficiency" class="input" type="number" min="0" max="1" step="any">
-          <p class="muted">Эта величина не является выведенной микрофизикой axion → e⁺e⁻; она остаётся явным energy-conversion proxy.</p>
+          <p class="muted">This quantity is not derived axion → e⁺e⁻ microphysics; it remains an explicit phenomenological energy-conversion proxy.</p>
         </div>
 
         <div class="actions">
-          <button id="runBtn" class="btn btn-primary" type="button">Рассчитать</button>
-          <button id="shareBtn" class="btn btn-secondary" type="button">Ссылка</button>
+          <button id="runBtn" class="btn btn-primary" type="button">Run <span class="kbd">⌘/Ctrl ↵</span></button>
+          <button id="resetBtn" class="btn btn-secondary" type="button">Reset</button>
+          <button id="shareBtn" class="btn btn-secondary" type="button">Share</button>
         </div>
       </aside>
 
       <section class="results">
         <div id="emptyState" class="panel empty">
-          <div><strong>Результаты появятся здесь</strong>Выбери параметры и запусти расчёт.</div>
+          <div><strong>Results will appear here</strong>Choose parameters and run the calculation.</div>
         </div>
 
-        <div id="resultArea" class="hidden">
+        <div id="resultArea" class="hidden" aria-live="polite">
           <div id="metricGrid" class="metric-grid"></div>
 
           <div class="panel result-panel" style="margin-top:18px">
             <div class="result-head">
-              <div><h2>Результат</h2><div id="modeBadge" class="muted"></div></div>
+              <div><h2>Result</h2><div id="modeBadge" class="muted"></div></div>
               <div class="inline-actions">
-                <button id="copyBtn" class="ghost-btn" type="button">Копировать</button>
+                <button id="copyBtn" class="ghost-btn" type="button">Copy</button>
                 <button id="exportBtn" class="ghost-btn" type="button">JSON</button>
                 <button id="reportBtn" class="ghost-btn" type="button">Report</button>
               </div>
@@ -176,10 +191,10 @@
         <div class="panel chart-panel">
           <div class="result-head analysis-head">
             <div>
-              <h2 id="analysisTitle">κ как функция спина</h2>
-              <div id="analysisSubtitle" class="muted">CVE closure · логарифмическая шкала</div>
+              <h2 id="analysisTitle">κ as a function of spin</h2>
+              <div id="analysisSubtitle" class="muted">CVE closure · logarithmic scale</div>
             </div>
-            <div class="analysis-tabs" role="tablist" aria-label="Анализ">
+            <div class="analysis-tabs" role="tablist" aria-label="Analysis">
               <button class="analysis-tab active" data-analysis="spin" type="button">κ(spin)</button>
               <button class="analysis-tab" data-analysis="explorer" type="button">3D Explorer</button>
               <button class="analysis-tab" data-analysis="sensitivity" type="button">Sensitivity</button>
@@ -195,13 +210,13 @@
               <button class="analysis-tab" data-analysis="validity" type="button">Validity</button>
               <button class="analysis-tab" data-analysis="chirality" type="button">Chirality</button>
               <button class="analysis-tab" data-analysis="missing" type="button">New Physics</button>
-              <button class="analysis-tab" data-analysis="compare" type="button">Сценарии</button>
+              <button class="analysis-tab" data-analysis="compare" type="button">Scenarios</button>
             </div>
           </div>
 
           <div id="explorerControls" class="explorer-controls hidden">
             <div class="explorer-field">
-              <label for="explorerView">Вид</label>
+              <label for="explorerView">View</label>
               <select id="explorerView" class="select compact-select">
                 <option value="surface">Surface A / B</option>
                 <option value="contour">Contour A / B</option>
@@ -210,9 +225,10 @@
               </select>
             </div>
             <div class="explorer-field">
-              <label for="explorerReference">Модель B</label>
+              <label for="explorerReference">Model B</label>
               <select id="explorerReference" class="select compact-select">
-                <option value="baseline">Sgr A* baseline</option>
+                <option value="baseline">Sgr A* · EHT-context baseline</option>
+            <option value="legacy">Legacy AxionBH baseline</option>
                 <option value="breakthrough">High-B breakthrough</option>
                 <option value="optimistic">Optimistic</option>
               </select>
@@ -225,7 +241,7 @@
               </div>
             </div>
             <div class="explorer-field">
-              <label for="explorerResolution">Сетка</label>
+              <label for="explorerResolution">Grid</label>
               <select id="explorerResolution" class="select compact-select">
                 <option value="low">Low · 14×10</option>
                 <option value="medium" selected>Medium · 20×15</option>
@@ -233,7 +249,7 @@
               </select>
             </div>
             <div class="explorer-field explorer-export">
-              <label>Данные</label>
+              <label>Data</label>
               <button id="explorerCsvBtn" class="mini-btn" type="button">CSV grid</button>
             </div>
           </div>
@@ -457,7 +473,7 @@
 
           <div id="missingPhysicsControls" class="explorer-controls missing-controls hidden">
             <div class="explorer-field">
-              <label for="missingPlacement">Куда входит g_extra</label>
+              <label for="missingPlacement">g_extra placement</label>
               <select id="missingPlacement" class="select compact-select">
                 <option value="source">Closure source</option>
                 <option value="chiral">Axion → μ₅ coupling</option>
@@ -473,7 +489,7 @@
             </div>
           </div>
 
-          <div id="analysisBusy" class="analysis-busy hidden">Считаю сетку…</div>
+          <div id="analysisBusy" class="analysis-busy hidden" role="status" aria-live="polite">Computing grid…</div>
           <div id="plot"></div>
           <div id="analysisTable" class="analysis-table hidden"></div>
         </div>
@@ -483,8 +499,8 @@
 
   <footer class="footer">
     <span>AxionBH Collaboration · 2026</span>
-    <span>Расчёты и пользовательские пресеты остаются локально в браузере.</span>
+    <span>Calculations and user presets remain local in your browser.</span>
   </footer>
-  <div id="toast" class="toast"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
 </body>
 </html>
