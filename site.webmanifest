@@ -1,0 +1,18 @@
+{
+  "name": "AxionBH Research Workbench",
+  "short_name": "AxionBH",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#070912",
+  "theme_color": "#070912",
+  "description": "Exploratory browser workbench for black-hole, plasma, pair-production and Galactic 511-keV model diagnostics.",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
