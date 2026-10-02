@@ -178,7 +178,7 @@ console.log("AxionBH simulator-core tests passed");
   const comparison = A.comparePresets("cme");
   assert.deepEqual(
     comparison.map((item) => item.name),
-    ["baseline", "breakthrough", "optimistic"]
+    ["baseline", "legacy", "breakthrough", "optimistic"]
   );
   assert.ok(comparison.every((item) => Number.isFinite(item.metric)));
 }
@@ -817,6 +817,17 @@ console.log("AxionBH simulator-core tests passed");
   const gs = A.mdotGsFromMsunPerYear(rate);
   const roundtrip = A.mdotMsunPerYearFromGs(gs);
   assert.ok(Math.abs(roundtrip / rate - 1) < 1e-14);
+}
+
+{
+  assert.equal(A.MODEL_VERSION, "8.9.1");
+  const eht = A.ACCRETION_CALIBRATIONS.eht2023;
+  const baselineRate = A.mdotMsunPerYearFromGs(A.PRESETS.baseline.mdot);
+  assert.ok(baselineRate >= eht.minMsunPerYear);
+  assert.ok(baselineRate <= eht.maxMsunPerYear);
+  assert.equal(A.PRESETS.baseline.electronDensityMode, 2);
+  assert.equal(A.PRESETS.legacy.mdot, A.DEFAULTS.mdot);
+  assert.equal(A.PRESETS.legacy.electronDensityMode, A.DEFAULTS.electronDensityMode);
 }
 
 {
