@@ -1,814 +1,529 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AxionBH – Гравитационная барионная конверсия</title>
-    <!-- Bootstrap 5 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- MathJax для формул -->
-    <script>
-        MathJax = {
-            tex: {
-                inlineMath: [['$', '$'], ['\\(', '\\)']],
-                displayMath: [['$$', '$$'], ['\\[', '\\]']]
-            },
-            svg: {
-                fontCache: 'global'
-            }
-        };
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
-    <style>
-        body {
-            padding-top: 70px;
-            scroll-behavior: smooth;
-        }
-        .formula-block {
-            background: #f8f9fa;
-            border-left: 4px solid #0d6efd;
-            padding: 15px;
-            margin: 20px 0;
-            overflow-x: auto;
-        }
-        .toc {
-            position: sticky;
-            top: 80px;
-        }
-        h2 {
-            border-bottom: 2px solid #0d6efd;
-            padding-bottom: 5px;
-            margin-top: 40px;
-        }
-        h3 {
-            margin-top: 30px;
-        }
-        footer {
-            background: #212529;
-            color: white;
-            padding: 20px 0;
-            margin-top: 50px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="AxionBH v8.9.0 — exploratory black-hole, pair-production and Galactic 511-keV research workbench.">
+  <title>AxionBH v8.9.0 — Research Workbench</title>
+  <style>
+    :root {
+      --bg: #070912;
+      --bg2: #0c1020;
+      --panel: rgba(17, 23, 42, .74);
+      --panel2: rgba(24, 31, 56, .64);
+      --text: #eef2ff;
+      --muted: #aab4d0;
+      --line: rgba(153, 169, 255, .18);
+      --accent: #8b7cff;
+      --accent2: #3dd9c5;
+      --warn: #ffca72;
+      --bad: #ff7d9c;
+      --good: #69e2aa;
+      --shadow: 0 22px 70px rgba(0,0,0,.32);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 15% 0%, rgba(92, 69, 255, .18), transparent 34rem),
+        radial-gradient(circle at 92% 15%, rgba(22, 212, 190, .10), transparent 32rem),
+        linear-gradient(180deg, #060810 0%, #090d18 48%, #070912 100%);
+      font: 16px/1.68 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      min-height: 100vh;
+    }
+    a { color: inherit; }
+    .wrap { width: min(1180px, calc(100% - 32px)); margin: 0 auto; }
+    nav {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(7,9,18,.76);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(18px);
+    }
+    .nav-inner {
+      min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 18px;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 800; letter-spacing: .08em; }
+    .brand-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent2); box-shadow: 0 0 22px rgba(61,217,197,.75); }
+    .nav-links { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+    .nav-links a { color: var(--muted); text-decoration: none; font-size: .92rem; }
+    .nav-links a:hover { color: var(--text); }
+    .button {
+      display: inline-flex; align-items: center; justify-content: center;
+      gap: 8px; min-height: 42px; padding: 0 16px; border-radius: 12px;
+      text-decoration: none; font-weight: 700;
+      border: 1px solid rgba(139,124,255,.5);
+      background: linear-gradient(135deg, rgba(139,124,255,.24), rgba(61,217,197,.10));
+      box-shadow: inset 0 0 20px rgba(139,124,255,.06);
+    }
+    .button.secondary { color: var(--muted); background: rgba(255,255,255,.025); border-color: var(--line); }
+    .hero { padding: 92px 0 56px; }
+    .eyebrow { color: var(--accent2); text-transform: uppercase; letter-spacing: .16em; font-size: .78rem; font-weight: 800; }
+    h1 {
+      margin: 10px 0 18px; max-width: 930px; font-size: clamp(3.1rem, 9vw, 7rem);
+      line-height: .9; letter-spacing: -.065em;
+      background: linear-gradient(110deg, #fff 18%, #a89cff 56%, #59e5d4 100%);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .hero p { max-width: 850px; color: var(--muted); font-size: clamp(1.05rem, 2vw, 1.28rem); }
+    .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 28px; }
+    .badges { display: flex; gap: 8px; flex-wrap: wrap; margin: 28px 0 0; }
+    .badge {
+      padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px;
+      color: #cfd7f2; background: rgba(255,255,255,.03); font-size: .82rem;
+    }
+    section { padding: 54px 0; }
+    .section-head { display: grid; grid-template-columns: 1fr 1.3fr; gap: 32px; align-items: end; margin-bottom: 26px; }
+    h2 { margin: 0; font-size: clamp(2rem, 4vw, 3.25rem); letter-spacing: -.035em; line-height: 1.06; }
+    h3 { margin: 0 0 10px; font-size: 1.12rem; }
+    .section-head p, .muted { color: var(--muted); }
+    .grid { display: grid; gap: 16px; }
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .card {
+      border: 1px solid var(--line);
+      background: linear-gradient(160deg, var(--panel), rgba(11,15,29,.68));
+      border-radius: 20px; padding: 22px;
+      box-shadow: var(--shadow);
+    }
+    .card p { color: var(--muted); margin: 8px 0 0; }
+    .card strong { color: var(--text); }
+    .status {
+      display: inline-flex; align-items: center; gap: 7px; margin-bottom: 14px;
+      font-size: .76rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em;
+    }
+    .status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 14px currentColor; }
+    .status.experimental { color: var(--warn); }
+    .status.implemented { color: var(--good); }
+    .status.audit { color: #9bb6ff; }
+    .status.open { color: var(--bad); }
+    .pipeline {
+      display: grid; grid-template-columns: repeat(7, minmax(0,1fr)); gap: 8px; align-items: stretch;
+    }
+    .step {
+      position: relative; padding: 18px 14px; border-radius: 16px; border: 1px solid var(--line);
+      background: var(--panel2); min-height: 112px;
+    }
+    .step b { display: block; margin-bottom: 6px; font-size: .94rem; }
+    .step span { color: var(--muted); font-size: .82rem; line-height: 1.45; }
+    .step:not(:last-child)::after {
+      content: "→"; position: absolute; right: -9px; top: 42%; z-index: 2; color: var(--accent2); font-weight: 900;
+    }
+    .callout {
+      border: 1px solid rgba(61,217,197,.22);
+      background: linear-gradient(135deg, rgba(61,217,197,.08), rgba(139,124,255,.08));
+      border-radius: 22px; padding: 24px;
+    }
+    .metric { font-size: 1.7rem; font-weight: 850; letter-spacing: -.035em; }
+    .metric small { display: block; margin-top: 4px; color: var(--muted); font-size: .84rem; font-weight: 500; letter-spacing: 0; }
+    .timeline { border-left: 1px solid var(--line); margin-left: 8px; padding-left: 24px; display: grid; gap: 22px; }
+    .timeline-item { position: relative; }
+    .timeline-item::before {
+      content:""; position:absolute; left:-29px; top:.55em; width:9px; height:9px; border-radius:50%;
+      background: var(--accent); box-shadow: 0 0 18px rgba(139,124,255,.75);
+    }
+    .timeline-item b { color: var(--accent2); }
+    code {
+      color: #dcd7ff; background: rgba(139,124,255,.10); border: 1px solid rgba(139,124,255,.14);
+      border-radius: 6px; padding: 2px 6px;
+    }
+    ul.clean { padding-left: 1.15rem; margin: 10px 0 0; color: var(--muted); }
+    ul.clean li { margin: 7px 0; }
+    .refs a { color: #b9b0ff; text-decoration: none; }
+    .refs a:hover { text-decoration: underline; }
+    footer {
+      border-top: 1px solid var(--line); margin-top: 54px; padding: 30px 0 46px; color: var(--muted);
+    }
+    .footer-inner { display:flex; justify-content:space-between; gap:20px; flex-wrap:wrap; }
+    @media (max-width: 900px) {
+      .nav-links a:not(.button) { display:none; }
+      .section-head { grid-template-columns: 1fr; }
+      .grid.three { grid-template-columns: 1fr; }
+      .pipeline { grid-template-columns: 1fr 1fr; }
+      .step:not(:last-child)::after { display:none; }
+    }
+    @media (max-width: 680px) {
+      .grid.two, .pipeline { grid-template-columns: 1fr; }
+      .hero { padding-top: 68px; }
+      h1 { font-size: clamp(3.2rem, 17vw, 5.2rem); }
+    }
+  </style>
 </head>
 <body>
-    <!-- Навигационная панель -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
-        <div class="container">
-            <a class="navbar-brand" href="#">AxionBH</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav">
-                    <li class="nav-item"><a class="nav-link active" href="index.html">Теория</a></li>
-                    <li class="nav-item"><a class="nav-link" href="sim.html">Симулятор</a></li>
-                </ul>
-            </div>
-        </div>
-    </nav>
-
-    <!-- Основное содержимое -->
-    <div class="container">
-        <div class="row">
-            <!-- Боковое оглавление (скрыто на мобильных) -->
-            <div class="col-md-3 d-none d-md-block">
-                <nav class="toc">
-                    <h5>Содержание</h5>
-                    <ul class="nav flex-column">
-                        <li class="nav-item"><a class="nav-link" href="#intro">1. Введение</a></li>
-                        <li class="nav-item"><a class="nav-link" href="#lagrangian">2. Лагранжиан</a></li>
-                        <li class="nav-item"><a class="nav-link" href="#regimes">3. Два режима</a></li>
-                        <li class="nav-item"><a class="nav-link" href="#math">4. Математика Режима II</a></li>
-                        <li class="nav-item"><a class="nav-link" href="#numerics">5. Численная реализация</a></li>
-                        <li class="nav-item"><a class="nav-link" href="#results">6. Результаты</a></li>
-                        <li class="nav-item"><a class="nav-link" href="#predictions">7. Предсказания</a></li>
-                        <li class="nav-item"><a class="nav-link" href="#discussion">8. Обсуждение</a></li>
-                        <li class="nav-item"><a class="nav-link" href="#conclusion">9. Заключение</a></li>
-                    </ul>
-                </nav>
-            </div>
-
-            <!-- Основной текст -->
-            <div class="col-md-9">
-                <h1 class="mt-4">Гравитационная барионная конверсия в чёрных дырах</h1>
-                <p class="lead">Модель, в которой чёрные дыры превращают обычную материю в антиматерию, объясняя барионную асимметрию Вселенной и линию 511 кэВ.</p>
-                <p><strong>Авторы:</strong> Dg, G., D., C.<br>
-                <strong>Дата:</strong> 31 мая 2026 г. | <strong>Версия:</strong> 6.2</p>
-
-                <!-- 1. Введение -->
-                <h2 id="intro">1. Введение</h2>
-                <p>
-                    Современная астрофизика сталкивается с двумя фундаментальными загадками:
-                </p>
-                <ul>
-                    <li><strong>Барионная асимметрия Вселенной:</strong> наблюдаемое отношение разности плотностей барионов и антибарионов к плотности фотонов составляет $\eta \equiv (n_B - n_{\bar{B}})/n_\gamma \approx 6 \times 10^{-10}$. Стандартные модели (электрослабый бариогенез) испытывают количественные трудности.</li>
-                    <li><strong>Избыток позитронов в центре Галактики:</strong> аннигиляционная линия 511 кэВ имеет светимость около $1.07 \times 10^{43}$ эрг/с, что трудно объяснить известными астрофизическими источниками.</li>
-                </ul>
-                <p>
-                    Мы предлагаем альтернативный подход: <strong>чёрные дыры являются не пассивными поглотителями, а активными конвертерами барионного заряда</strong>. Внутри них, благодаря топологическим эффектам и аксионному полю, обычная материя превращается в антиматерию. Эта идея реализуется в рамках единого лагранжиана, который в разных условиях проявляется как два различных режима.
-                </p>
-
-                <!-- 2. Лагранжиан -->
-                <h2 id="lagrangian">2. Фундаментальный лагранжиан</h2>
-                <p>
-                    Остов теории составляет следующий лагранжиан, включающий эйнштейновскую гравитацию, динамическое псевдоскалярное поле $a(x)$ (аксион) и дилатон $\phi(x)$:
-                </p>
-                <div class="formula-block">
-                    $$
-                    \boxed{
-                    \begin{aligned}
-                    \mathcal{L} &= \frac{M_{Pl}^2}{2}R 
-                    + \frac{1}{2}e^{-\gamma \phi/M_{Pl}} g^{\mu\nu}\partial_\mu a \partial_\nu a 
-                    - V(a, K, \phi) \\
-                    &\quad + \frac{a}{f_a}\frac{1}{32\pi^2}\left(\alpha_R R_{\mu\nu\rho\sigma}\tilde{R}^{\mu\nu\rho\sigma} 
-                    + \alpha_F F_{\mu\nu}\tilde{F}^{\mu\nu}\right) \\
-                    &\quad + \mathcal{L}_{\text{SM}} 
-                    + \frac{\partial_\mu a}{f_a}\sum_i c_i \bar{\psi}_i \gamma^\mu \gamma_5 \psi_i,
-                    \end{aligned}
-                    }
-                    $$
-                </div>
-                <p>где:</p>
-                <ul>
-                    <li>$M_{Pl} = (8\pi G)^{-1/2}$ — редуцированная планковская масса,</li>
-                    <li>$R$ — скалярная кривизна,</li>
-                    <li>$\gamma$ — безразмерная константа связи дилатона с аксионом,</li>
-                    <li>$V(a, K, \phi)$ — потенциал аксиона, зависящий от скаляра Кречмана $K \equiv R_{\mu\nu\rho\sigma}R^{\mu\nu\rho\sigma}$,</li>
-                    <li>$\alpha_R, \alpha_F \sim \mathcal{O}(1)$ — коэффициенты связи с гравитационной и электромагнитной аномалиями,</li>
-                    <li>$f_a$ — затравочная константа затухания аксиона (типично $\sim 10^{16}$ ГэВ),</li>
-                    <li>$c_i$ — модельно-зависимые коэффициенты связи с фермионами Стандартной модели.</li>
-                </ul>
-
-                <h3>Потенциал $V(a, K, \phi)$</h3>
-                <p>
-                    Потенциал строится так, чтобы минимум для $a$ смещался при достижении критической кривизны, характеризуемой скаляром Кречмана $K$:
-                </p>
-                <div class="formula-block">
-                    $$
-                    V(a, K, \phi) = e^{\kappa \phi/M_{Pl}} \Lambda^4 
-                    \left[ 1 - \cos\left( \frac{a}{f_a} - \pi \frac{K^2}{K^2 + K_{\rm crit}^2} \right) \right] 
-                    + \frac{1}{2}m_\phi^2 \phi^2.
-                    $$
-                </div>
-                <p>
-                    При $K \ll K_{\rm crit}$ минимум находится в $a=0$ (обычное пространство-время). 
-                    При $K \gtrsim K_{\rm crit}$ минимум смещается к $a = \pi f_a$, что соответствует «анти-состоянию» внутри чёрной дыры.
-                    Использование $K$ вместо скалярной кривизны $R$ автоматически ограничивает область перехода узким слоем вблизи горизонта (или сингулярности), 
-                    решая проблему доменной стенки.
-                </p>
-
-                <h3>Дилатон и иерархия $f_a$</h3>
-                <p>
-                    Эффективная константа связи аксиона зависит от дилатонного поля:
-                    $$
-                    f_a^{\rm eff} = f_a \cdot e^{\gamma \phi / (2M_{Pl})}.
-                    $$
-                    В обычных условиях ($\phi \approx 0$) $f_a^{\rm eff} \sim 10^{16}$ ГэВ. 
-                    В планковской области (коллапс первичной чёрной дыры) $\phi$ получает большое значение, и $f_a^{\rm eff}$ возрастает до $\sim 0.1 M_{Pl}$, 
-                    делая аксион «тяжёлым» и сильно связанным. Это обеспечивает естественное переключение между двумя режимами.
-                </p>
-
-                <!-- 3. Два режима -->
-                <h2 id="regimes">3. Два физических режима</h2>
-
-                <h3>3.1 Режим I: Первичные чёрные дыры (ПЧД) и бариогенез</h3>
-                <p><strong>Условия:</strong> $K \gg K_{\rm crit}$ (планковская кривизна при коллапсе ПЧД).</p>
-                <p><strong>Механизм:</strong></p>
-                <ol>
-                    <li>При коллапсе поле $a$ скатывается к $\pi f_a$.</li>
-                    <li>Член $\frac{a}{f_a} R\tilde{R}$ делает топологически нетривиальные конфигурации гравитационного поля энергетически выгодными. Пространство-время проходит через <strong>self-induced гравитационный инстантон</strong> типа Эгучи-Хансона с целым числом Понтрягина $p_1$.</li>
-                    <li>Интеграл от аномалии даёт изменение барионного числа:
-                        <div class="formula-block">
-                            $$
-                            \Delta B = \frac{N_f}{32\pi^2} \int R\tilde{R}\, d^4x = \frac{N_f}{4} p_1.
-                            $$
-                        </div>
-                        Для $p_1 = 4$ (простейший нетривиальный случай) $\Delta B = 3$ (при $N_f = 1$).
-                    </li>
-                    <li>Каждая такая ПЧД меняет барионное число на целое число единиц. При необходимой плотности ПЧД $n_{\rm PBH}/s \approx \eta / \Delta B \sim 2 \times 10^{-10}$ получается наблюдаемая асимметрия.</li>
-                </ol>
-                <p><strong>Дополнительное предсказание:</strong> процесс генерирует стохастический гравитационно-волновой фон в диапазоне $10^{-4}$–$1$ Гц (LISA, Einstein Telescope).</p>
-
-                <h3>3.2 Режим II: Астрофизические чёрные дыры и позитроны 511 кэВ</h3>
-                <p><strong>Условия:</strong> $K \ll K_{\rm crit}$, но присутствуют сильное вращение ($a/M \gtrsim 0.35$) и магнитное поле.</p>
-                <p><strong>Механизм:</strong></p>
-                <ol>
-                    <li><strong>Хиральный вортексный эффект:</strong> вращение Керр-дыры ($\Omega_H$) создаёт ненулевой аксиальный ток $\langle J^\mu_5 \rangle = \sigma_5 \omega^\mu$ в эргосфере.</li>
-                    <li><strong>Индуцированное аксионное облако:</strong> аксионное поле подчиняется уравнению $\Box a + V'(a) = -\frac{1}{f_a}\nabla_\mu J^\mu_5$, и в эргосфере формируется стационарное решение с $\langle a \rangle \neq 0$.</li>
-                    <li><strong>Самосогласование:</strong> поле $\langle a \rangle$ создаёт хиральный химический потенциал $\mu_5$, который усиливает аксиальный ток, что, в свою очередь, усиливает облако. Уравнение $\bar{a} = F(\bar{a})$ решается численно и имеет пороговый характер: нетривиальное решение существует только при $a/M > a_{\rm crit} \approx 0.35$.</li>
-                    <li><strong>Рождение позитронов:</strong> $\mu_5$ смещает равновесие в плазме, делая рождение позитронов энергетически выгодным. Эффективность конверсии $\kappa = \langle \mu_5 \rangle / m_p c^2$. Светимость $L_{e^+} = \kappa \dot{M} c^2$.</li>
-                </ol>
-
-                <!-- 4. Математика Режима II -->
-                <h2 id="math">4. Математический аппарат Режима II</h2>
-
-                <h3>4.1 Метрика Керра и эргосфера</h3>
-                <p>
-                    Используется метрика Керра в координатах Бойера–Линдквиста. 
-                    Горизонт событий: $r_+ = \frac{GM}{c^2} + \sqrt{\left(\frac{GM}{c^2}\right)^2 - a^2}$, 
-                    внешняя граница эргосферы: $r_{\rm erg}(\theta) = \frac{GM}{c^2} + \sqrt{\left(\frac{GM}{c^2}\right)^2 - a^2 \cos^2\theta}$, 
-                    угловая скорость горизонта: $\Omega_H = \frac{a c}{2GM r_+}$.
-                </p>
-
-                <h3>4.2 Хиральный вортексный эффект и аксионное облако</h3>
-                <p>
-                    В замагниченной турбулентной плазме аксиальный ток принимает вид:
-                    $$
-                    \langle J^\mu_5 \rangle = \sigma_5 \, \omega^\mu,
-                    $$
-                    где $\omega^\mu = \epsilon^{\mu\nu\rho\sigma} u_\nu \partial_\rho u_\sigma$ — завихренность, 
-                    $\sigma_5$ — хиральная проводимость.
-                </p>
-                <p>
-                    Уравнение для аксиона (в стационарном приближении):
-                    $$
-                    \nabla^2 a - m_{\rm eff}^2 a = -\frac{1}{f_a} \nabla_\mu J^\mu_5,
-                    $$
-                    где $m_{\rm eff}$ — эффективная масса аксиона в минимуме $a=0$.
-                </p>
-
-                <h3>4.3 Самосогласованное уравнение для $\bar{a}$</h3>
-                <p>
-                    В представительной точке (экватор, середина эргосферы) получаем:
-                    $$
-                    \bar{a} \simeq \frac{\sigma_5(\bar{a}) \, \Omega_H}
-                    {f_a \, m_{\rm eff}^2 \, L_{\rm eff}},
-                    $
-                    где $L_{\rm eff} \approx 1.2\, r_{\rm erg}(\pi/2)$. Здесь используется локальное
-                    приближение $\nabla_\mu J_5^\mu \sim J_5/L_{\rm eff}$, поэтому характерная длина
-                    входит в знаменатель. Перед решением $B$, $T$, $\Omega_H$, $m_{\rm eff}$ и $L_{\rm eff}$
-                    переводятся в единую систему $\hbar=c=k_B=1$.
-                </p>
-
-                <h3>4.4 Хиральная проводимость и химический потенциал</h3>
-                <p>
-                    Удобно ввести безразмерный параметр хирального дисбаланса
-                    $\eta_5 \equiv \mu_5/T$:
-                    $
-                    \eta_5 = \alpha_F\,\frac{\bar a}{f_a}\,
-                    \frac{\mu_B B}{T}\,C_{\rm turb},
-                    \qquad
-                    \mu_5 = T\eta_5
-                    = \alpha_F\,\frac{\bar a}{f_a}\,\mu_B B\,C_{\rm turb}.
-                    $
-                    В этой записи $\mu_5$ имеет размерность энергии.
-                </p>
-                <p>
-                    Для нулевого векторного химического потенциала коэффициент аксиального
-                    хирального вортексного тока в natural units берётся в виде:
-                    $
-                    \sigma_5 = \frac{\mu_5^2}{2\pi^2} + \frac{T^2}{6}.
-                    $
-                    Турбулентное усиление модели входит через $C_{\rm turb}$ в $\mu_5$ и не
-                    смешивается с размерностным коэффициентом $\sigma_5$.
-                </p>
-
-                <h3>4.5 Динамический турбулентный фактор $C_{\rm turb}$</h3>
-                <p>
-                    Вместо константы используется зависимость от поля и температуры (физика CME + MRI):
-                    $$
-                    C_{\rm turb}(B, T_K) = C_0 \left[ 1 + \beta \left(\frac{B}{B_{\rm eq}}\right)^{p_B} 
-                    \left(\frac{T_K}{T_{\rm norm}}\right)^{p_T} M_A^{p_M} \right],
-                    $$
-                    где $C_0 = 8000$, $B_{\rm eq} = 3\times 10^4$ Гс, $T_{\rm norm} = 10^7$ K, 
-                    $M_A \approx 0.4$, $\beta = 150$, $p_B = 0.7$, $p_T = 0.5$, $p_M = 1.8$.
-                </p>
-
-                <h3>4.6 Профиль магнитного поля и усреднение</h3>
-                <p>
-                    Магнитное поле спадает с расстоянием по степенному закону:
-                    $$
-                    B(r) = B_0 \left(\frac{r}{r_+}\right)^{-n}, \quad n \approx 1.8.
-                    $$
-                    Среднее поле в эргосфере:
-                    $$
-                    \langle B \rangle = \frac{B_0 \, r_+^n}{(1-n)(r_{\rm erg} - r_+)} 
-                    \left( r_{\rm erg}^{1-n} - r_+^{1-n} \right) \quad (n \neq 1).
-                    $$
-                </p>
-
-                <h3>4.7 Разделение CVE и CME</h3>
-                <p>
-                    Самосогласованная стационарная ветка выше использует аксиальный
-                    хиральный вортексный ток (CVE),
-                    $J_5^\mu=\sigma_V\omega^\mu$. Это не следует смешивать с
-                    магнитным chiral magnetic effect (CME), который для одной
-                    единично заряженной Dirac-компоненты имеет вид
-                    $
-                    \mathbf j_{\rm CME}=\frac{e^2}{2\pi^2}\mu_5\mathbf B
-                    =\frac{2\alpha_F}{\pi}\mu_5\mathbf B.
-                    $
-                    В v8.4.1 оба тока вычисляются отдельно в natural units. CVE является
-                    аксиальным током вдоль $\omega$, CME — vector/electric током вдоль $B$;
-                    программа не складывает их и не переводит $j_{\rm CME}$ в 511-кэВ
-                    светимость без дополнительной кинетической модели.
-                </p>
-
-                <h3>4.8 Finite-mass electron CVE</h3>
-                <p>
-                    В v8.4.1 базовый коэффициент axial CVE больше не аппроксимируется
-                    безмассовым $T^2/6$ при любых температурах. Для свободного massive
-                    Dirac-поля в bulk linear response используется одномерный
-                    Fermi–Dirac integral при конечных $m_e/T$ и vector chemical
-                    potential $\mu_V/T$. В massless-пределе этот integral точно
-                    возвращает
-                    $
-                    \sigma_{V,0}\to\frac{T^2}{6}
-                    +\frac{\mu_V^2}{2\pi^2}.
-                    $
-                    Параметр $\mu_V(e)$ вынесен в интерфейс отдельно, поскольку его
-                    нельзя определить из одной температуры: он зависит от электронной
-                    плотности, состава и состояния аккреционной плазмы.
-                </p>
-                <p>
-                    Для baseline $T=10^7$ K и $\mu_V=0$ имеем
-                    $m_e/T\simeq593$, поэтому massive coefficient экспоненциально
-                    подавлен относительно massless $T^2/6$. Это pair-symmetric
-                    reference point, а не утверждение, что реальная electron-ion
-                    plasma около Sgr A* обязана иметь $\mu_V=0$.
-                </p>
-
-                <h3>4.9 Electron density → chemical potential</h3>
-                <p>
-                    В v8.4.1 chemical potential электронов может быть не входным параметром,
-                    а решением number-conservation closure. Для ideal massive Fermi gas
-                    используется net electron density
-                    $
-                    n_{e,\rm net}=2\int\frac{d^3p}{(2\pi)^3}
-                    \left[
-                    \frac{1}{e^{(E_p-\mu_V)/T}+1}
-                    -
-                    \frac{1}{e^{(E_p+\mu_V)/T}+1}
-                    \right],
-                    \qquad E_p=\sqrt{p^2+m_e^2}.
-                    $
-                    При заданных $T$ и $n_{e,\rm net}\ge0$ программа численно инвертирует
-                    эту монотонную зависимость и получает $\mu_V$. Отдельно выводятся
-                    $n_{e^-}$, $n_{e^+}$ и positron fraction.
-                </p>
-                <p>
-                    Здесь $n_{e,\rm net}=n_{e^-}-n_{e^+}$ — именно conserved vector
-                    charge density. Для charge-neutral electron-ion plasma она связывается
-                    с положительным ионным зарядом. Значение плотности около Sgr A* в модели
-                    не зашито: его должен задавать или вычислять отдельный accretion-flow layer.
-                </p>
-
-                <h3>4.10 Accretion plasma closure</h3>
-                <p>
-                    В v8.4.1 добавлен явный мост от accretion-rate к electron plasma.
-                    В режиме accretion closure используется прозрачная stationary
-                    continuity-оценка толстого диска
-                    $
-                    \dot M = 4\pi r H\rho |v_r|,
-                    \qquad
-                    n_{e,\rm net}=Y_e\frac{\rho}{m_p}.
-                    $
-                    Параметры $r/r_g$, $H/r$, $|v_r|/c$ и $Y_e$ остаются
-                    отдельными входами. Это не GRMHD-решение, а phenomenological
-                    closure, предназначенная для явной передачи $\dot M$ в
-                    finite-mass Fermi-gas слой.
-                </p>
-                <p>
-                    После вычисления $n_{e,\rm net}$ программа решает
-                    $n_{e,\rm net}\to\mu_V$ тем же massive Fermi–Dirac
-                    inversion, что и density closure, и только затем вычисляет
-                    axial CVE coefficient.
-                </p>
-
-                <h3>4.11 Динамика хирального заряда</h3>
-                <p>
-                    Для отдельной диагностической ветки v8.4.1 вводится плотность аксиального
-                    заряда $n_5$. В massless free-Dirac приближении при нулевом vector chemical
-                    potential используется
-                    $
-                    n_5(\mu_5,T)=\frac{\mu_5T^2}{3}
-                    +\frac{\mu_5^3}{3\pi^2},
-                    \qquad
-                    \chi_5=\frac{\partial n_5}{\partial\mu_5}
-                    =\frac{T^2}{3}+\frac{\mu_5^2}{\pi^2}.
-                    $
-                    Эволюция задаётся диагностическим уравнением
-                    $
-                    \dot n_5=S_{\rm proxy}
-                    +\frac{e^2}{2\pi^2}\mathbf E\!\cdot\!\mathbf B
-                    -\Gamma_{\rm flip}n_5,
-                    $
-                    где $S_{\rm proxy}=|J_{5,{\rm CVE}}|/L_{\rm eff}$ используется только
-                    как proxy текущей closure и не считается микроскопически выведенным
-                    axion-to-chirality source.
-                </p>
-                <p>
-                    При постоянных $S_{\rm proxy}$, $E\cdot B$ и $\Gamma_{\rm flip}$
-                    уравнение для $n_5$ решается аналитически. Интерфейс затем численно
-                    инвертирует монотонную связь $n_5(\mu_5,T)$ и показывает $\mu_5(t)$,
-                    equilibrium value и magnetic CME current.
-                </p>
-                <div class="alert alert-warning">
-                    <strong>Massless-regime caveat:</strong> при baseline $T=10^7$ K
-                    отношение $T/m_e\approx1.7\times10^{-3}$. Следовательно, massless
-                    susceptibility и anomaly-transport coefficients в этой точке являются
-                    структурной диагностикой, а не количественно надёжной моделью
-                    электрон-позитронной плазмы. Для физического вывода требуется finite-mass
-                    kinetic treatment и обоснованный $\Gamma_{\rm flip}$.
-                </div>
-
-                <h3>4.12 Эффективность конверсии $\kappa$ и светимость</h3>
-                <p>
-                    Итоговая эффективность:
-                    $$
-                    \kappa = \frac{\langle \mu_5 \rangle}{m_p c^2}.
-                    $$
-                    Светимость в позитронах:
-                    $$
-                    L_{e^+} = \kappa \, \dot{M} c^2.
-                    $$
-                    Для сравнения с наблюдениями используется отношение $L_{e^+} / L_{\rm obs}$, где $L_{\rm obs} \approx 1.07 \times 10^{43}$ эрг/с.
-                </p>
-
-                <!-- 5. Численная реализация -->
-                <h2 id="numerics">5. Численная реализация (AxionBH Research Workbench v8.4.1)</h2>
-                <p>
-                    Актуальный Research Workbench v8.4.1 реализован как браузерное приложение: вычислительное ядро
-                    находится в <code>simulator-core.js</code>, интерфейс — в <code>simulator-app.js</code>.
-                    Расчёты выполняются локально в браузере и не требуют Python, Pyodide или серверной части.
-                </p>
-                <p>
-                    Интерфейс позволяет варьировать массу, спин, $B$, $\dot{M}$, $T$,
-                    $\beta_{\rm turb}$, $f_a$, $m_{\rm eff}$, профиль $n$ и параметры
-                    Bosenova/суперрадиантной ветки. Доступны CME, ручной Bosenova,
-                    суперрадиантный и гибридный режимы, график $\kappa(a/M)$,
-                    3D/contour explorer по $(a/M, B_0)$ с логарифмическими срезами $f_a$,
-                    A/B-сравнение сценариев, карту относительной разницы и one-at-a-time
-                    анализ чувствительности результата к изменению входных параметров. В v8.4.1 также добавлены
-                    диагностический residual самосогласованного CME-корня, детерминированный state ID,
-                    Markdown-отчёт воспроизводимости и CSV-экспорт сетки Parameter Explorer.
-                    В v8.4.1 добавлены inverse inference по одному параметру за раз и карта
-                    дефицита $\log_{10}(L_{\rm obs}/L_{e^+})$.
-                </p>
-                <p>
-                    Parameter Explorer и sensitivity-анализ являются инструментами исследования
-                    поведения текущей реализации модели. Для A/B-карты используется
-                    $\Delta\% = (A-B)/|B|\times 100$; точки с нулевым результатом reference-модели
-                    не интерпретируются как конечная относительная разница. Эти визуализации не являются
-                    байесовскими/частотными доверительными интервалами и не заменяют сравнение с наблюдательными данными.
-                </p>
-                <p>
-                    После перевода в natural units зависимость $\mu_5\propto\bar a$ делает
-                    самосогласованное уравнение точным квадратным уравнением
-                    $\bar a=c_0+c_2\bar a^2$. Движок вычисляет дискриминант аналитически,
-                    показывает обе математические ветви и для расчёта выбирает меньший положительный
-                    корень, соответствующий устойчивой fixed-point ветви $|F'(\bar a)|<1$.
-                    Это устраняет зависимость результата от произвольного диапазона логарифмического сканирования.
-                </p>
-                <p>
-                    Вкладка Plasma v8.4.1 теперь умеет два режима: manual $\mu_V(e)$
-                    и density closure $n_{e,\rm net}\to\mu_V$. Она показывает exact
-                    finite-mass free-Dirac CVE suppression и строит зависимость resolved
-                    $\mu_V$ от net electron density и сравнивает его с massless
-                    reference. Основная stationary closure теперь использует именно
-                    этот massive base coefficient; legacy $\mu_5^2$ nonlinear term
-                    остаётся отдельно помеченным phenomenological ansatz.
-                </p>
-                <p>
-                    Вкладка Anomalous Transport v8.4.1 дополнительно показывает отдельно
-                    величины axial CVE и magnetic CME токов, их направления и отношение
-                    модулей как функцию магнитного поля. Она является диагностикой транспорта,
-                    а не новым каналом светимости. Вкладка Chirality Dynamics строит
-                    аналитическую эволюцию $n_5(t)$ при выбранном $\Gamma_{\rm flip}$ и
-                    signed $E\cdot B$ source, отдельно показывая область применимости
-                    massless approximation через $T/m_e$.
-                </p>
-                <p>
-                    Inference-инструмент v8.4.1 решает обратную задачу: при фиксированных остальных
-                    параметрах он ищет значение одного параметра, для которого
-                    $L_{e^+}/L_{\rm obs}=1$. Поиск ведётся в намеренно широких диагностических
-                    диапазонах. Если пересечения нет, интерфейс показывает лучшую найденную точку
-                    и остаточный дефицит в dex. Эти диапазоны не являются физическими priors,
-                    а результат не является статистической подгонкой.
-                </p>
-                <p>
-                    В v8.4.1 введена отдельная Missing Physics Lab. Феноменологический множитель
-                    $g_{\rm extra}$ можно поместить в источник самосогласования, в эффективную
-                    связь $a\to\mu_5$ или после closure на стадии позитронной конверсии.
-                    Основной расчёт при этом остаётся с $g_{\rm extra}=1$.
-                </p>
-                <p>
-                    Для текущей quadratic closure существует аналитический предел. Условие
-                    $D=1-4c_0c_2\ge0$ для вещественной устойчивой ветви приводит к
-                    $
-                    \mu_{5,\max}=\frac{\pi}{\sqrt{3}}T.
-                    $
-                    Поэтому простой multiplicative gain в любой upstream-точке между источником
-                    и $\mu_5$ не может неограниченно повышать светимость: при baseline потолок
-                    соответствует примерно $L/L_{511}\simeq8.8\times10^{-6}$, то есть даже
-                    идеальная saturation текущей closure оставляет около 5.05 dex дефицита.
-                </p>
-                <div class="alert alert-warning">
-                    <strong>Статус модели:</strong> симулятор является исследовательской реализацией
-                    текущих допущений AxionBH, а не подтверждённым инструментом наблюдательной астрофизики.
-                    Unit-аудит v8.4.1 исправляет внутреннюю размерностную согласованность CVE-ветки,
-                    а Missing Physics Lab показывает её внутренние пределы. Ни один из этих инструментов
-                    сам по себе не подтверждает физическую корректность выбранной closure-модели.
-                </div>
-
-                <!-- 6. Результаты -->
-                <h2 id="results">6. Результаты численного моделирования</h2>
-                <p>
-                    Модель AxionBH была протестирована для Sgr A* со следующими наблюдательными параметрами:
-                    масса $M \approx 4.28 \times 10^6 M_\odot$, спин $a/M \sim 0.9$, 
-                    магнитное поле на горизонте $B_0 \sim 93$ Гс (EHT, 2025), 
-                    темп аккреции $\dot{M} \sim 10^{-8} M_\odot$/год.
-                </p>
-                <p>
-                    Ключевые результаты:
-                </p>
-                <ul>
-                    <li><strong>Суперрадиантная неустойчивость:</strong> для аксиона с массой $m_a \sim 10^{-17}$ эВ 
-                    инкремент роста $\Gamma \approx 1.7 \times 10^{-3} M^{-1}$ ($\sim 4.8 \times 10^{-5}$ с$^{-1}$). 
-                    Время насыщения облака до $0.1 M_{\text{ЧД}}$ составляет $\sim 15$ лет.</li>
-                    <li><strong>Спиновый gate:</strong> в текущей реализации CME включается при $a/M \ge 0.35$.
-                    После unit-аудита v8.4.1 этот порог трактуется как феноменологическое допущение модели,
-                    а не как величина, выведенная из quadratic closure.</li>
-                    <li><strong>Bosenova-вспышки:</strong> при нелинейном насыщении облака возможны 
-                    коллапсы (bosenova), создающие ударные волны в аккреционном диске. 
-                    Температура ударной волны $T \sim 10^{11}$ K достаточна для теплового рождения $e^+e^-$ пар 
-                    с темпом $\dot{N}_{e^+} \sim 10^{42} - 10^{44}$ с$^{-1}$, 
-                    что перекрывает наблюдаемый поток INTEGRAL.</li>
-                    <li><strong>Ограничения GRAVITY:</strong> масса облака не может превышать $\sim 0.5\% M_{\text{ЧД}}$ 
-                    ($\sim 2 \times 10^4 M_\odot$). Модель удовлетворяет этому ограничению 
-                    за счёт компактности облака ($r \sim 0.13$ а.е.) и тонкой настройки массы аксиона.</li>
-                </ul>
-
-                <!-- 7. Предсказания -->
-                <h2 id="predictions">7. Наблюдательные предсказания и проверяемость</h2>
-                <div class="table-responsive">
-                    <table class="table table-bordered">
-                        <thead class="table-dark">
-                            <tr><th>Предсказание</th><th>Описание</th><th>Метод проверки</th></tr>
-                        </thead>
-                        <tbody>
-                            <tr><td>Спиновый порог</td><td>ЧД со спином $a < 0.35$ не дают позитронного избытка</td><td>Сравнение AGN с измеренными спинами (EHT)</td></tr>
-                            <tr><td>Корреляция 511 кэВ со спином</td><td>Интенсивность линии растёт с $a$</td><td>Совместный анализ INTEGRAL + спиновые измерения</td></tr>
-                            <tr><td>Корреляция с магнитным полем</td><td>$L_{511}$ коррелирует с $B$ в эргосфере</td><td>Данные EHT (поляризация) + INTEGRAL</td></tr>
-                            <tr><td>Аксионное эхо</td><td>Слияние быстровращающихся ЧД даёт короткий $\gamma$-всплеск (позитроны)</td><td>Поиск корреляций LIGO/Virgo + Fermi/GBM</td></tr>
-                            <tr><td>Гравитационно-волновой фон</td><td>Стохастический фон от топологических переходов ПЧД</td><td>LISA, Einstein Telescope</td></tr>
-                            <tr><td>Переменность 511 кэВ</td><td>Периодические вспышки с характерным временем $\sim 10^4-10^6$ лет</td><td>Мониторинг INTEGRAL, будущие MeV-телескопы</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- 8. Обсуждение -->
-                <h2 id="discussion">8. Обсуждение и открытые вопросы</h2>
-                <p><strong>Сильные стороны:</strong></p>
-                <ul>
-                    <li>Единый лагранжиан объединяет квантовую гравитацию, физику плазмы и наблюдательную астрофизику.</li>
-                    <li>Качественное объяснение двух независимых загадок (бариогенез и 511 кэВ).</li>
-                    <li>Конкретные, фальсифицируемые предсказания.</li>
-                    <li>Работающий открытый код для воспроизведения результатов.</li>
-                    <li>Лабораторное подтверждение ключевых механизмов (ωΩ-динамо, OMEGA-60).</li>
-                </ul>
-                <p><strong>Нерешённые проблемы:</strong></p>
-                <ul>
-                    <li>Точное значение $p_1$ в self-induced инстантоне требует квантово-гравитационных расчётов.</li>
-                    <li>После unit-аудита и inverse scan текущая quadratic CVE closure имеет внутренний потолок: простое усиление $B$, $f_a$, турбулентности или upstream coupling не закрывает последние ~5 dex до $L_{511}$.</li>
-                    <li>Свободный параметр $f_a$ нуждается в более строгом обосновании; модель использует дилатонный механизм для обхода стандартных ограничений.</li>
-                </ul>
-
-                <!-- 9. Заключение -->
-                <h2 id="conclusion">9. Заключение</h2>
-                <p>
-                    Мы построили феноменологическую модель гравитационной барионной конверсии, 
-                    в которой чёрные дыры действуют как топологические конвертеры материи в антиматерию. 
-                    Модель объясняет барионную асимметрию Вселенной (Режим I) и предлагает механизм генерации 
-                    позитронов в центре Галактики (Режим II). Несмотря на количественные трудности, 
-                    модель даёт ряд независимых проверяемых предсказаний и может служить основой для 
-                    междисциплинарных исследований. Программный комплекс AxionBH доступен для свободного 
-                    использования и модификации.
-                </p>
-
-                <div class="text-center my-5">
-                    <a href="sim.html" class="btn btn-primary btn-lg">Запустить интерактивный симулятор</a>
-                </div>
-            </div>
-        </div>
+<nav>
+  <div class="wrap nav-inner">
+    <a class="brand" href="#top"><span class="brand-dot"></span> AXIONBH</a>
+    <div class="nav-links">
+      <a href="#hypotheses">Гипотезы</a>
+      <a href="#pipeline">Архитектура</a>
+      <a href="#audits">Аудиты</a>
+      <a href="#limits">Ограничения</a>
+      <a class="button" href="sim.html">Открыть симулятор</a>
     </div>
+  </div>
+</nav>
 
-    <!-- Футер -->
-    <footer>
-        <div class="container text-center">
-            <p>AxionBH Collaboration © 2026 | 
-            <a href="https://github.com/Dargon777/AxionBH-v3.3" class="text-white">GitHub</a></p>
+<main id="top">
+  <header class="hero">
+    <div class="wrap">
+      <div class="eyebrow">Exploratory research workbench · v8.9.0</div>
+      <h1>AxionBH</h1>
+      <p>
+        Исследовательская модель, связывающая физику окрестности чёрной дыры, плазменные и аксионные механизмы,
+        рождение электрон-позитронных пар и последующий транспорт позитронов до наблюдаемой 511-кэВ линии.
+        Проект намеренно разделяет <strong>гипотезы</strong>, <strong>реализованные расчёты</strong> и
+        <strong>наблюдательные якоря</strong> вместо того, чтобы выдавать единый сценарий за установленную теорию.
+      </p>
+      <div class="hero-actions">
+        <a class="button" href="sim.html">Запустить Research Workbench</a>
+        <a class="button secondary" href="https://github.com/Dargon777/AxionBH-v3.3">GitHub</a>
+      </div>
+      <div class="badges">
+        <span class="badge">v8.9.0</span>
+        <span class="badge">local browser simulation</span>
+        <span class="badge">CVE / CME audit</span>
+        <span class="badge">gap + γγ cascade</span>
+        <span class="badge">multiphase ISM transport</span>
+        <span class="badge">exploratory — not a validated inference</span>
+      </div>
+    </div>
+  </header>
+
+  <section>
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Что изменилось</div>
+          <h2>От одной сильной идеи — к проверяемой цепочке моделей</h2>
         </div>
-    </footer>
+        <p>
+          Ранние версии формулировали AxionBH слишком жёстко: будто чёрные дыры непосредственно превращают материю
+          в антиматерию и тем самым уже объясняют барионную асимметрию и 511-кэВ сигнал. В v8.x это заменено
+          послойной архитектурой, где каждое звено можно отключить, проверить и отдельно признать несостоятельным.
+        </p>
+      </div>
+      <div class="grid two">
+        <div class="card">
+          <span class="status audit">исправлено</span>
+          <h3>511 кэВ: скорость, а не «эрг/с»</h3>
+          <p>
+            Число порядка <code>10^43</code> для Галактики относится к скорости аннигиляции/инжекции позитронов
+            в <code>e+/s</code>, а не к энергетической светимости. Нынешняя модель ведёт эти величины раздельно
+            и отдельно считает поток 511-кэВ фотонов.
+          </p>
+        </div>
+        <div class="card">
+          <span class="status audit">исправлено</span>
+          <h3>CVE ≠ CME</h3>
+          <p>
+            Аксиальный хиральный вортексный ток и магнитный хиральный ток теперь считаются разными объектами.
+            Они не складываются автоматически и не превращаются в позитронную светимость без дополнительной микрофизики.
+          </p>
+        </div>
+        <div class="card">
+          <span class="status implemented">реализовано</span>
+          <h3>Рождение пар отделено от наблюдаемого сигнала</h3>
+          <p>
+            Источник позитронов — только начало. v8.8–v8.9 добавляют escape, замедление, пространственный транспорт,
+            аннигиляцию, позитроний и перевод результата в наблюдаемый поток 511-кэВ линии.
+          </p>
+        </div>
+        <div class="card">
+          <span class="status implemented">реализовано</span>
+          <h3>Плазма стала отдельным слоем</h3>
+          <p>
+            Электронная химическая потенция может задаваться вручную, выводиться из плотности или через упрощённую
+            аккреционную closure. Finite-mass эффект электронов учитывается отдельно от старого massless-приближения.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
 
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <section id="hypotheses">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Карта гипотез</div>
+          <h2>Что AxionBH сейчас реально предполагает</h2>
+        </div>
+        <p>
+          Здесь статус — не «истина/ложь», а уровень модели: от спекулятивного фундаментального предположения
+          до обычной астрофизической микрофизики, использованной как диагностический модуль.
+        </p>
+      </div>
+
+      <div class="grid two">
+        <article class="card">
+          <span class="status experimental">H1 · фундаментальная гипотеза</span>
+          <h3>Кривизна может активировать сектор нарушения барионного числа</h3>
+          <p>
+            Историческое ядро AxionBH сохраняется как спекулятивная идея: сильная кривизна и псевдоскалярное поле
+            могут менять доступные CP/топологические конфигурации. Это <strong>не считается установленным механизмом
+            бариогенеза</strong> и не используется как доказанный результат симулятора.
+          </p>
+        </article>
+
+        <article class="card">
+          <span class="status experimental">H2 · phenomenological closure</span>
+          <h3>Вращение и плазма могут поддерживать хиральную асимметрию</h3>
+          <p>
+            Стационарная ветвь использует аксиальный CVE-источник и самосогласованную closure для хирального масштаба.
+            Единицы и квадратичная структура проаудированы, но конкретная связь «аксион → μ₅ → позитроны»
+            остаётся модельной и требует микроскопического вывода.
+          </p>
+        </article>
+
+        <article class="card">
+          <span class="status audit">H3 · кинематический аудит</span>
+          <h3>Скалярная superradiance — отдельная ветвь, а не универсальный источник</h3>
+          <p>
+            Для состояния 211 проверяется условие <code>ωR &lt; mΩH</code>, оцениваются рост, насыщение и число e-folds.
+            Старый spin-only порог удалён. Само наличие superradiance не означает автоматическое производство MeV-позитронов.
+          </p>
+        </article>
+
+        <article class="card">
+          <span class="status implemented">H4 · near-horizon source</span>
+          <h3>Charge-starved gap может запустить γγ pair cascade</h3>
+          <p>
+            v8.6–v8.7 строят диагностическую цепочку: дефицит заряда → gap voltage → ускорение частиц →
+            curvature/IC photons → Breit–Wheeler пары. Высота gap ищется самосогласованно; если критерии не выполняются,
+            решатель честно возвращает <code>closure-not-found</code>.
+          </p>
+        </article>
+
+        <article class="card">
+          <span class="status implemented">H5 · transport layer</span>
+          <h3>Наблюдаемая 511-кэВ морфология зависит от транспорта сильнее, чем от одного production rate</h3>
+          <p>
+            v8.8–v8.9 разделяют производство, выход из источника, замедление, diffusion/advection или ballistic-перенос,
+            escape из балджа и аннигиляцию в разных фазах ISM. Один и тот же источник может давать radically different
+            наблюдаемый сигнал при разных режимах транспорта.
+          </p>
+        </article>
+
+        <article class="card">
+          <span class="status open">главный открытый вопрос</span>
+          <h3>Есть ли вообще канал, который закрывает весь бюджет?</h3>
+          <p>
+            Workbench теперь предназначен не для подгонки ответа к единице, а для поиска bottleneck'ов:
+            энергетического потолка, плазменного подавления, отсутствия gap closure, недостаточного escape/retention
+            или неправильной морфологии. «Не достигается» — полноценный результат модели.
+          </p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="pipeline">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Архитектура v8.9</div>
+          <h2>От горизонта до телескопа</h2>
+        </div>
+        <p>
+          Самая важная перемена проекта — отказ от одного коэффициента «эффективности». Теперь путь до 511 кэВ
+          разбит на физически разные стадии.
+        </p>
+      </div>
+
+      <div class="pipeline">
+        <div class="step"><b>1. BH state</b><span>M, spin, ΩH, rg, геометрия.</span></div>
+        <div class="step"><b>2. Accretion</b><span>ṁ, B, T, плотность и flow proxy.</span></div>
+        <div class="step"><b>3. Plasma</b><span>μV, finite-mass CVE, chirality diagnostics.</span></div>
+        <div class="step"><b>4. Source</b><span>CVE branch, superradiance или gap.</span></div>
+        <div class="step"><b>5. Pairs</b><span>Schwinger / γγ diagnostics, energy ceiling.</span></div>
+        <div class="step"><b>6. Transport</b><span>escape, slowing, diffusion/advection/ballistic.</span></div>
+        <div class="step"><b>7. 511 keV</b><span>annihilation, positronium, Earth line flux.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="audits">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Ключевые аудиты</div>
+          <h2>Где модель уже сама себе сказала «стоп»</h2>
+        </div>
+        <p>
+          Эти результаты важнее красивого совпадения с целью: они показывают, какие старые предположения
+          не выдерживают более строгой реализации.
+        </p>
+      </div>
+
+      <div class="grid three">
+        <div class="card">
+          <div class="metric">5.2–9.5 × 10⁻⁹ M☉/yr
+            <small>Promising EHT GRMHD cluster for Sgr A*</small>
+          </div>
+          <p>
+            Историческое значение AxionBH около <code>10⁻³ M☉/yr</code> было более чем на пять порядков выше.
+            Поэтому современный workbench показывает калибровку аккреции отдельно, а не прячет её в preset.
+          </p>
+        </div>
+        <div class="card">
+          <div class="metric">≈0.961 × 10⁻³ ph cm⁻² s⁻¹
+            <small>Bulge 511-keV line-flux reference</small>
+          </div>
+          <p>
+            Наблюдаемая линия теперь сравнивается как поток фотонов и как выведенная photon-rate,
+            а не смешивается с энергетической светимостью.
+          </p>
+        </div>
+        <div class="card">
+          <div class="metric">up to ~30 kpc / nH
+            <small>1-MeV field-aligned collisional path context</small>
+          </div>
+          <p>
+            Это делает магнитную топологию и режим транспорта критическими: длинный путь вдоль поля
+            не равен такому же пространственному смещению от источника.
+          </p>
+        </div>
+      </div>
+
+      <div class="grid two" style="margin-top:16px">
+        <div class="card">
+          <span class="status audit">finite-mass plasma</span>
+          <h3>Massless electron approximation больше не базовая</h3>
+          <p>
+            При <code>T = 10⁷ K</code> электрон всё ещё очень массивен относительно теплового масштаба.
+            v8.4.1 добавил прямой Fermi–Dirac integral и явное предупреждение, когда massless transport formula
+            используется вне надёжного режима.
+          </p>
+        </div>
+        <div class="card">
+          <span class="status audit">superradiance</span>
+          <h3>Старый default 10⁻¹⁷ eV не проходит 211-condition</h3>
+          <p>
+            Для стандартной точки <code>M = 4.28×10⁶ M☉</code>, <code>a* = 0.89</code> ветвь больше не включается
+            простым порогом spin. Сначала проверяется физическое superradiant condition.
+          </p>
+        </div>
+        <div class="card">
+          <span class="status audit">transport uncertainty</span>
+          <h3>Один MeV-позитрон — разные морфологии</h3>
+          <p>
+            В WNM-примере v8.9 diffusion+advection даёт характерный smearing порядка <strong>12.8 pc</strong>,
+            тогда как collisional/ballistic интерпретация с 1% field-line displacement — порядка
+            <strong>4.7×10² pc</strong>. Разница оставлена видимой как структурная неопределённость.
+          </p>
+        </div>
+        <div class="card">
+          <span class="status audit">observable semantics</span>
+          <h3>Production rate ≠ annihilation rate ≠ line-photon rate</h3>
+          <p>
+            В v8.8 эти величины стали отдельными. Позитроний тоже учитывается явно:
+            para-Ps даёт два line photons, ortho-Ps — трёхфотонный continuum.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="callout">
+        <div class="eyebrow">Текущий смысл проекта</div>
+        <h2 style="margin-top:8px">AxionBH сейчас — не «доказательство теории», а машина для уничтожения плохих допущений.</h2>
+        <p class="muted" style="max-width:900px">
+          Хороший результат workbench — это не обязательно совпадение с наблюдением. Если конкретная ветвь нарушает
+          размерности, требует нереальной аккреции, не закрывает gap, превышает энергетический потолок или теряет позитроны
+          при переносе — эта ветвь должна быть помечена как проблемная, а не «дотянута» коэффициентом.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Эволюция</div>
+          <h2>Что добавили версии 8.x</h2>
+        </div>
+        <p>Коротко — только изменения, которые реально поменяли физический смысл расчёта.</p>
+      </div>
+      <div class="timeline">
+        <div class="timeline-item"><b>v8.4.1</b> — unit audit, analytic quadratic CVE closure, finite-mass electron plasma, density/accretion closure, microphysics audit.</div>
+        <div class="timeline-item"><b>v8.5.1</b> — единый 511-keV positron-rate reference и корректная минимальная pair rest-energy.</div>
+        <div class="timeline-item"><b>v8.5.2</b> — физическое условие scalar-211 superradiance вместо ad-hoc spin threshold.</div>
+        <div class="timeline-item"><b>v8.6</b> — charge-starved magnetospheric gap, curvature photons, γγ pairs и electrical-power ceiling.</div>
+        <div class="timeline-item"><b>v8.7</b> — spectral soft-photon field, IC cooling с KN suppression и self-consistent gap-height closure.</div>
+        <div class="timeline-item"><b>v8.8</b> — source → transport → annihilation → positronium → observed 511-keV flux pipeline.</div>
+        <div class="timeline-item"><b>v8.9</b> — reduced multiphase ISM transport: WNM/WIM/HIM/CNM/molecular presets, slowing, in-flight annihilation, diffusion/advection и ballistic regime.</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="limits">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Ограничения</div>
+          <h2>Что пока нельзя считать результатом физики</h2>
+        </div>
+        <p>Эти пункты являются частью модели, а не мелким дисклеймером.</p>
+      </div>
+      <div class="grid two">
+        <div class="card">
+          <h3>Нет микроскопического вывода всей axion → chirality → e⁺ цепочки</h3>
+          <p>Derivative axion couplings мотивируют axial backgrounds, но конкретная стационарная closure AxionBH остаётся phenomenological ansatz.</p>
+        </div>
+        <div class="card">
+          <h3>Gap model не заменяет GRPIC</h3>
+          <p>Нет полноценной Kerr Poisson problem, time-dependent feedback, recursive cascade и self-consistent global magnetosphere.</p>
+        </div>
+        <div class="card">
+          <h3>ISM transport редуцирован</h3>
+          <p>Не решаются полная 3D Galactic magnetic topology, детальная chemistry, dust, phase transitions и полный stopping-power network.</p>
+        </div>
+        <div class="card">
+          <h3>Это не статистический fit</h3>
+          <p>Explorer, sensitivity, inverse scans и Missing Physics tools — deterministic diagnostics. Они не являются posterior, confidence interval или observational detection.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="refs">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Наблюдательные якоря</div>
+          <h2>Контекст, с которым сравнивается workbench</h2>
+        </div>
+        <p>Ссылки ведут на исходные работы; AxionBH не объявляет их подтверждением собственной гипотезы.</p>
+      </div>
+      <div class="grid three">
+        <div class="card">
+          <h3>EHT Sgr A* model testing</h3>
+          <p>GRMHD-модели и promising low-inclination MAD cluster с ṁ порядка 5.2–9.5×10⁻⁹ M☉/yr.</p>
+          <p><a href="https://arxiv.org/abs/2311.09478">arXiv:2311.09478 →</a></p>
+        </div>
+        <div class="card">
+          <h3>Galactic 511-keV spectroscopy</h3>
+          <p>Булджевый 511-кэВ line flux порядка 0.96×10⁻³ ph cm⁻² s⁻¹ используется как observational reference.</p>
+          <p><a href="https://www.aanda.org/articles/aa/abs/2016/02/aa27510-15/aa27510-15.html">Siegert et al. 2016 →</a></p>
+        </div>
+        <div class="card">
+          <h3>MeV positron transport</h3>
+          <p>Коллизионный/магнитный перенос низкоэнергетических позитронов задаёт критический масштаб между source и annihilation morphology.</p>
+          <p><a href="https://arxiv.org/abs/0909.4022">Jean et al. 2009 →</a></p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap footer-inner">
+    <span>AxionBH · Research Workbench v8.9.0</span>
+    <span>Exploratory model · Dargon777</span>
+  </div>
+</footer>
 </body>
 </html>
-
-<section id="v8-validity">
-  <h2>AxionBH v8.4.1: архитектура допущений</h2>
-  <p>
-    v8.4.1 не объединяет все уровни модели под одним словом «CME».
-    Интерфейс Validity показывает отдельно Kerr geometry, accretion
-    closure, massive electron Fermi gas, anomalous transport,
-    axion-to-chiral coupling, stationary closure, chirality proxy и
-    positron-luminosity mapping. Категории описывают происхождение
-    каждого слоя и не являются рейтингом достоверности.
-  </p>
-</section>
-
-<section id="v81-accretion-calibration">
-  <h2>AxionBH v8.4.1: Sgr A* accretion calibration</h2>
-  <p>
-    v8.4.1 сохраняет legacy accretion rate как воспроизводимый исторический
-    параметр, но отдельно сравнивает его с опубликованными диапазонами.
-    В EHT Sgr A* Paper V перспективный кластер MAD-моделей с малым
-    inclination имеет
-    $\dot M=(5.2$–$9.5)\times10^{-9}\,M_\odot\,{\rm yr}^{-1}$.
-    Это model-cluster result: сама работа подчёркивает, что все
-    рассмотренные семейства моделей нарушают хотя бы одно наблюдательное
-    ограничение.
-  </p>
-  <p>
-    Для отдельного исторического контекста также используется диапазон
-    Faraday-rotation $2\times10^{-9}$–$2\times10^{-7}\,M_\odot\,{\rm yr}^{-1}$
-    из Marrone et al. Его границы зависят от предположений о величине,
-    упорядоченности и геометрии магнитного поля и поэтому не трактуются
-    как model-independent confidence interval.
-  </p>
-  <p>
-    Во вкладке Calibration все точки прогоняются через одну и ту же
-    v8.0 цепочку $\dot M\to\rho\to n_{e,\rm net}\to\mu_V\to\sigma_{\rm CVE}$,
-    при фиксированных $r/r_g$, $H/r$, $|v_r|/c$, $Y_e$ и остальных
-    параметрах. Это позволяет отделить эффект accretion rate от других
-    допущений модели.
-  </p>
-</section>
-
-<section id="v82-flow-geometry">
-  <h2>AxionBH v8.4.1: flow geometry calibration</h2>
-  <p>
-    После калибровки $\dot M$ остаётся неопределённость continuity-слоя:
-    радиус оценки, толщина потока, radial inflow velocity и composition.
-    Для RIAF используется стандартная scaling-форма
-    $$
-    \frac{|v_r|}{c}\simeq
-    \alpha\left(\frac{H}{R}\right)^2
-    \frac{1}{\sqrt{R/r_g}},
-    $$
-    соответствующая $v_r\sim\alpha v_K(H/R)^2$.
-    В ADAF/RIAF review геометрия описывается как thick, $H\sim R$,
-    а типичный viscosity parameter приводится как $\alpha\sim0.1$–$0.3$.
-  </p>
-  <p>
-    Workbench не превращает это в observational prior. Для stress-test
-    используется явно помеченный envelope:
-    $R/r_g=3$–$30$, $H/R=0.3$–$1$, $\alpha=0.1$–$0.3$,
-    $Y_e=0.5$–$1$. Последние границы включают exploratory choices;
-    вкладка Flow показывает, сколько порядков они могут изменить в
-    полной цепочке при фиксированном EHT-mid $\dot M$.
-  </p>
-</section>
-
-<section id="v83-microphysics-audit">
-<h2>AxionBH v8.4.1: microphysics and observable audit</h2>
-<p>Наблюдаемая величина порядка $10^{43}$ для Galactic 511-keV problem — это positron annihilation/injection rate в $e^+/s$, а не $erg/s$. Поэтому прямое сравнение model power с числом $1.07\times10^{43}$ было размерностно некорректным.</p>
-<p>v8.4.1 вводит отдельный rate observable $\dot N_{e^+}=L_{model}/E_{cost}$ и явно маркирует этот переход как phenomenological energy proxy. Переход axion field $\to\mu_5$ также остаётся phenomenological: derivative current couplings не являются выводом конкретной stationary local relation, использованной в AxionBH.</p>
-</section>
-<section id="v84-pairs"><h2>AxionBH v8.4.1: explicit pair production</h2><p>Добавлен idealized Schwinger channel с $E_{crit}\simeq1.32\times10^{16}$ V/cm. Local E-field, screening, backreaction и active volume остаются нерешёнными слоями.</p></section>
-<section id="v841-canonical-observable">
-  <h2>AxionBH v8.4.1: canonical positron-rate comparison</h2>
-  <p>
-    Начиная с v8.4.1 поле <code>ratio511</code> больше не означает
-    историческое размерностно некорректное деление erg/s на число
-    порядка $10^{43}$ s$^{-1}$. Canonical metric определяется через
-    energy-budget-equivalent positron rate:
-    $$
-    \dot N_{e^+,\rm eq}=P_{\rm proxy}/E_{\rm cost},
-    \qquad
-    R_{511}=\dot N_{e^+,\rm eq}/(1.07\times10^{43}\,{\rm s}^{-1}).
-    $$
-    Старое значение сохраняется только как
-    <code>legacyRatio511</code>.
-  </p>
-  <p>
-    Schwinger pair-production diagnostic остаётся отдельным каналом и
-    использует minimum pair rest energy $2m_ec^2$. Вкладка
-    Microphysics также показывает derivative axion-fermion benchmark
-    $b_{0,\rm peak}=C_e m_a a_0/(2f_a)$ при $C_e=1$.
-  </p>
-</section>
-
-<section id="v851-reference">
-<h2>AxionBH v8.5.1: Galactic-bulge positron-rate calibration</h2>
-<p>The canonical 511-keV target is now $2\times10^{43}\,e^+\,s^{-1}$ for the Galactic bulge, following Siegert et al. (2016). It is explicitly model-dependent. All energy-to-rate paths use the same $2m_ec^2$ pair-rest-energy conversion.</p>
-</section>
-
-<section id="v852-superradiance">
-<h2>AxionBH v8.5.2: scalar 211 superradiance audit</h2>
-<p>
-  The superradiant branch now requires the Kerr condition
-  $\omega_R &lt; m\Omega_H$ instead of a spin-only threshold. For the scalar
-  $211$ level it uses the hydrogenic frequency
-  $\omega_R/\mu\simeq1-\alpha^2/8$ and the small-$\alpha$ growth-rate fit
-  from Baryakhtar et al. (2021). The workbench reports the critical spin,
-  explicit seed occupation, e-fold count and an idealized spin-down saturation
-  estimate.
-</p>
-<p>
-  The former fixed 5% cloud fraction and hidden $10^{-10}M_{BH}$ seed are no
-  longer used. Positron conversion remains explicitly phenomenological and is
-  not interpreted as direct decay of an ultralight axion into an
-  $e^+e^-$ pair.
-</p>
-</section>
-
-<section id="v86-gap-cascade">
-<h2>AxionBH v8.6: charge-starved gap and γγ pair cascade</h2>
-<p>
-  The Gap layer now checks whether the available funnel charge supply falls below
-  a Goldreich–Julian density scale before applying an analytic black-hole gap
-  potential. It then propagates the potential through particle acceleration,
-  curvature radiation and head-on Breit–Wheeler pair conversion in an explicit
-  soft-photon bath.
-</p>
-<p>
-  Two literature-motivated voltage scalings are exposed:
-  $\Delta V\propto(h/r_g)^2$ for a strongly charge-starved vacuum gap and
-  $\Delta V\propto(h/r_g)^3/6$ for a near-GJ configuration. The resulting
-  one-generation multiplicity is a cascade-closure diagnostic, not a
-  time-dependent GR PIC solution.
-</p>
-</section>
-
-
-<section id="v87-spectral-gap">
-<h2>AxionBH v8.7: spectral photon field, IC losses and gap-height closure</h2>
-<p>
-  v8.7 replaces the one-energy soft-photon proxy with a normalized power-law
-  spectrum and integrates gamma-gamma opacity across that field. Electron
-  acceleration is limited by the available potential or by the combined
-  curvature and inverse-Compton radiative drag. The IC term includes an
-  explicit Klein-Nishina suppression approximation.
-</p>
-<p>
-  A closure solver scans the gap height and searches for the first region where
-  both one-generation pair multiplicity and the Goldreich-Julian refill proxy
-  reach unity. Failure to satisfy either condition is reported as an unresolved
-  gap rather than converted into a successful positron prediction.
-</p>
-<p>
-  This remains a diagnostic stationary model. It is not a GRPIC simulation,
-  fitted Sgr A* radiation field, or time-dependent pair cascade.
-</p>
-</section>
-
-
-<section id="v88-positron-transport">
-<h2>AxionBH v8.8: positron transport and the 511-keV observable</h2>
-<p>
-  v8.8 stops treating near-source pair production and the Galactic 511-keV
-  signal as the same quantity. The workbench now tracks source production,
-  escape, spatial retention, thermalisation survival, annihilation and
-  positronium branching separately before predicting the 511-keV line flux.
-</p>
-<p>
-  The observational reference is the Siegert et al. (2016) bulge line flux
-  $(0.96\pm0.07)\times10^{-3}\,\mathrm{ph\,cm^{-2}\,s^{-1}}$.
-  At the same effective 8.5-kpc bulge distance this corresponds to about
-  $8.3\times10^{42}$ line photons per second. A $150\pm50$ pc smearing scale
-  and a scenario-dependent $\lesssim1.4$ MeV injection-energy diagnostic from
-  later morphology work are exposed as context rather than hard priors.
-</p>
-<p>
-  Transport efficiencies and the Gaussian spatial kernel remain
-  phenomenological; no full ISM kinetic transport equation is solved.
-</p>
-</section>
-
-
-<section id="v89-ism-transport">
-<h2>AxionBH v8.9: reduced multiphase ISM transport</h2>
-<p>
-  v8.9 derives the positron slowing time, propagation scale, in-flight survival
-  and competition between thermal annihilation and bulge escape instead of
-  requiring those quantities as manual efficiencies. Warm neutral, warm
-  ionized, hot ionized, cold neutral and diffuse molecular phase presets are
-  exposed explicitly.
-</p>
-<p>
-  The collisional timescale is anchored to the Jean et al. (2009)
-  order-of-magnitude result that a 1-MeV positron can travel up to about
-  $30\,\mathrm{kpc}/n_H$ along field lines when low-energy MHD scattering is
-  inefficient. A separate cosmic-ray-style diffusion+advection model is kept
-  exploratory because its extrapolation to MeV energies is uncertain.
-</p>
-<p>
-  Free-electron in-flight annihilation uses the exact two-photon cross section,
-  while post-thermal annihilation is still compressed into an effective phase
-  rate coefficient. Neutral charge exchange, dust and a full 3D Galactic
-  transport calculation remain future work.
-</p>
-</section>
