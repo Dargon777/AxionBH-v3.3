@@ -47,7 +47,7 @@ assert.ok(robots.includes("sitemap.xml"));
 assert.ok(readme.includes("AxionBH v8.9.1"));
 assert.ok(readme.includes("Legacy AxionBH baseline"));
 assert.ok(readme.includes("SCIENTIFIC_STATUS.md"));
-assert.ok(scientific.includes("not a validated astrophysical inference"));
+assert.ok(scientific.includes("not established"));
 assert.ok(scientific.includes("Sgr A* · EHT-context baseline"));
 
 console.log("AxionBH site integrity checks passed");
