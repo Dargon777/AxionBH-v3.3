@@ -32,6 +32,7 @@ for (const id of [
   "savePresetBtn",
   "deletePresetBtn",
   "shareBtn",
+  "resetBtn",
   "analysisTitle",
   "analysisTable",
   "analysisBusy",
@@ -123,8 +124,8 @@ for (const feature of [
   );
 }
 
-assert.ok(html.includes("v8.9.0"));
-assert.ok(app.includes("AxionBH research workbench v8.9.0"));
+assert.ok(html.includes("v8.9.1"));
+assert.ok(app.includes("AxionBH research workbench v8.9.1"));
 
 
 for (const feature of [
@@ -187,7 +188,7 @@ for (const feature of [
 }
 
 assert.ok(html.includes('data-analysis="transport"'));
-assert.ok(app.includes("CVE closure / стационарное облако"));
+assert.ok(app.includes("CVE closure / stationary cloud"));
 
 
 for (const id of [
@@ -485,3 +486,11 @@ for (const id of [
 assert.ok(app.includes("ISM phase"));
 assert.ok(app.includes("slowing time"));
 assert.ok(app.includes("field-line path"));
+
+assert.ok(html.includes('<html lang="en"'));
+assert.ok(html.includes('rel="manifest" href="site.webmanifest"'));
+assert.ok(html.includes('rel="canonical" href="https://dargon777.github.io/AxionBH-v3.3/sim.html"'));
+assert.ok(html.includes('<option value="legacy">Legacy AxionBH baseline</option>'));
+assert.ok(app.includes("resetWorkbench"));
+assert.ok(app.includes('referenceNames = {'));
+assert.ok(app.includes('legacy: "Legacy AxionBH baseline"'));
