@@ -2598,7 +2598,8 @@
     });
 
     const names = {
-      baseline: "Sgr A* baseline",
+      baseline: "Sgr A* · EHT-context baseline",
+      legacy: "Legacy AxionBH baseline",
       breakthrough: "High-B breakthrough",
       optimistic: "Optimistic",
       current: "Current parameters"
