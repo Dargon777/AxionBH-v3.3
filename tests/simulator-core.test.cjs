@@ -732,7 +732,7 @@ console.log("AxionBH simulator-core tests passed");
 
 
 {
-  assert.equal(A.MODEL_VERSION, "8.9.0");
+  assert.equal(A.MODEL_VERSION, "8.9.1");
   assert.equal(A.STATE_SCHEMA_VERSION, 14);
 }
 
@@ -800,7 +800,7 @@ console.log("AxionBH simulator-core tests passed");
     },
     "cme"
   );
-  assert.equal(report.modelVersion, "8.9.0");
+  assert.equal(report.modelVersion, "8.9.1");
   assert.equal(report.stateSchemaVersion, 14);
   assert.equal(report.layers.length, A.MODEL_LAYERS.length);
   assert.ok(report.accretion);
@@ -1013,7 +1013,7 @@ console.log("AxionBH simulator-core tests passed");
 {const a=A.gapParallelElectricField(A.DEFAULTS,{screeningFraction:.1}),b=A.gapParallelElectricField(A.DEFAULTS,{screeningFraction:1});assert.ok(a.parallelElectricFieldVcm<b.parallelElectricFieldVcm);}
 
 {
-  assert.equal(A.MODEL_VERSION,"8.9.0");
+  assert.equal(A.MODEL_VERSION,"8.9.1");
   assert.equal(A.CONSTANTS.POSITRON_RATE_OBS_511,2e43);
   assert.equal(A.CONSTANTS.POSITRON_RATE_GALAXY_511,5e43);
   const base=A.cme(A.DEFAULTS);
