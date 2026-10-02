@@ -5,7 +5,7 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  const MODEL_VERSION = "8.9.0";
+  const MODEL_VERSION = "8.9.1";
   const STATE_SCHEMA_VERSION = 14;
 
   const CONSTANTS = Object.freeze({
@@ -242,15 +242,27 @@
     })
   });
 
+  const EHT_BASELINE = Object.freeze({
+    ...DEFAULTS,
+    mdot: mdotGsFromMsunPerYear(
+      Math.sqrt(
+        ACCRETION_CALIBRATIONS.eht2023.minMsunPerYear *
+        ACCRETION_CALIBRATIONS.eht2023.maxMsunPerYear
+      )
+    ),
+    electronDensityMode: 2
+  });
+
   const PRESETS = Object.freeze({
-    baseline: { ...DEFAULTS },
+    baseline: { ...EHT_BASELINE },
+    legacy: { ...DEFAULTS },
     breakthrough: {
-      ...DEFAULTS,
+      ...EHT_BASELINE,
       B0: 2e5,
       betaTurb: 2.0
     },
     optimistic: {
-      ...DEFAULTS,
+      ...EHT_BASELINE,
       spin: 0.94,
       B0: 1e5,
       betaTurb: 1.5,
@@ -5075,6 +5087,7 @@
     ISM_PHASE_PRESETS,
     CONSTANTS,
     DEFAULTS,
+    EHT_BASELINE,
     derivativeAxialBackgroundPeak,
     positronRateFromPower,
     positronObservableFromPower,
