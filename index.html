@@ -3,8 +3,33 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="AxionBH v8.9.0 — exploratory black-hole, pair-production and Galactic 511-keV research workbench.">
-  <title>AxionBH v8.9.0 — Research Workbench</title>
+  <meta name="description" content="AxionBH v8.9.1 — an exploratory black-hole, plasma, pair-production and Galactic 511-keV research workbench.">
+  <meta name="theme-color" content="#070912">
+  <meta name="color-scheme" content="dark">
+  <link rel="canonical" href="https://dargon777.github.io/AxionBH-v3.3/">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="site.webmanifest">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="AxionBH v8.9.1 — Research Workbench">
+  <meta property="og:description" content="Exploratory black-hole, plasma, pair-production and Galactic 511-keV model diagnostics.">
+  <meta property="og:url" content="https://dargon777.github.io/AxionBH-v3.3/">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="AxionBH v8.9.1 — Research Workbench">
+  <meta name="twitter:description" content="Exploratory black-hole, plasma, pair-production and 511-keV model diagnostics.">
+  <script type="application/ld+json">
+  {
+    "@context":"https://schema.org",
+    "@type":"SoftwareApplication",
+    "name":"AxionBH Research Workbench",
+    "applicationCategory":"ScientificApplication",
+    "operatingSystem":"Web browser",
+    "softwareVersion":"8.9.1",
+    "url":"https://dargon777.github.io/AxionBH-v3.3/",
+    "codeRepository":"https://github.com/Dargon777/AxionBH-v3.3",
+    "description":"Exploratory browser workbench for black-hole, plasma, pair-production and Galactic 511-keV model diagnostics."
+  }
+  </script>
+  <title>AxionBH v8.9.1 — Research Workbench</title>
   <style>
     :root {
       --bg:#070912; --panel:rgba(17,23,42,.74); --panel2:rgba(24,31,56,.64);
@@ -56,19 +81,21 @@
     footer{border-top:1px solid var(--line);margin-top:54px;padding:30px 0 46px;color:var(--muted)}.footer-inner{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
     @media(max-width:980px){.nav-links{display:none}.section-head{grid-template-columns:1fr}.grid.three{grid-template-columns:1fr}.pipeline{grid-template-columns:1fr 1fr}.step:not(:last-child)::after{display:none}}
     @media(max-width:680px){.grid.two,.pipeline{grid-template-columns:1fr}.hero{padding-top:68px}h1{font-size:clamp(3.2rem,17vw,5.2rem)}.nav-inner{align-items:flex-start;padding:10px 0}.nav-right{flex-direction:column;align-items:flex-end;gap:7px}.lang-switch{gap:2px}.lang-btn{padding:5px 6px}}
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior:auto; } *,*::before,*::after { animation-duration:.001ms!important; animation-iteration-count:1!important; transition-duration:.001ms!important; } }
   </style>
 </head>
 <body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
 <nav>
   <div class="wrap nav-inner">
-    <a class="brand" href="#top"><span class="brand-dot"></span> AXIONBH</a>
+    <a class="brand" href="#main-content"><span class="brand-dot"></span> AXIONBH</a>
     <div class="nav-right">
       <div class="nav-links">
         <a href="#hypotheses" data-i18n="navHyp">Hypotheses</a>
         <a href="#pipeline" data-i18n="navArchitecture">Architecture</a>
         <a href="#audits" data-i18n="navAudits">Audits</a>
         <a href="#limits" data-i18n="navLimits">Limitations</a>
-        <a class="button" href="sim.html" data-i18n="navSimulator">Open simulator</a>
+        <a class="button" href="sim.html" data-i18n="navSimulator">Open workbench</a>
       </div>
       <div class="lang-switch" aria-label="Language">
         <button class="lang-btn active" type="button" data-lang="en">EN</button>
@@ -80,10 +107,10 @@
   </div>
 </nav>
 
-<main id="top">
+<main id="main-content">
   <header class="hero">
     <div class="wrap">
-      <div class="eyebrow" data-i18n="heroEyebrow">Exploratory research workbench · v8.9.0</div>
+      <div class="eyebrow" data-i18n="heroEyebrow">Exploratory research workbench · v8.9.1</div>
       <h1>AxionBH</h1>
       <p data-i18n="heroText">An exploratory model connecting black-hole environments, plasma and axion-inspired mechanisms, electron–positron pair production, and positron transport to the observable Galactic 511-keV line. The project deliberately separates hypotheses, implemented calculations, and observational anchors instead of presenting one scenario as established physics.</p>
       <div class="hero-actions">
@@ -91,7 +118,7 @@
         <a class="button secondary" href="https://github.com/Dargon777/AxionBH-v3.3">GitHub</a>
       </div>
       <div class="badges">
-        <span class="badge">v8.9.0</span><span class="badge">local browser simulation</span><span class="badge">CVE / CME audit</span>
+        <span class="badge">v8.9.1</span><span class="badge">local browser simulation</span><span class="badge">CVE / CME audit</span>
         <span class="badge">gap + γγ cascade</span><span class="badge">multiphase ISM transport</span>
         <span class="badge" data-i18n="badgeExploratory">exploratory — not a validated inference</span>
       </div>
@@ -224,13 +251,14 @@
   </section>
 </main>
 
-<footer><div class="wrap footer-inner"><span>AxionBH · Research Workbench v8.9.0</span><span>Exploratory model · Dargon777</span></div></footer>
+<footer><div class="wrap footer-inner"><span>AxionBH · Research Workbench v8.9.1</span><span>Exploratory model · Dargon777</span></div></footer>
+<noscript><div class="wrap" style="padding:20px 0;color:#ffca72">Language switching requires JavaScript. The English content remains fully readable without it.</div></noscript>
 
 <script>
 const translations = {
 ru: {
-navHyp:"Гипотезы",navArchitecture:"Архитектура",navAudits:"Аудиты",navLimits:"Ограничения",navSimulator:"Открыть симулятор",
-heroEyebrow:"Исследовательский workbench · v8.9.0",heroText:"Исследовательская модель, связывающая физику окрестности чёрной дыры, плазменные и аксионные механизмы, рождение электрон-позитронных пар и последующий транспорт позитронов до наблюдаемой галактической линии 511 кэВ. Проект намеренно разделяет гипотезы, реализованные расчёты и наблюдательные якоря, вместо того чтобы выдавать один сценарий за установленную физику.",heroRun:"Запустить Research Workbench",badgeExploratory:"исследовательская модель — не подтверждённый вывод",
+navHyp:"Гипотезы",navArchitecture:"Архитектура",navAudits:"Аудиты",navLimits:"Ограничения",navSimulator:"Открыть workbench",
+heroEyebrow:"Исследовательский workbench · v8.9.1",heroText:"Исследовательская модель, связывающая физику окрестности чёрной дыры, плазменные и аксионные механизмы, рождение электрон-позитронных пар и последующий транспорт позитронов до наблюдаемой галактической линии 511 кэВ. Проект намеренно разделяет гипотезы, реализованные расчёты и наблюдательные якоря, вместо того чтобы выдавать один сценарий за установленную физику.",heroRun:"Запустить Research Workbench",badgeExploratory:"исследовательская модель — не подтверждённый вывод",
 changedEye:"Что изменилось",changedTitle:"От одной сильной идеи — к проверяемой цепочке моделей",changedIntro:"Ранние версии AxionBH были слишком категоричны: чёрные дыры рассматривались как прямые конвертеры материи в антиматерию, а сценарий подавался как уже объясняющий барионную асимметрию и сигнал 511 кэВ. В v8.x это заменено послойной архитектурой, где каждое звено можно независимо проверить, отключить или отвергнуть.",
 fixed:"исправлено",implemented:"реализовано",c1t:"511 кэВ: скорость, а не эрг/с",c1p:"Величина порядка 10^43 для Галактики относится к скорости аннигиляции/инжекции позитронов в e+/s, а не к энергетической светимости. Текущая модель разделяет эти величины и отдельно считает поток 511-кэВ фотонов.",c2p:"Аксиальный хиральный вортексный ток и магнитный хиральный ток теперь считаются разными физическими объектами. Они не складываются автоматически и не превращаются в позитронную светимость без дополнительной микрофизики.",c3t:"Рождение пар отделено от наблюдаемого сигнала",c3p:"Источник позитронов — только начало. v8.8–v8.9 добавляют выход из источника, замедление, пространственный перенос, аннигиляцию, ветвление позитрония и перевод результата в наблюдаемый поток линии 511 кэВ.",c4t:"Плазма стала отдельным слоем",c4p:"Электронный векторный химический потенциал можно задать вручную, вывести из плотности или оценить через редуцированную аккреционную closure. Эффекты конечной массы электронов отделены от старого безмассового приближения.",
 hypEye:"Карта гипотез",hypTitle:"Что AxionBH действительно предполагает сегодня",hypIntro:"Статусы здесь не означают «истина» или «ложь». Они показывают уровень модели: от спекулятивных фундаментальных предположений до стандартной астрофизической микрофизики, используемой как диагностический слой.",
@@ -243,8 +271,8 @@ limitsEye:"Ограничения",limitsTitle:"Что пока нельзя с�
 refsEye:"Наблюдательные якоря",refsTitle:"Контекст, которым проверяется workbench",refsIntro:"Ссылки ведут к исходным работам; AxionBH не выдаёт их за подтверждение собственных гипотез.",r1p:"GRMHD-модели и перспективный low-inclination MAD cluster с ṁ около 5.2–9.5×10⁻⁹ M☉/yr.",r2p:"Поток линии 511 кэВ из балджа около 0.96×10⁻³ ph cm⁻² s⁻¹ используется как наблюдательный ориентир.",r3p:"Коллизионный и магнитно-направляемый перенос низкоэнергетических позитронов задаёт критический масштаб между рождением у источника и морфологией аннигиляции."
 },
 de: {
-navHyp:"Hypothesen",navArchitecture:"Architektur",navAudits:"Prüfungen",navLimits:"Grenzen",navSimulator:"Simulator öffnen",
-heroEyebrow:"Explorative Forschungsumgebung · v8.9.0",heroText:"Ein exploratives Modell, das die Physik in der Umgebung Schwarzer Löcher, Plasma- und axioninspirierte Mechanismen, Elektron-Positron-Paarerzeugung und den anschließenden Positronentransport mit der beobachtbaren galaktischen 511-keV-Linie verbindet. Das Projekt trennt bewusst Hypothesen, implementierte Berechnungen und Beobachtungsanker, statt ein einzelnes Szenario als etablierte Physik darzustellen.",heroRun:"Research Workbench starten",badgeExploratory:"explorativ — keine validierte Inferenz",
+navHyp:"Hypothesen",navArchitecture:"Architektur",navAudits:"Prüfungen",navLimits:"Grenzen",navSimulator:"Workbench öffnen",
+heroEyebrow:"Explorative Forschungsumgebung · v8.9.1",heroText:"Ein exploratives Modell, das die Physik in der Umgebung Schwarzer Löcher, Plasma- und axioninspirierte Mechanismen, Elektron-Positron-Paarerzeugung und den anschließenden Positronentransport mit der beobachtbaren galaktischen 511-keV-Linie verbindet. Das Projekt trennt bewusst Hypothesen, implementierte Berechnungen und Beobachtungsanker, statt ein einzelnes Szenario als etablierte Physik darzustellen.",heroRun:"Research Workbench starten",badgeExploratory:"explorativ — keine validierte Inferenz",
 changedEye:"Was sich geändert hat",changedTitle:"Von einer starken Idee zu einer überprüfbaren Modellkette",changedIntro:"Frühe AxionBH-Versionen waren zu kategorisch: Schwarze Löcher wurden als direkte Materie-Antimaterie-Konverter behandelt, und das Szenario wurde so formuliert, als erkläre es bereits die Baryonenasymmetrie und das 511-keV-Signal. In v8.x wurde dies durch eine Schichtenarchitektur ersetzt, in der jedes Glied unabhängig geprüft, deaktiviert oder verworfen werden kann.",
 fixed:"korrigiert",implemented:"implementiert",c1t:"511 keV: eine Rate, nicht erg/s",c1p:"Die galaktische Größe der Ordnung 10^43 bezeichnet eine Positron-Annihilations-/Injektionsrate in e+/s und keine Energieleuchtkraft. Das aktuelle Modell trennt diese Größen und berechnet den 511-keV-Photonenfluss separat.",c2p:"Der axiale chirale Wirbelstrom und der magnetische chirale Strom werden nun als unterschiedliche physikalische Größen behandelt. Sie werden nicht automatisch addiert und ergeben ohne zusätzliche Mikrophysik keine Positronenleuchtkraft.",c3t:"Paarerzeugung ist vom beobachteten Signal getrennt",c3p:"Eine Positronenquelle ist nur der Anfang. v8.8–v8.9 ergänzen Quellenaustritt, Abbremsung, räumlichen Transport, Annihilation, Positronium-Verzweigung und die Umrechnung in einen beobachtbaren 511-keV-Linienfluss.",c4t:"Plasma ist jetzt eine eigene Schicht",c4p:"Das Elektronen-Vektor-Chemiepotential kann manuell vorgegeben, aus der Dichte bestimmt oder über eine reduzierte Akkretions-Closure geschätzt werden. Effekte der endlichen Elektronenmasse werden getrennt von der alten masselosen Näherung behandelt.",
 hypEye:"Hypothesenkarte",hypTitle:"Was AxionBH heute tatsächlich voraussetzt",hypIntro:"Die Statusangaben bedeuten nicht „wahr“ oder „falsch“. Sie markieren die Modellierungsebene: von spekulativen fundamentalen Annahmen bis zu etablierter astrophysikalischer Mikrophysik als Diagnoseschicht.",
@@ -257,8 +285,8 @@ limitsEye:"Grenzen",limitsTitle:"Was noch nicht als etablierte Physik gelten kan
 refsEye:"Beobachtungsanker",refsTitle:"Kontext, mit dem die Workbench geprüft wird",refsIntro:"Die Links führen zu Originalarbeiten; AxionBH stellt sie nicht als Bestätigung seiner eigenen Hypothesen dar.",r1p:"GRMHD-Modelle und ein vielversprechender niedrig geneigter MAD-Cluster mit ṁ von etwa 5.2–9.5×10⁻⁹ M☉/yr.",r2p:"Ein Bulge-Linienfluss bei 511 keV von etwa 0.96×10⁻³ ph cm⁻² s⁻¹ dient als Beobachtungsreferenz.",r3p:"Kollisionaler und magnetisch geführter Transport niederenergetischer Positronen setzt eine kritische Skala zwischen Quellproduktion und Annihilationsmorphologie."
 },
 zh: {
-navHyp:"假设",navArchitecture:"架构",navAudits:"审计",navLimits:"局限",navSimulator:"打开模拟器",
-heroEyebrow:"探索性研究工作台 · v8.9.0",heroText:"一个探索性模型，将黑洞附近物理、等离子体与类轴子机制、电子—正电子对产生，以及正电子后续输运，与可观测的银河系 511 keV 谱线联系起来。项目刻意区分假设、已实现计算和观测锚点，而不是把某一个情景当成已经确立的物理理论。",heroRun:"启动 Research Workbench",badgeExploratory:"探索性模型 — 非经验证的推断",
+navHyp:"假设",navArchitecture:"架构",navAudits:"审计",navLimits:"局限",navSimulator:"打开工作台",
+heroEyebrow:"探索性研究工作台 · v8.9.1",heroText:"一个探索性模型，将黑洞附近物理、等离子体与类轴子机制、电子—正电子对产生，以及正电子后续输运，与可观测的银河系 511 keV 谱线联系起来。项目刻意区分假设、已实现计算和观测锚点，而不是把某一个情景当成已经确立的物理理论。",heroRun:"启动 Research Workbench",badgeExploratory:"探索性模型 — 非经验证的推断",
 changedEye:"发生了什么变化",changedTitle:"从一个强假设，转向可检验的模型链",changedIntro:"早期 AxionBH 版本的表述过于确定：把黑洞视为直接的物质—反物质转换器，并暗示它已经解释了重子不对称和 511 keV 信号。v8.x 将其改为分层架构，每个环节都可以独立检验、关闭或否定。",
 fixed:"已修正",implemented:"已实现",c1t:"511 keV：是速率，不是 erg/s",c1p:"银河系中约 10^43 的量级指的是正电子湮灭/注入速率 e+/s，而不是能量光度。当前模型将这些量分开，并独立计算 511 keV 光子通量。",c2p:"轴向手征涡旋流与磁性手征流现在被视为不同的物理对象。它们不会被自动相加，也不会在缺少额外微观物理的情况下直接变成正电子光度。",c3t:"正负电子对产生与观测信号已分离",c3p:"正电子源只是第一步。v8.8–v8.9 加入源区逃逸、减速、空间输运、湮灭、正电子素分支，以及到可观测 511 keV 谱线通量的转换。",c4t:"等离子体成为独立层",c4p:"电子矢量化学势可以手动给定、由密度反演，或通过简化吸积 closure 估算。有限电子质量效应与旧的无质量近似分开处理。",
 hypEye:"假设地图",hypTitle:"AxionBH 目前真正假设了什么",hypIntro:"这里的状态标签不代表“真/假”，而是表示建模层级：从推测性的基础假设，到作为诊断模块使用的常规天体物理微观过程。",
@@ -275,7 +303,7 @@ refsEye:"观测锚点",refsTitle:"用于检验 workbench 的外部背景",refsIn
 const english = {};
 document.querySelectorAll("[data-i18n]").forEach(el => english[el.dataset.i18n] = el.textContent);
 
-function setLanguage(lang) {
+function setLanguage(lang, { syncUrl = true } = {}) {
   const dict = lang === "en" ? english : translations[lang];
   if (!dict) return;
   document.querySelectorAll("[data-i18n]").forEach(el => {
@@ -283,12 +311,24 @@ function setLanguage(lang) {
     if (value !== undefined) el.textContent = value;
   });
   document.documentElement.lang = lang === "zh" ? "zh-CN" : lang;
-  document.querySelectorAll(".lang-btn").forEach(btn => btn.classList.toggle("active", btn.dataset.lang === lang));
+  document.querySelectorAll(".lang-btn").forEach(btn => {
+    const active = btn.dataset.lang === lang;
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-pressed", String(active));
+  });
   localStorage.setItem("axionbh-language", lang);
+  if (syncUrl) {
+    const url = new URL(window.location.href);
+    if (lang === "en") url.searchParams.delete("lang");
+    else url.searchParams.set("lang", lang);
+    history.replaceState(null, "", url);
+  }
 }
 document.querySelectorAll(".lang-btn").forEach(btn => btn.addEventListener("click", () => setLanguage(btn.dataset.lang)));
+const requested = new URLSearchParams(window.location.search).get("lang");
 const saved = localStorage.getItem("axionbh-language");
-setLanguage(["en","ru","de","zh"].includes(saved) ? saved : "en");
+const initial = ["en","ru","de","zh"].includes(requested) ? requested : (["en","ru","de","zh"].includes(saved) ? saved : "en");
+setLanguage(initial, { syncUrl: false });
 </script>
 </body>
 </html>
