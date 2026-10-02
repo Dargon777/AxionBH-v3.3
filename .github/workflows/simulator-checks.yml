@@ -1,4 +1,4 @@
-name: AxionBH simulator checks
+name: AxionBH checks
 
 on:
   push:
@@ -10,14 +10,25 @@ permissions:
   contents: read
 
 jobs:
-  simulator:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+
+      - name: JavaScript syntax
+        run: |
+          node --check simulator-core.js
+          node --check simulator-app.js
+
       - name: Physics engine tests
         run: node tests/simulator-core.test.cjs
-      - name: Static app integrity
+
+      - name: Workbench static integrity
         run: node tests/static-app.test.cjs
+
+      - name: Site and docs integrity
+        run: node tests/site-integrity.test.cjs
