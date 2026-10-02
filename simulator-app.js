@@ -15,9 +15,9 @@
   };
 
   const modeNames = {
-    cme: "CVE closure / стационарное облако",
-    bosenova: "Bosenova / ручные вспышки",
-    superradiant: "Суперрадиантный рост",
+    cme: "CVE closure / stationary cloud",
+    bosenova: "Bosenova / manual bursts",
+    superradiant: "Scalar superradiant growth",
     hybrid: "Superradiant + Bosenova"
   };
 
@@ -165,7 +165,7 @@
   }
 
   function saveUserPreset() {
-    let name = window.prompt("Название пресета:");
+    let name = window.prompt("Preset name:");
     if (!name) return;
     name = name.trim().slice(0, 48);
     if (!name) return;
@@ -198,7 +198,7 @@
 
     persistUserPresets();
     refreshPresetOptions("user:" + record.id);
-    toast("Пресет сохранён локально.");
+    toast("Preset saved locally.");
   }
 
   function deleteUserPreset() {
@@ -208,7 +208,7 @@
     state.userPresets = state.userPresets.filter((item) => item.id !== id);
     persistUserPresets();
     refreshPresetOptions("custom");
-    toast("Пресет удалён.");
+    toast("Preset deleted.");
   }
 
   function markCustom() {
@@ -269,8 +269,8 @@
   function primaryMetrics(result) {
     if (result.mode === "cme") {
       return [
-        ["ā", A.formatScientific(result.aBar) + " GeV", "устойчивая natural-unit ветвь"],
-        ["κ", A.formatScientific(result.kappa), "эффективность конверсии"],
+        ["ā", A.formatScientific(result.aBar) + " GeV", "stable natural-unit branch"],
+        ["κ", A.formatScientific(result.kappa), "conversion efficiency"],
         ["P_proxy", A.formatScientific(result.luminosity) + " erg/s", "phenomenological energy-budget power"],
         ["Ṅₑ₊,eq", A.formatScientific(result.equivalentPositronRate) + " s⁻¹", "energy-budget equivalent"],
         ["e⁺ budget / target", formatRatio(result.ratio511), "target 2×10⁴³ e⁺/s"]
@@ -278,34 +278,34 @@
     }
     if (result.mode === "bosenova") {
       return [
-        ["Eₑ₊ / burst", A.formatScientific(result.convertedEnergy) + " erg", "энергия после эффективности"],
-        ["Nₑ₊ / burst", A.formatScientific(result.positronsPerBurst), "оценка числа позитронов"],
-        ["⟨L⟩", A.formatScientific(result.averageLuminosity) + " erg/s", "средняя светимость"],
-        ["⟨L⟩ / L₅₁₁", formatRatio(result.ratio511), "относительно наблюдаемой"]
+        ["Eₑ₊ / burst", A.formatScientific(result.convertedEnergy) + " erg", "energy after efficiency"],
+        ["Nₑ₊ / burst", A.formatScientific(result.positronsPerBurst), "positron-count estimate"],
+        ["⟨L⟩", A.formatScientific(result.averageLuminosity) + " erg/s", "average luminosity"],
+        ["⟨L⟩ / L₅₁₁", formatRatio(result.ratio511), "relative to observed"]
       ];
     }
     if (result.mode === "superradiant") {
       return [
-        ["α", A.formatScientific(result.alpha), "гравитационная связь"],
+        ["α", A.formatScientific(result.alpha), "gravitational coupling"],
         ["SR gate", result.superradiantCondition ? "OPEN" : "CLOSED", "ω_R < mΩ_H"],
         ["Γ₂₁₁", A.formatScientific(result.gamma) + " s⁻¹", "small-α literature fit"],
         ["e⁺ budget / target", formatRatio(result.ratio511), "phenomenological conversion"]
       ];
     }
     return [
-      ["α", A.formatScientific(result.alpha), "гравитационная связь"],
-      ["t_sat", A.formatDuration(result.saturationTime), "время накопления"],
-      ["⟨L_burst⟩", A.formatScientific(result.averageLuminosity) + " erg/s", "среднее по циклу"],
-      ["⟨L⟩ / L₅₁₁", formatRatio(result.ratio511), "относительно наблюдаемой"]
+      ["α", A.formatScientific(result.alpha), "gravitational coupling"],
+      ["t_sat", A.formatDuration(result.saturationTime), "growth time"],
+      ["⟨L_burst⟩", A.formatScientific(result.averageLuminosity) + " erg/s", "cycle average"],
+      ["⟨L⟩ / L₅₁₁", formatRatio(result.ratio511), "relative to observed"]
     ];
   }
 
   function detailedRows(result) {
-    const rows = [["Режим", modeNames[result.mode]]];
+    const rows = [["Mode", modeNames[result.mode]]];
     if (result.mode === "cme") {
       rows.push(
-        ["Спиновый порог", result.thresholdPassed ? "пройден" : "не пройден (a/M < 0.35)"],
-        ["Среднее B в эргосфере", A.formatScientific(result.avgB) + " G"],
+        ["Spin threshold", result.thresholdPassed ? "passed" : "not passed (a/M < 0.35)"],
+        ["Average B in ergosphere", A.formatScientific(result.avgB) + " G"],
         ["ā", A.formatScientific(result.aBar) + " GeV"],
         ["μ₅", A.formatScientific(result.mu5) + " GeV"],
         ["η₅ = μ₅/T", A.formatScientific(result.eta5)],
@@ -331,44 +331,44 @@
       );
     } else if (result.mode === "bosenova") {
       rows.push(
-        ["Конвертированная энергия", A.formatScientific(result.convertedEnergy) + " erg"],
-        ["Средний темп e⁺", A.formatScientific(result.averageRate) + " s⁻¹"],
-        ["Средняя светимость", A.formatScientific(result.averageLuminosity) + " erg/s"],
-        ["Пиковая светимость", A.formatScientific(result.burstLuminosity) + " erg/s"],
-        ["Интервал", A.formatDuration(result.intervalSeconds)]
+        ["Converted energy", A.formatScientific(result.convertedEnergy) + " erg"],
+        ["Average e⁺ rate", A.formatScientific(result.averageRate) + " s⁻¹"],
+        ["Average luminosity", A.formatScientific(result.averageLuminosity) + " erg/s"],
+        ["Peak luminosity", A.formatScientific(result.burstLuminosity) + " erg/s"],
+        ["Interval", A.formatDuration(result.intervalSeconds)]
       );
     } else {
       rows.push(
-        ["Уровень", result.level || "211"],
-        ["Активна суперрадиация", result.active ? "да" : "нет"],
-        ["Условие ω_R < mΩ_H", result.superradiantCondition ? "выполнено" : "не выполнено"],
+        ["Level", result.level || "211"],
+        ["Superradiance active", result.active ? "yes" : "no"],
+        ["Condition ω_R < mΩ_H", result.superradiantCondition ? "satisfied" : "not satisfied"],
         ["α", A.formatScientific(result.alpha)],
         ["ω_R M", A.formatScientific(result.omegaRDimensionless)],
         ["Ω_H M", A.formatScientific(result.horizonOmegaDimensionless)],
-        ["Критический spin", result.criticalSpin == null ? "—" : A.formatScientific(result.criticalSpin)],
+        ["Critical spin", result.criticalSpin == null ? "—" : A.formatScientific(result.criticalSpin)],
         ["Growth bracket", A.formatScientific(result.growthBracket)],
         ["Γ₂₁₁", A.formatScientific(result.gamma) + " s⁻¹"],
         ["e-fold", A.formatDuration(result.eFoldTime)],
         ["N_seed", A.formatScientific(result.seedOccupation)],
         ["N_sat", A.formatScientific(result.saturationOccupation)],
-        ["Число e-fold", A.formatScientific(result.eFoldCount)],
-        ["Доля массы облака при saturation", A.formatScientific(result.saturationFraction)],
-        ["Насыщение", A.formatDuration(result.saturationTime)]
+        ["Number of e-folds", A.formatScientific(result.eFoldCount)],
+        ["Cloud-mass fraction at saturation", A.formatScientific(result.saturationFraction)],
+        ["Saturation", A.formatDuration(result.saturationTime)]
       );
       if (result.mode === "superradiant") {
         rows.push(
-          ["Энергия облака при saturation", A.formatScientific(result.cloudEnergyErg) + " erg"],
+          ["Cloud energy at saturation", A.formatScientific(result.cloudEnergyErg) + " erg"],
           ["ΓE_cloud proxy", A.formatScientific(result.growthPowerAtSaturationProxy) + " erg/s"],
-          ["Средняя мощность извлечения", A.formatScientific(result.averageExtractionPower) + " erg/s"],
+          ["Average extraction power", A.formatScientific(result.averageExtractionPower) + " erg/s"],
           ["ε_pair", A.formatScientific(result.conversionEfficiency)],
-          ["Позитронная мощность proxy", A.formatScientific(result.positronPower) + " erg/s"]
+          ["Positron-power proxy", A.formatScientific(result.positronPower) + " erg/s"]
         );
       } else {
         rows.push(
-          ["Энергия вспышки", A.formatScientific(result.burstEnergy) + " erg"],
-          ["Конвертированная энергия", A.formatScientific(result.convertedEnergy) + " erg"],
-          ["Средняя светимость", A.formatScientific(result.averageLuminosity) + " erg/s"],
-          ["Пиковая светимость", A.formatScientific(result.burstLuminosity) + " erg/s"]
+          ["Burst energy", A.formatScientific(result.burstEnergy) + " erg"],
+          ["Converted energy", A.formatScientific(result.convertedEnergy) + " erg"],
+          ["Average luminosity", A.formatScientific(result.averageLuminosity) + " erg/s"],
+          ["Peak luminosity", A.formatScientific(result.burstLuminosity) + " erg/s"]
         );
       }
     }
@@ -382,7 +382,7 @@
       ordered[key] = Number(p[key]);
     });
     const source = JSON.stringify({
-      model: "AxionBH-v8.9.0",
+      model: "AxionBH-v8.9.1",
       mode,
       parameters: ordered
     });
@@ -430,8 +430,8 @@
 
     $("diagnostics").innerHTML =
       '<div class="diagnostics-head">' +
-      '<strong>Диагностика</strong>' +
-      '<span class="state-id" title="Детерминированный идентификатор режима и параметров">' +
+      '<strong>Diagnostics</strong>' +
+      '<span class="state-id" title="Deterministic identifier for the mode and parameter state">' +
       stateId + '</span>' +
       '</div>' +
       '<div class="diagnostics-list">' + items + '</div>';
@@ -465,8 +465,8 @@
         "Scalar 211 superradiance kinematically closed: ω_R ≥ mΩ_H. Γ is set to zero before any positron-conversion proxy.";
     } else {
       $("interpretation").textContent = ratio >= 1
-        ? "В этой точке реализация модели достигает или превышает выбранный positron-rate target."
-        : "В этой точке реализация модели остаётся ниже выбранного positron-rate target.";
+        ? "At this point the implemented model reaches or exceeds the selected positron-rate target."
+        : "At this point the implemented model remains below the selected positron-rate target.";
     }
     renderDiagnostics(result);
   }
@@ -511,10 +511,10 @@
   function renderSpinAnalysis() {
     const p = params();
     const points = A.spinSweep(p, 72);
-    setAnalysisMeta("κ как функция спина", "CVE closure · логарифмическая шкала");
+    setAnalysisMeta("κ as a function of spin", "CVE closure · logarithmic scale");
     setAnalysisTable("");
 
-    if (!window.Plotly) return toast("Plotly не загрузился; сами расчёты работают.");
+    if (!window.Plotly) return toast("Plotly did not load; the numerical calculations still work.");
 
     const layout = plotLayout("spin a/M", "κ");
     layout.yaxis.type = "log";
@@ -534,7 +534,8 @@
   }
 
   const referenceNames = {
-    baseline: "Sgr A* baseline",
+    baseline: "Sgr A* · EHT-context baseline",
+    legacy: "Legacy AxionBH baseline",
     breakthrough: "High-B breakthrough",
     optimistic: "Optimistic"
   };
@@ -661,12 +662,12 @@
 
     return [
       '<div class="explorer-summary">',
-      '<div><span>Модель A</span><strong>Текущие параметры</strong></div>',
-      '<div><span>Модель B</span><strong>' +
+      '<div><span>Model A</span><strong>Current parameters</strong></div>',
+      '<div><span>Model B</span><strong>' +
         (referenceNames[referenceKey] || referenceKey) + '</strong></div>',
       '<div><span>fₐ slice</span><strong>' +
         A.formatScientific(faGev, 2) + ' GeV</strong></div>',
-      '<div><span>Сетка</span><strong>' +
+      '<div><span>Grid</span><strong>' +
         resolution[0] + '×' + resolution[1] + '</strong></div>',
       '<div><span>Median |Δ|</span><strong>' +
         (median === null ? "—" : median.toFixed(2) + "%") + '</strong></div>',
@@ -901,8 +902,8 @@
 
     return [
       '<div class="explorer-summary">',
-      '<div><span>Карта</span><strong>Дефицит до L₅₁₁</strong></div>',
-      '<div><span>Модель</span><strong>Текущие параметры</strong></div>',
+      '<div><span>Map</span><strong>Deficit to the e⁺ target</strong></div>',
+      '<div><span>Model</span><strong>Current parameters</strong></div>',
       '<div><span>fₐ slice</span><strong>' +
         A.formatScientific(data.faGev, 2) + ' GeV</strong></div>',
       '<div><span>Best gap</span><strong>' +
@@ -961,8 +962,8 @@
     setAnalysisMeta(
       view === "deficit" ? "CME deficit map" : "3D Parameter Explorer",
       view === "deficit"
-        ? "Сколько порядков величины отделяет e⁺ budget ratio от единицы; нулевые точки не имеют конечного log-gap"
-        : "CVE closure · spin × B₀ · fₐ задаёт логарифмический срез; A и B используют один fₐ"
+        ? "Decimal orders separating the e⁺ budget ratio from unity; zero-output points have no finite log gap"
+        : "CVE closure · spin × B₀ · fₐ defines the logarithmic slice; A and B use the same fₐ"
     );
 
     const data = getExplorerComparison();
@@ -980,7 +981,7 @@
     $("explorerReference").disabled = view === "deficit";
 
     if (!window.Plotly) {
-      return toast("Plotly не загрузился; сетка рассчитана, но не может быть нарисована.");
+      return toast("Plotly did not load; the grid was computed but cannot be rendered.");
     }
 
     if (view === "deficit") renderExplorerDeficit(data);
@@ -997,13 +998,13 @@
     });
 
     setAnalysisMeta(
-      "Чувствительность ±10%",
-      modeNames[mode] + " · отклик e⁺ budget ratio на изменение одного параметра"
+      "Sensitivity ±10%",
+      modeNames[mode] + " · e⁺ budget-ratio response to a one-parameter perturbation"
     );
 
     const rows = analysis.rows;
     const html = [
-      '<div class="analysis-row analysis-row-head"><span>Параметр</span><span>−10%</span><span>+10%</span><span>Эластичность</span></div>',
+      '<div class="analysis-row analysis-row-head"><span>Parameter</span><span>−10%</span><span>+10%</span><span>Elasticity</span></div>',
       ...rows.map((row) =>
         '<div class="analysis-row"><strong>' +
         (parameterLabels[row.key] || row.key) +
@@ -1017,7 +1018,7 @@
     setAnalysisTable(html);
 
     if (!window.Plotly) return;
-    const layout = plotLayout("параметр", "макс. |Δ(e⁺ budget ratio)|, %");
+    const layout = plotLayout("parameter", "max |Δ(e⁺ budget ratio)|, %");
     Plotly.react("plot", [{
       type: "bar",
       x: rows.map((row) => parameterLabels[row.key] || row.key),
@@ -1052,10 +1053,10 @@
     if ($("mode").value !== "cme") {
       setAnalysisMeta(
         "Parameter Inference",
-        "v8.9 inverse solver сейчас определён для CVE closure"
+        "The v8.9 inverse solver is currently defined for the CVE closure"
       );
       setAnalysisTable(
-        '<div class="inference-empty">Переключи режим на CME, чтобы оценить дефицит и требуемые однопараметрические сдвиги.</div>'
+        '<div class="inference-empty">Switch to the CVE closure to estimate the deficit and required one-parameter shifts.</div>'
       );
       if (window.Plotly) Plotly.purge("plot");
       return;
@@ -1069,7 +1070,7 @@
 
     setAnalysisMeta(
       "Parameter Inference",
-      "Однопараметрический inverse scan до e⁺ budget ratio = 1 · диапазоны диагностические, не физические priors"
+      "One-parameter inverse scan to e⁺ budget ratio = 1 · scan ranges are diagnostic, not physical priors"
     );
 
     const deficit = analysis.deficitOrders;
@@ -1090,7 +1091,7 @@
     ].join("");
 
     const table = [
-      '<div class="analysis-row analysis-row-head inference"><span>Параметр</span><span>Сейчас</span><span>Required / best</span><span>Сдвиг</span><span>Итог</span></div>',
+      '<div class="analysis-row analysis-row-head inference"><span>Parameter</span><span>Current</span><span>Required / best</span><span>Shift</span><span>Outcome</span></div>',
       ...rows.map((row) => {
         const remaining = row.status === "solved"
           ? "0 dex"
@@ -1111,8 +1112,8 @@
 
     if (!window.Plotly) return;
     const layout = plotLayout(
-      "один изменяемый параметр",
-      "оставшийся дефицит, dex"
+      "one varied parameter",
+      "remaining deficit, dex"
     );
     layout.yaxis.rangemode = "tozero";
     Plotly.react("plot", [{
@@ -1177,10 +1178,10 @@
     if ($("mode").value !== "cme") {
       setAnalysisMeta(
         "Anomalous Transport",
-        "CVE/CME decomposition сейчас привязана к стационарной axion closure"
+        "CVE/CME decomposition is currently tied to the stationary axion closure"
       );
       setAnalysisTable(
-        '<div class="inference-empty">Переключи режим на CVE closure. Этот анализ сравнивает токи и не преобразует их автоматически в L₅₁₁.</div>'
+        '<div class="inference-empty">Switch to the CVE closure. This analysis compares currents and does not automatically convert them into a 511-keV observable.</div>'
       );
       if (window.Plotly) Plotly.purge("plot");
       return;
@@ -1224,17 +1225,17 @@
     ].join("");
 
     const table = [
-      '<div class="analysis-row analysis-row-head transport"><span>Канал</span><span>Тип тока</span><span>Направление</span><span>Коэффициент</span></div>',
+      '<div class="analysis-row analysis-row-head transport"><span>Channel</span><span>Current type</span><span>Direction</span><span>Coefficient</span></div>',
       '<div class="analysis-row transport"><strong>Axial CVE</strong><span>axial J₅</span><span>∥ ω</span><span>T²/6 + μ₅²/(2π²)</span></div>',
       '<div class="analysis-row transport"><strong>Magnetic CME</strong><span>vector/electric j</span><span>∥ B</span><span>e² μ₅/(2π²)</span></div>'
     ].join("");
 
     const note =
-      '<div class="missing-note"><strong>Не суммируется в L₅₁₁:</strong> ' +
-      'это разные токи с разными направлениями и квантовыми числами. ' +
-      'Без отдельной геометрии, кинетики, relaxation и pair-production closure ' +
-      'перевод jCME в позитронную светимость был бы выдуманным. ' +
-      'В текущем CVE коэффициенте доля μ₅²-члена = ' +
+      '<div class="missing-note"><strong>Not summed into the 511-keV observable:</strong> ' +
+      'these are distinct currents with different directions and quantum numbers. ' +
+      'Without a dedicated geometry, kinetic model, relaxation treatment, and pair-production closure, ' +
+      'converting jCME into positron luminosity would be unjustified. ' +
+      'In the current CVE coefficient, the μ₅²-term fraction = ' +
       chemicalShare + '.</div>';
 
     setAnalysisTable(summary + table + note);
@@ -1441,7 +1442,7 @@
         "massive Dirac CVE diagnostic is attached to the stationary CVE closure"
       );
       setAnalysisTable(
-        '<div class="inference-empty">Переключи режим на CVE closure.</div>'
+        '<div class="inference-empty">Switch to the CVE closure.</div>'
       );
       if (window.Plotly) Plotly.purge("plot");
       return;
@@ -1633,7 +1634,7 @@
         "Calibration is evaluated through the stationary CVE + accretion-plasma chain"
       );
       setAnalysisTable(
-        '<div class="inference-empty">Переключи режим на CVE closure.</div>'
+        '<div class="inference-empty">Switch to the CVE closure.</div>'
       );
       if (window.Plotly) Plotly.purge("plot");
       return;
@@ -1859,7 +1860,7 @@
         "RIAF geometry envelope is evaluated through the stationary CVE accretion-plasma chain"
       );
       setAnalysisTable(
-        '<div class="inference-empty">Переключи режим на CVE closure.</div>'
+        '<div class="inference-empty">Switch to the CVE closure.</div>'
       );
       if (window.Plotly) Plotly.purge("plot");
       return;
@@ -1996,7 +1997,7 @@
   function renderMicrophysicsAudit() {
     if ($("mode").value !== "cme") {
       setAnalysisMeta("Microphysics Audit", "stationary CVE closure only");
-      setAnalysisTable('<div class="inference-empty">Переключи режим на CVE closure.</div>');
+      setAnalysisTable('<div class="inference-empty">Switch to the CVE closure.</div>');
       if (window.Plotly) Plotly.purge("plot");
       return;
     }
@@ -2054,7 +2055,7 @@
 
 
   function renderPairProduction() {
-    if ($("mode").value !== "cme") {setAnalysisMeta("Pair Production","Schwinger diagnostic");setAnalysisTable('<div class="inference-empty">Переключи режим на CVE closure.</div>');if(window.Plotly)Plotly.purge("plot");return;}
+    if ($("mode").value !== "cme") {setAnalysisMeta("Pair Production","Schwinger diagnostic");setAnalysisTable('<div class="inference-empty">Switch to the CVE closure.</div>');if(window.Plotly)Plotly.purge("plot");return;}
     const audit=A.pairProductionAudit(params()),req=audit.required;
     setAnalysisMeta("Explicit Pair Production","idealized constant-field Schwinger channel · 1 r_g shell");
     setAnalysisTable(['<div class="pair-summary">','<div><span>Ecrit</span><strong>'+A.formatScientific(audit.criticalFieldVcm,3)+' V/cm</strong></div>','<div><span>Required E/Ecrit</span><strong>'+A.formatScientific(req.electricFieldOverCritical,3)+'</strong></div>','<div><span>Required E</span><strong>'+A.formatScientific(req.electricFieldVcm,3)+' V/cm</strong></div>','<div><span>Min pair power</span><strong>'+A.formatScientific(audit.minimumObservedPairPowerErgS,3)+' erg/s</strong></div>','<div><span>Ṁc² / min pair power</span><strong>'+A.formatScientific(audit.energyBudgetRatio,3)+'×</strong></div>','</div>','<div class="missing-note"><strong>Interpretation:</strong> Schwinger production remains an explicit vacuum-QED channel. The v8.6 Gap tab now supplies a separate charge-starvation and analytic-potential cascade diagnostic; neither channel is a self-consistent GR plasma solution.</div>'].join(""));
@@ -2066,7 +2067,7 @@
   function renderGapElectrodynamics() {
     if ($("mode").value !== "cme") {
       setAnalysisMeta("Gap / Pair Cascade","charge starvation → curvature/IC γ → γγ");
-      setAnalysisTable('<div class="inference-empty">Переключи режим на CVE closure.</div>');
+      setAnalysisTable('<div class="inference-empty">Switch to the CVE closure.</div>');
       if(window.Plotly)Plotly.purge("plot");
       return;
     }
@@ -2246,7 +2247,7 @@
 
     setAnalysisMeta(
       "Model Validity / Layer Map",
-      "Что выведено внутри принятой модели, что идеализировано, а что остаётся phenomenological ansatz"
+      "What is derived within the adopted model, what is idealized, and what remains a phenomenological ansatz"
     );
 
     const summary = [
@@ -2299,10 +2300,10 @@
     if ($("mode").value !== "cme") {
       setAnalysisMeta(
         "Chirality Dynamics",
-        "n₅(t) diagnostic определён для стационарной CVE closure"
+        "The n₅(t) diagnostic is defined for the stationary CVE closure"
       );
       setAnalysisTable(
-        '<div class="inference-empty">Переключи режим на CVE closure. Динамика хиральности не подключена к другим luminosity-веткам.</div>'
+        '<div class="inference-empty">Switch to the CVE closure. Chirality dynamics are not wired into the other luminosity branches.</div>'
       );
       if (window.Plotly) Plotly.purge("plot");
       return;
@@ -2442,10 +2443,10 @@
     if ($("mode").value !== "cme") {
       setAnalysisMeta(
         "Missing Physics Lab",
-        "Феноменологические gain-каналы определены только для CVE closure"
+        "Phenomenological gain channels are defined only for the CVE closure"
       );
       setAnalysisTable(
-        '<div class="inference-empty">Переключи режим на CME. Эта вкладка не меняет основной расчёт и служит только диагностикой.</div>'
+        '<div class="inference-empty">Switch to the CVE closure. This tab does not alter the baseline calculation and is diagnostic only.</div>'
       );
       if (window.Plotly) Plotly.purge("plot");
       return;
@@ -2460,7 +2461,7 @@
 
     setAnalysisMeta(
       "Missing Physics Lab",
-      "g_extra — феноменологический диагностический множитель; основной CVE-результат остаётся неизменным"
+      "g_extra is a phenomenological diagnostic multiplier; the baseline CVE result remains unchanged"
     );
 
     const selectedState = selected.closureValid
@@ -2600,16 +2601,16 @@
       baseline: "Sgr A* baseline",
       breakthrough: "High-B breakthrough",
       optimistic: "Optimistic",
-      current: "Текущие параметры"
+      current: "Current parameters"
     };
 
     setAnalysisMeta(
-      "Сравнение сценариев",
-      modeNames[mode] + " · одна и та же метрика e⁺ budget ratio"
+      "Scenario comparison",
+      modeNames[mode] + " · the same e⁺ budget-ratio metric"
     );
 
     const html = [
-      '<div class="analysis-row analysis-row-head compare"><span>Сценарий</span><span>a/M</span><span>B₀</span><span>e⁺ budget ratio</span></div>',
+      '<div class="analysis-row analysis-row-head compare"><span>Scenario</span><span>a/M</span><span>B₀</span><span>e⁺ budget ratio</span></div>',
       ...scenarios.map((item) =>
         '<div class="analysis-row compare"><strong>' +
         names[item.name] +
@@ -2622,7 +2623,7 @@
     setAnalysisTable(html);
 
     if (!window.Plotly) return;
-    const layout = plotLayout("сценарий", "e⁺ budget ratio");
+    const layout = plotLayout("scenario", "e⁺ budget ratio");
     layout.yaxis.type = "log";
     Plotly.react("plot", [{
       type: "bar",
@@ -2682,11 +2683,11 @@
       state.lastParams = p;
       state.lastMode = mode;
       render(result);
-      $("runStatus").textContent = "Расчёт завершён";
+      $("runStatus").textContent = "Calculation complete";
       $("runStatusDot").style.background = "var(--ok)";
       renderAnalysis(state.analysis);
     } catch (error) {
-      $("runStatus").textContent = "Ошибка параметров";
+      $("runStatus").textContent = "Parameter error";
       $("runStatusDot").style.background = "var(--danger)";
       toast(error.message || String(error));
     }
@@ -2704,11 +2705,11 @@
   }
 
   function downloadJson() {
-    if (!state.lastResult) return toast("Сначала выполни расчёт.");
+    if (!state.lastResult) return toast("Run a calculation first.");
     const diagnostics = currentDiagnostics();
     const payload = {
       generatedAt: new Date().toISOString(),
-      model: "AxionBH research workbench v8.9.0",
+      model: "AxionBH research workbench v8.9.1",
       modelVersion: A.MODEL_VERSION,
       stateSchemaVersion: A.STATE_SCHEMA_VERSION,
       stateId: runStateId(state.lastMode, state.lastParams),
@@ -2788,13 +2789,13 @@
   }
 
   function downloadReport() {
-    if (!state.lastResult) return toast("Сначала выполни расчёт.");
+    if (!state.lastResult) return toast("Run a calculation first.");
     const diagnostics = currentDiagnostics();
     const stateId = runStateId(state.lastMode, state.lastParams);
     const lines = [
       "# AxionBH reproducibility report",
       "",
-      "- Model: AxionBH Research Workbench v8.9.0",
+      "- Model: AxionBH Research Workbench v8.9.1",
       "- Generated: " + new Date().toISOString(),
       "- State ID: " + stateId,
       "- Mode: " + modeNames[state.lastMode],
@@ -2915,15 +2916,15 @@
   }
 
   async function copyResult() {
-    if (!state.lastResult) return toast("Сначала выполни расчёт.");
+    if (!state.lastResult) return toast("Run a calculation first.");
     const text = detailedRows(state.lastResult)
       .map(([key, value]) => key + ": " + value)
       .join("\n");
     try {
       await navigator.clipboard.writeText(text);
-      toast("Результаты скопированы.");
+      toast("Results copied.");
     } catch {
-      toast("Буфер обмена недоступен.");
+      toast("Clipboard unavailable.");
     }
   }
 
@@ -3004,9 +3005,9 @@
 
     try {
       await navigator.clipboard.writeText(url.toString());
-      toast("Ссылка на этот расчёт скопирована.");
+      toast("Link to this calculation copied.");
     } catch {
-      window.prompt("Скопируй ссылку:", url.toString());
+      window.prompt("Copy this link:", url.toString());
     }
   }
 
@@ -3132,7 +3133,7 @@
       updatePresetButtons();
       return true;
     } catch {
-      toast("Не удалось прочитать параметры из ссылки.");
+      toast("Could not restore parameters from the shared link.");
       return false;
     }
   }
@@ -3143,6 +3144,20 @@
     document.documentElement.dataset.theme = next;
     localStorage.setItem("axionbh-theme", next);
     if (state.lastResult) renderAnalysis(state.analysis);
+  }
+
+  function resetWorkbench() {
+    const url = new URL(window.location.href);
+    url.search = "";
+    window.history.replaceState(null, "", url.toString());
+    $("mode").value = "cme";
+    state.analysis = "spin";
+    document.querySelectorAll(".analysis-tab").forEach((button) => {
+      button.classList.toggle("active", button.dataset.analysis === "spin");
+    });
+    selectPreset("baseline");
+    renderAnalysis("spin");
+    toast("Workbench reset to the EHT-context baseline.");
   }
 
   let explorerRenderTimer;
@@ -3200,6 +3215,7 @@
       run();
     });
     $("runBtn").addEventListener("click", run);
+    $("resetBtn").addEventListener("click", resetWorkbench);
     $("shareBtn").addEventListener("click", shareCurrentState);
     $("copyBtn").addEventListener("click", copyResult);
     $("exportBtn").addEventListener("click", downloadJson);
@@ -3288,8 +3304,20 @@
     updateGapLabels();
     updatePositronLabels();
     updateMissingGainLabel();
-    restoreSharedState();
-    run();
+    const restored = restoreSharedState();
+    if (restored) {
+      run();
+    } else {
+      $("preset").value = "baseline";
+      selectPreset("baseline");
+    }
+
+    document.addEventListener("keydown", (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+        event.preventDefault();
+        run();
+      }
+    });
   }
 
   document.addEventListener("DOMContentLoaded", init);
