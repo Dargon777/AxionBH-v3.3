@@ -5,7 +5,7 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  const MODEL_VERSION = "8.9.1";
+  const MODEL_VERSION = "8.10.0";
   const STATE_SCHEMA_VERSION = 14;
 
   const CONSTANTS = Object.freeze({
@@ -76,7 +76,10 @@
     THOMSON_CROSS_SECTION_CM2: 6.6524587321e-25,
     CLASSICAL_ELECTRON_RADIUS_CM: 2.8179403262e-13,
     MEV_TO_EV: 1e6,
-    KM_TO_CM: 1e5
+    KM_TO_CM: 1e5,
+    GEV_MASS_TO_G: 1.78266192e-24,
+    PLANCK_MASS_GEV: 1.220890e19,
+    PLANCK_EV_S: 4.135667696e-15
   });
 
   const ISM_PHASE_PRESETS = Object.freeze({
@@ -1647,6 +1650,428 @@
       geometry,
       closure,
       thresholdPassed: true
+    };
+  }
+
+
+  function energyDensityGeVCm3ToNatural(value) {
+    const density = assertFinitePositive(Number(value), "energyDensityGeVCm3", true);
+    return density / Math.pow(CONSTANTS.CM_TO_GEV_INV, 3);
+  }
+
+  function energyDensityNaturalToGeVCm3(value) {
+    const density = assertFinitePositive(Number(value), "energyDensityNatural", true);
+    return density * Math.pow(CONSTANTS.CM_TO_GEV_INV, 3);
+  }
+
+  function pbhAxionMassCoupling(input) {
+    const p = normalizeParams(input);
+    const massG = p.massSolar * CONSTANTS.MSUN;
+    const muWaveNumber =
+      p.axionMassEv * CONSTANTS.ERG_PER_EV /
+      (CONSTANTS.HBAR * CONSTANTS.C);
+    const alpha =
+      CONSTANTS.G * massG * muWaveNumber /
+      (CONSTANTS.C * CONSTANTS.C);
+    const muGeV = p.axionMassEv * 1e-9;
+    const bohrRadiusGeVInv =
+      alpha > 0 ? 1 / (alpha * muGeV) : Number.POSITIVE_INFINITY;
+    const bohrRadiusCm =
+      Number.isFinite(bohrRadiusGeVInv)
+        ? bohrRadiusGeVInv / CONSTANTS.CM_TO_GEV_INV
+        : Number.POSITIVE_INFINITY;
+    return {
+      alpha,
+      muGeV,
+      massG,
+      bohrRadiusGeVInv,
+      bohrRadiusCm,
+      schwarzschildRadiusCm:
+        2 * CONSTANTS.G * massG /
+        (CONSTANTS.C * CONSTANTS.C)
+    };
+  }
+
+  function pbhStimulatedCaptureAudit(input, options = {}) {
+    const p = normalizeParams(input);
+    const coupling = pbhAxionMassCoupling(p);
+    const rhoGeVCm3 = assertFinitePositive(
+      Number(options.axionDensityGeVCm3 ?? 0.4),
+      "axionDensityGeVCm3"
+    );
+    const velocityFracC = assertFinitePositive(
+      Number(options.axionVelocityFracC ?? 1e-3),
+      "axionVelocityFracC"
+    );
+    if (velocityFracC >= 1) {
+      throw new RangeError("axionVelocityFracC must be < 1");
+    }
+
+    const rhoNatural = energyDensityGeVCm3ToNatural(rhoGeVCm3);
+    const fa = p.faGev;
+    const mu = coupling.muGeV;
+    const xi = 2 * Math.PI * coupling.alpha / velocityFracC;
+    const gamma1GeV =
+      (3 / 64) *
+      rhoNatural * rhoNatural /
+      (Math.pow(fa, 4) * Math.pow(mu, 3) * velocityFracC * velocityFracC);
+    const gamma1PerSecond =
+      gamma1GeV / CONSTANTS.S_INV_TO_GEV;
+
+    const criticalCloudDensityNatural =
+      16 *
+      coupling.alpha * coupling.alpha *
+      mu * mu *
+      fa * fa;
+    const criticalCloudDensityGeVCm3 =
+      energyDensityNaturalToGeVCm3(criticalCloudDensityNatural);
+
+    const maxCloudMassGeV =
+      coupling.alpha > 0
+        ? (8 * Math.PI / coupling.alpha) * fa * fa / mu
+        : Number.POSITIVE_INFINITY;
+    const maxCloudMassG =
+      maxCloudMassGeV * CONSTANTS.GEV_MASS_TO_G;
+    const maxCloudMassFraction =
+      maxCloudMassG / coupling.massG;
+
+    const eraBeta = Number(options.eraBeta ?? 0.5);
+    if (!Number.isFinite(eraBeta) || eraBeta <= 0) {
+      throw new RangeError("eraBeta must be positive");
+    }
+    const hubbleRatePerSecond =
+      options.hubbleRatePerSecond == null
+        ? null
+        : assertFinitePositive(
+            Number(options.hubbleRatePerSecond),
+            "hubbleRatePerSecond"
+          );
+    const gammaOverH =
+      hubbleRatePerSecond == null
+        ? null
+        : gamma1PerSecond / hubbleRatePerSecond;
+    const fullGrowthThreshold = 60 / eraBeta;
+    const fullGrowthCriterionMet =
+      gammaOverH == null
+        ? null
+        : gammaOverH >= fullGrowthThreshold;
+
+    const reabsorptionLifetimeSeconds =
+      4e4 * CONSTANTS.YEAR *
+      Math.pow(1e-13 / p.axionMassEv, 6) *
+      Math.pow(1 / p.massSolar, 5);
+
+    return {
+      model: "Branco-Rosa 2026 stimulated self-interaction capture audit",
+      source: "arXiv:2610.21951",
+      mechanism: "quartic self-interaction mediated 2->2 capture into a Schwarzschild gravitational atom",
+      alpha: coupling.alpha,
+      xi,
+      focusedRegime: xi >= 1,
+      axionDensityGeVCm3: rhoGeVCm3,
+      axionDensityNaturalGeV4: rhoNatural,
+      axionVelocityFracC: velocityFracC,
+      stimulatedGrowthRateGeV: gamma1GeV,
+      stimulatedGrowthRatePerSecond: gamma1PerSecond,
+      stimulatedGrowthTimeSeconds:
+        gamma1PerSecond > 0
+          ? 1 / gamma1PerSecond
+          : Number.POSITIVE_INFINITY,
+      bohrRadiusCm: coupling.bohrRadiusCm,
+      criticalCloudDensityNaturalGeV4: criticalCloudDensityNatural,
+      criticalCloudDensityGeVCm3,
+      maxCloudMassGeV,
+      maxCloudMassG,
+      maxCloudMassSolar: maxCloudMassG / CONSTANTS.MSUN,
+      maxCloudMassFraction,
+      hubbleRatePerSecond,
+      gammaOverH,
+      eraBeta,
+      fullGrowthThreshold,
+      fullGrowthCriterionEvaluated: gammaOverH != null,
+      fullGrowthCriterionMet,
+      reabsorptionLifetimeSeconds,
+      validity: {
+        nonRelativisticAlpha: coupling.alpha > 0 && coupling.alpha < 1,
+        localRateOnly: true,
+        cosmologicalEvolutionSolved: false,
+        strippingSolved: false,
+        note:
+          "Gamma1 uses Eq. (1.4) with an explicitly supplied local axion density and velocity. The paper's cosmological rho_a(a), v_a(a), transition time t*, stripping and repeated bosenova history are not integrated here."
+      }
+    };
+  }
+
+  function axionPhotonDecayRatePerSecond(axionMassEv, gAggGevInv) {
+    const massEv = assertFinitePositive(Number(axionMassEv), "axionMassEv");
+    const coupling = assertFinitePositive(Number(gAggGevInv), "gAggGevInv");
+    const massGeV = massEv * 1e-9;
+    const rateGeV =
+      coupling * coupling * Math.pow(massGeV, 3) /
+      (64 * Math.PI);
+    return {
+      massGeV,
+      couplingGevInv: coupling,
+      rateGeV,
+      ratePerSecond: rateGeV / CONSTANTS.S_INV_TO_GEV,
+      lifetimeSeconds:
+        rateGeV > 0
+          ? CONSTANTS.S_INV_TO_GEV / rateGeV
+          : Number.POSITIVE_INFINITY
+    };
+  }
+
+  function pbhAxionPhotonTimescales(input, options = {}) {
+    const p = normalizeParams(input);
+    const coupling = pbhAxionMassCoupling(p);
+    const radiusSchwarzschild = assertFinitePositive(
+      Number(options.radiusSchwarzschild ?? 100),
+      "radiusSchwarzschild"
+    );
+    const radiusCm =
+      radiusSchwarzschild * coupling.schwarzschildRadiusCm;
+    const deBroglieRadiusCm = coupling.bohrRadiusCm;
+    const inSolitonCore = radiusCm <= deBroglieRadiusCm;
+    const characteristicRadiusCm =
+      inSolitonCore ? deBroglieRadiusCm : radiusCm;
+    const beta =
+      options.beta == null
+        ? (
+            inSolitonCore
+              ? coupling.alpha
+              : Math.sqrt(
+                  2 *
+                  CONSTANTS.G *
+                  coupling.massG /
+                  (radiusCm * CONSTANTS.C * CONSTANTS.C)
+                )
+          )
+        : assertFinitePositive(Number(options.beta), "beta");
+    if (!(beta > 0 && beta < 1)) {
+      throw new RangeError("beta must satisfy 0 < beta < 1");
+    }
+    const escapeTimeSeconds =
+      options.escapeTimeSeconds == null
+        ? 2 * characteristicRadiusCm / (3 * CONSTANTS.C)
+        : assertFinitePositive(
+            Number(options.escapeTimeSeconds),
+            "escapeTimeSeconds"
+          );
+    const fillTimeSeconds =
+      options.fillTimeSeconds == null
+        ? (
+            Math.PI / 2 *
+            Math.sqrt(
+              Math.pow(characteristicRadiusCm, 3) /
+              (2 * CONSTANTS.G * coupling.massG)
+            )
+          )
+        : assertFinitePositive(
+            Number(options.fillTimeSeconds),
+            "fillTimeSeconds"
+          );
+    return {
+      alpha: coupling.alpha,
+      schwarzschildRadiusCm: coupling.schwarzschildRadiusCm,
+      cutoffRadiusCm: 3 * coupling.schwarzschildRadiusCm,
+      radiusSchwarzschild,
+      radiusCm,
+      deBroglieRadiusCm,
+      deBroglieRadiusSchwarzschild:
+        deBroglieRadiusCm / coupling.schwarzschildRadiusCm,
+      inSolitonCore,
+      beta,
+      betaPrescription:
+        options.beta == null
+          ? (inSolitonCore ? "v_sol = alpha" : "v_esc = sqrt(2GM/r)")
+          : "explicit override",
+      escapeTimeSeconds,
+      fillTimeSeconds,
+      fillToEscapeRatio: fillTimeSeconds / escapeTimeSeconds,
+      outsideInnerCutoff:
+        radiusCm >= 3 * coupling.schwarzschildRadiusCm
+    };
+  }
+
+  function pbhAxionPhotonKineticsAudit(input, options = {}) {
+    const p = normalizeParams(input);
+    const gAggGevInv = assertFinitePositive(
+      Number(options.gAggGevInv ?? 1e-11),
+      "gAggGevInv"
+    );
+    const axionNumberDensityCm3 = assertFinitePositive(
+      Number(options.axionNumberDensityCm3 ?? 4.6e32),
+      "axionNumberDensityCm3"
+    );
+    const decay =
+      axionPhotonDecayRatePerSecond(p.axionMassEv, gAggGevInv);
+    const times =
+      pbhAxionPhotonTimescales(p, options);
+    const numberDensityNatural =
+      densityCm3ToNatural(axionNumberDensityCm3);
+    const nbarA0 =
+      16 *
+      Math.PI * Math.PI *
+      numberDensityNatural /
+      Math.pow(decay.massGeV, 3);
+    const tbarEsc =
+      times.escapeTimeSeconds / decay.lifetimeSeconds;
+    const tbarFill =
+      times.fillTimeSeconds / decay.lifetimeSeconds;
+    const invTbarEsc = 1 / tbarEsc;
+    const kappa =
+      nbarA0 / times.beta - invTbarEsc;
+    const enhanced = kappa > 0;
+
+    const inverseDecayFactor = 1 + 2 * times.beta / 3;
+    let nbarGamma;
+    let branch;
+    if (enhanced) {
+      const A =
+        2 / tbarEsc +
+        2 * times.beta * inverseDecayFactor / tbarFill;
+      const B =
+        16 * times.beta * kappa / tbarFill;
+      const root = Math.sqrt(A * A + B);
+      nbarGamma =
+        B > 0
+          ? B / (2 * (root + A))
+          : 0;
+      branch = "stimulated";
+    } else {
+      const B =
+        4 * inverseDecayFactor * nbarA0;
+      const root =
+        Math.sqrt(kappa * kappa + B);
+      const numerator =
+        kappa >= 0
+          ? kappa + root
+          : B / (root - kappa);
+      nbarGamma =
+        numerator / inverseDecayFactor;
+      branch = "spontaneous";
+    }
+
+    const nbarAxionEq =
+      (
+        0.5 * inverseDecayFactor * nbarGamma * nbarGamma +
+        nbarGamma / tbarEsc
+      ) /
+      (
+        2 *
+        (1 + nbarGamma / (2 * times.beta))
+      );
+
+    const photonNumberDensityNatural =
+      Math.pow(decay.massGeV, 3) *
+      nbarGamma /
+      (16 * Math.PI * Math.PI);
+    const axionEqNumberDensityNatural =
+      Math.pow(decay.massGeV, 3) *
+      nbarAxionEq /
+      (16 * Math.PI * Math.PI);
+    const photonNumberDensityCm3 =
+      naturalDensityToCm3(photonNumberDensityNatural);
+    const axionEqNumberDensityCm3 =
+      naturalDensityToCm3(axionEqNumberDensityNatural);
+    const thresholdNbar =
+      times.beta / tbarEsc;
+    const thresholdDensityNatural =
+      thresholdNbar *
+      Math.pow(decay.massGeV, 3) /
+      (16 * Math.PI * Math.PI);
+    const thresholdDensityCm3 =
+      naturalDensityToCm3(thresholdDensityNatural);
+    const onsetTimeSeconds =
+      nbarA0 > 0
+        ? times.beta / nbarA0 * decay.lifetimeSeconds
+        : Number.POSITIVE_INFINITY;
+
+    const linePhotonEnergyEv = p.axionMassEv / 2;
+    const lineFrequencyHz =
+      linePhotonEnergyEv / CONSTANTS.PLANCK_EV_S;
+
+    return {
+      model: "Choi-Joh-Kadota 2026 local semi-analytic axion-photon kinetics",
+      source: "arXiv:2611.09132",
+      gAggGevInv,
+      decay,
+      timescales: times,
+      axionNumberDensityCm3,
+      axionNumberDensityNaturalGeV3: numberDensityNatural,
+      nbarAxionInitial: nbarA0,
+      tbarEscape: tbarEsc,
+      tbarFill,
+      kappa,
+      stimulatedEnhanced: enhanced,
+      branch,
+      nbarPhotonEquilibrium: nbarGamma,
+      nbarAxionEquilibrium: nbarAxionEq,
+      photonEquilibriumNumberDensityCm3: photonNumberDensityCm3,
+      axionEquilibriumNumberDensityCm3: axionEqNumberDensityCm3,
+      escapingPhotonRateDensityCm3S:
+        photonNumberDensityCm3 / times.escapeTimeSeconds,
+      onsetTimeSeconds,
+      onsetToEscapeRatio:
+        onsetTimeSeconds / times.escapeTimeSeconds,
+      requiredAxionDensityForKappaZeroCm3:
+        thresholdDensityCm3,
+      suppliedToThresholdDensityRatio:
+        axionNumberDensityCm3 / thresholdDensityCm3,
+      linePhotonEnergyEv,
+      lineFrequencyHz,
+      validity: {
+        nonRelativisticAxions:
+          times.beta > 0 && times.beta < 0.3,
+        outsideInnerCutoff:
+          times.outsideInnerCutoff,
+        semiAnalyticLocalEquilibrium: true,
+        radialHybridProfileSolved: false,
+        cosmologicalDiffuseBackgroundSolved: false,
+        unitConversion:
+          "cm^-3 is converted to GeV^3 before applying nbar = 16 pi^2 n / m_a^3",
+        note:
+          "This implements Eqs. (3.2), (3.11), (3.14), (3.16), (3.23), (3.25), (3.29), (3.41) and (3.42) as a local audit. A discrepancy with a published benchmark must not be tuned away; verify the paper/code normalization first."
+      }
+    };
+  }
+
+  function pbhAxionPhotonPublishedBenchmarkAudit() {
+    const input = {
+      ...DEFAULTS,
+      massSolar: 1e-6,
+      spin: 0,
+      axionMassEv: 1e-6
+    };
+    const result =
+      pbhAxionPhotonKineticsAudit(input, {
+        gAggGevInv: 1e-11,
+        axionNumberDensityCm3: 4.6e32,
+        radiusSchwarzschild: 100
+      });
+    const paper = {
+      massSolar: 1e-6,
+      axionMassEv: 1e-6,
+      gAggGevInv: 1e-11,
+      radiusSchwarzschild: 100,
+      axionNumberDensityCm3: 4.6e32,
+      lifetimeSeconds: 1.3e45,
+      reportedBehavior:
+        "stimulated emission develops and approaches equilibrium"
+    };
+    return {
+      paper,
+      directNaturalUnitEvaluation: result,
+      lifetimeRelativeDifference:
+        Math.abs(result.decay.lifetimeSeconds / paper.lifetimeSeconds - 1),
+      enhancementAgreement:
+        result.stimulatedEnhanced,
+      status:
+        result.stimulatedEnhanced
+          ? "qualitatively-consistent"
+          : "normalization-discrepancy-needs-audit",
+      note:
+        "The lifetime reproduces the stated benchmark scale. With direct cm^-3 -> natural-unit conversion, the local kappa criterion may disagree with the paper's stated stimulated benchmark; this is intentionally surfaced rather than calibrated away."
     };
   }
 
@@ -4836,6 +5261,8 @@
     "ism_energy_losses",
     "ism_propagation",
     "annihilation_observable",
+    "pbh_stimulated_capture",
+    "axion_photon_kinetics",
     "superradiance_rate",
     "cloud_saturation",
     "positron_conversion",
@@ -5004,6 +5431,22 @@
           "The line yield follows direct annihilation plus para/ortho positronium branching. The bulge line reference uses the Siegert et al. 2016 0.96e-3 ph cm^-2 s^-1 flux at an effective 8.5 kpc distance."
       },
       {
+        id: "pbh_stimulated_capture",
+        category: "literature-model",
+        title: "PBH stimulated axion capture",
+        state: "standalone audit",
+        detail:
+          "v8.10 implements the Branco-Rosa 2026 local stimulated-capture rate, focusing parameter, bosenova critical density and maximum cloud mass. Cosmological rho_a(a), v_a(a), stripping and repeated growth cycles remain outside the local audit."
+      },
+      {
+        id: "axion_photon_kinetics",
+        category: "literature-model-with-unit-audit",
+        title: "PBH axion <-> photon kinetics",
+        state: "standalone local equilibrium audit",
+        detail:
+          "v8.10 implements the Choi-Joh-Kadota 2026 local semi-analytic stimulated/spontaneous branches with explicit cgs-to-natural-unit conversion. It also exposes a benchmark-normalization cross-check instead of tuning discrepancies away."
+      },
+      {
         id: "superradiance_rate",
         category: "literature-model",
         title: "Scalar 211 superradiance rate",
@@ -5154,6 +5597,14 @@
     fermiOccupation,
     naturalDensityToCm3,
     densityCm3ToNatural,
+    energyDensityGeVCm3ToNatural,
+    energyDensityNaturalToGeVCm3,
+    pbhAxionMassCoupling,
+    pbhStimulatedCaptureAudit,
+    axionPhotonDecayRatePerSecond,
+    pbhAxionPhotonTimescales,
+    pbhAxionPhotonKineticsAudit,
+    pbhAxionPhotonPublishedBenchmarkAudit,
     electronPairDensitiesNatural,
     electronNetDensityNatural,
     electronNetDensityCm3,

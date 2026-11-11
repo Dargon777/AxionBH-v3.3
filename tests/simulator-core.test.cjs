@@ -732,7 +732,7 @@ console.log("AxionBH simulator-core tests passed");
 
 
 {
-  assert.equal(A.MODEL_VERSION, "8.9.1");
+  assert.equal(A.MODEL_VERSION, "8.10.0");
   assert.equal(A.STATE_SCHEMA_VERSION, 14);
 }
 
@@ -800,7 +800,7 @@ console.log("AxionBH simulator-core tests passed");
     },
     "cme"
   );
-  assert.equal(report.modelVersion, "8.9.1");
+  assert.equal(report.modelVersion, "8.10.0");
   assert.equal(report.stateSchemaVersion, 14);
   assert.equal(report.layers.length, A.MODEL_LAYERS.length);
   assert.ok(report.accretion);
@@ -820,7 +820,7 @@ console.log("AxionBH simulator-core tests passed");
 }
 
 {
-  assert.equal(A.MODEL_VERSION, "8.9.1");
+  assert.equal(A.MODEL_VERSION, "8.10.0");
   const eht = A.ACCRETION_CALIBRATIONS.eht2023;
   const baselineRate = A.mdotMsunPerYearFromGs(A.PRESETS.baseline.mdot);
   assert.ok(baselineRate >= eht.minMsunPerYear);
@@ -1013,7 +1013,7 @@ console.log("AxionBH simulator-core tests passed");
 {const a=A.gapParallelElectricField(A.DEFAULTS,{screeningFraction:.1}),b=A.gapParallelElectricField(A.DEFAULTS,{screeningFraction:1});assert.ok(a.parallelElectricFieldVcm<b.parallelElectricFieldVcm);}
 
 {
-  assert.equal(A.MODEL_VERSION,"8.9.1");
+  assert.equal(A.MODEL_VERSION,"8.10.0");
   assert.equal(A.CONSTANTS.POSITRON_RATE_OBS_511,2e43);
   assert.equal(A.CONSTANTS.POSITRON_RATE_GALAXY_511,5e43);
   const base=A.cme(A.DEFAULTS);
@@ -1461,4 +1461,73 @@ console.log("AxionBH simulator-core tests passed");
   for(const id of ["ism_energy_losses","ism_propagation"]){
     assert.ok(report.layers.some((layer)=>layer.id===id));
   }
+}
+
+
+{
+  const base=A.pbhStimulatedCaptureAudit(A.DEFAULTS,{
+    axionDensityGeVCm3:0.4,
+    axionVelocityFracC:1e-3
+  });
+  const dense=A.pbhStimulatedCaptureAudit(A.DEFAULTS,{
+    axionDensityGeVCm3:0.8,
+    axionVelocityFracC:1e-3
+  });
+  const slow=A.pbhStimulatedCaptureAudit(A.DEFAULTS,{
+    axionDensityGeVCm3:0.4,
+    axionVelocityFracC:5e-4
+  });
+  assert.ok(base.alpha>0);
+  assert.ok(base.bohrRadiusCm>0);
+  assert.ok(base.maxCloudMassG>0);
+  assert.ok(base.criticalCloudDensityGeVCm3>0);
+  assert.ok(Math.abs(dense.stimulatedGrowthRatePerSecond/base.stimulatedGrowthRatePerSecond-4)<1e-12);
+  assert.ok(Math.abs(slow.stimulatedGrowthRatePerSecond/base.stimulatedGrowthRatePerSecond-4)<1e-12);
+  assert.equal(base.fullGrowthCriterionEvaluated,false);
+}
+
+{
+  const capture=A.pbhStimulatedCaptureAudit(
+    {...A.DEFAULTS,massSolar:1e-8,spin:0,axionMassEv:1e-8,faGev:1e8},
+    {axionDensityGeVCm3:1e20,axionVelocityFracC:1e-8,hubbleRatePerSecond:1e-10,eraBeta:0.5}
+  );
+  assert.ok(capture.xi>0);
+  assert.equal(capture.fullGrowthCriterionEvaluated,true);
+  assert.ok(Number.isFinite(capture.gammaOverH));
+  assert.equal(capture.fullGrowthThreshold,120);
+}
+
+{
+  const d=A.axionPhotonDecayRatePerSecond(1e-6,1e-11);
+  assert.ok(d.lifetimeSeconds>1e45&&d.lifetimeSeconds<1.5e45);
+}
+
+{
+  const bench=A.pbhAxionPhotonPublishedBenchmarkAudit();
+  const r=bench.directNaturalUnitEvaluation;
+  assert.ok(bench.lifetimeRelativeDifference<0.05);
+  assert.equal(r.timescales.inSolitonCore,true);
+  assert.ok(r.timescales.fillToEscapeRatio>1);
+  assert.ok(r.lineFrequencyHz>1.20e8&&r.lineFrequencyHz<1.22e8);
+  assert.equal(r.stimulatedEnhanced,false);
+  assert.equal(bench.status,"normalization-discrepancy-needs-audit");
+  assert.ok(r.requiredAxionDensityForKappaZeroCm3>r.axionNumberDensityCm3);
+  assert.ok(r.suppliedToThresholdDensityRatio<1e-10);
+}
+
+{
+  const low=A.pbhAxionPhotonKineticsAudit(
+    {...A.DEFAULTS,massSolar:1e-6,spin:0,axionMassEv:1e-6},
+    {gAggGevInv:1e-14,axionNumberDensityCm3:1e20,radiusSchwarzschild:100}
+  );
+  assert.equal(low.branch,"spontaneous");
+  assert.ok(low.photonEquilibriumNumberDensityCm3>=0);
+  assert.ok(low.escapingPhotonRateDensityCm3S>=0);
+}
+
+{
+  const rho=7.25;
+  const nat=A.energyDensityGeVCm3ToNatural(rho);
+  const back=A.energyDensityNaturalToGeVCm3(nat);
+  assert.ok(Math.abs(back/rho-1)<1e-14);
 }

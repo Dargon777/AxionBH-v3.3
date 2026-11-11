@@ -1,5 +1,16 @@
 # Changelog
 
+## v8.10.0
+
+PBH axion-cloud literature-integration release.
+
+- added Branco–Rosa (2026) stimulated self-interaction capture audit: `xi`, `Gamma1`, critical cloud density, approximate maximum cloud mass and optional `Gamma1/H` growth criterion;
+- added Choi–Joh–Kadota (2026) local axion↔photon kinetics: vacuum decay, de Broglie-core/spike timescales, `kappa`, and semi-analytic equilibrium photon/axion densities;
+- added explicit `cm^-3 <-> natural units` normalization in the photon-kinetics path;
+- added a published-benchmark cross-check that reproduces the quoted vacuum lifetime but surfaces a currently unresolved enhancement-normalization discrepancy;
+- kept both PBH modules standalone so they do not silently alter the existing Sgr A* / 511-keV pipeline;
+- added regression tests and updated reproducibility metadata.
+
 ## v8.9.1
 
 Product, reproducibility and scientific-integrity release.
