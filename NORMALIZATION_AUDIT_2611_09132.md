@@ -191,3 +191,45 @@ The two-power branch in AxionBH is therefore a forensic counterfactual only. The
 
 - Choi, Joh & Kadota (2026), arXiv:2611.09132v1.
 - AxionBH v8.10.1 normalization-forensics module.
+
+
+## Conditional impact on Eq. (3.27) and Figure 7
+
+The published enhancement interval is bounded by
+
+```text
+M^- = 2.90e-9 M_sun (g/1e-11)^-2 (m_a/1e-6)^-1/2
+M^+ = 69.6    M_sun (g/1e-11)^4  (m_a/1e-6)^-2.
+```
+
+The lower boundary scales inversely with an overall density normalization, while the spike-side upper boundary scales with its square. If the same normalization discrepancy inferred above affects both boundaries, applying the factor needed to reconcile `M^-` gives
+
+```text
+reference corrected M^-  ~= 3.03e5 M_sun
+conditional corrected M+ ~= 6.39e-27 M_sun.
+```
+
+Across the Figure-7 grid
+
+```text
+g = 1e-10, 1e-11, 1e-12, 1e-13 GeV^-1
+m_a = 1e-7, 1e-6, 1e-5, 1e-4, 1e-3 eV
+```
+
+all 20 cells have `M^- > M^+` under this hypothesis.
+
+Solving `M^-=M^+` gives the coupling required merely to create any enhancement interval:
+
+```text
+1e-7 eV -> 1.07e-6 GeV^-1
+1e-6 eV -> 1.90e-6 GeV^-1
+1e-5 eV -> 3.38e-6 GeV^-1
+1e-4 eV -> 6.01e-6 GeV^-1
+1e-3 eV -> 1.07e-5 GeV^-1
+```
+
+For context, the 2024 extended CAST result reports `g_agamma < 5.8e-11 GeV^-1` at 95% C.L. for `m_a <= ~0.02 eV`, covering this entire mass grid.
+
+Therefore, **if** the shared-normalization hypothesis is correct, the stimulated-enhancement prerequisite disappears throughout the parameter space used for the paper's radio-background plots at couplings already many orders above existing limits.
+
+This remains conditional because the upper-bound rescaling has not yet been independently reconstructed from the full spike normalization. The next required step is a from-scratch radial-profile and cosmological-intensity reproduction.

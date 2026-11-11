@@ -732,7 +732,7 @@ console.log("AxionBH simulator-core tests passed");
 
 
 {
-  assert.equal(A.MODEL_VERSION, "8.10.1");
+  assert.equal(A.MODEL_VERSION, "8.10.2");
   assert.equal(A.STATE_SCHEMA_VERSION, 14);
 }
 
@@ -800,7 +800,7 @@ console.log("AxionBH simulator-core tests passed");
     },
     "cme"
   );
-  assert.equal(report.modelVersion, "8.10.1");
+  assert.equal(report.modelVersion, "8.10.2");
   assert.equal(report.stateSchemaVersion, 14);
   assert.equal(report.layers.length, A.MODEL_LAYERS.length);
   assert.ok(report.accretion);
@@ -820,7 +820,7 @@ console.log("AxionBH simulator-core tests passed");
 }
 
 {
-  assert.equal(A.MODEL_VERSION, "8.10.1");
+  assert.equal(A.MODEL_VERSION, "8.10.2");
   const eht = A.ACCRETION_CALIBRATIONS.eht2023;
   const baselineRate = A.mdotMsunPerYearFromGs(A.PRESETS.baseline.mdot);
   assert.ok(baselineRate >= eht.minMsunPerYear);
@@ -1013,7 +1013,7 @@ console.log("AxionBH simulator-core tests passed");
 {const a=A.gapParallelElectricField(A.DEFAULTS,{screeningFraction:.1}),b=A.gapParallelElectricField(A.DEFAULTS,{screeningFraction:1});assert.ok(a.parallelElectricFieldVcm<b.parallelElectricFieldVcm);}
 
 {
-  assert.equal(A.MODEL_VERSION,"8.10.1");
+  assert.equal(A.MODEL_VERSION,"8.10.2");
   assert.equal(A.CONSTANTS.POSITRON_RATE_OBS_511,2e43);
   assert.equal(A.CONSTANTS.POSITRON_RATE_GALAXY_511,5e43);
   const base=A.cme(A.DEFAULTS);
@@ -1579,5 +1579,38 @@ console.log("AxionBH simulator-core tests passed");
   assert.equal(
     cmp.nonRelativisticCoreOverlapUnderCorrectConversion,
     false
+  );
+}
+
+
+{
+  const impact=A.pbhAxionPhotonConditionalConstraintImpactAudit();
+  assert.equal(impact.status,"conditional-impact-audit");
+  assert.equal(impact.assumptionProven,false);
+  assert.equal(impact.grid.length,20);
+  assert.equal(impact.allGridCellsLoseEnhancement,true);
+
+  const coeff=impact.coefficients;
+  assert.ok(coeff.correctedLowerSolar>1e5);
+  assert.ok(coeff.conditionalCorrectedUpperSolar<1e-20);
+
+  for(const cell of impact.grid){
+    assert.equal(
+      cell.conditionalCorrected.enhancementIntervalExists,
+      false
+    );
+    assert.ok(
+      cell.conditionalCorrected.lowerToUpperRatio>1
+    );
+  }
+
+  const required=impact.couplingForOverlapByMass;
+  assert.equal(required.length,5);
+  assert.ok(
+    required[0].minimumCouplingForAnyIntervalGevInv>1e-7
+  );
+  assert.ok(
+    required[required.length-1]
+      .minimumCouplingForAnyIntervalGevInv>1e-6
   );
 }

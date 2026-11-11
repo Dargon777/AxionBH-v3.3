@@ -1,6 +1,6 @@
 # AxionBH
 
-**AxionBH v8.10.1** is an exploratory browser-based research workbench for testing a layered black-hole / plasma / pair-production / positron-transport model against Galactic 511-keV observables.
+**AxionBH v8.10.2** is an exploratory browser-based research workbench for testing a layered black-hole / plasma / pair-production / positron-transport model against Galactic 511-keV observables.
 
 > The project is a model-testing environment, not a validated astrophysical inference tool.
 
@@ -104,7 +104,7 @@ AxionBH reproduces the quoted vacuum lifetime scale. However, when the quoted nu
 
 These PBH modules are therefore diagnostic research tools. They do not establish PBH axion clouds observationally and do not validate the original AxionBH axion→chirality hypothesis.
 
-## v8.10.1 normalization forensics
+## v8.10.2 normalization forensics
 
 A follow-up audit of arXiv:2611.09132 now isolates the benchmark discrepancy more sharply.
 
@@ -121,6 +121,42 @@ The forensics module also evaluates a **deliberately invalid counterfactual** in
 This is **strong evidence for a density/unit-normalization inconsistency**, but it is not proof that the authors' code used exactly this two-power conversion. AxionBH preserves both the correct calculation and the counterfactual side by side so the discrepancy remains auditable.
 
 See `NORMALIZATION_AUDIT_2611_09132.md` for the numerical derivation.
+
+## v8.10.2 conditional impact on the radio-constraint grid
+
+v8.10.2 asks a second question: **if the same density-normalization discrepancy inferred from the Figure-3 / Eq. (3.27) lower bound also enters the spike-side upper bound, does the stimulated-enhancement mass interval survive?**
+
+This is explicitly a conditional test, not a full re-analysis of the paper.
+
+The paper's threshold scalings are
+
+```text
+M^- ∝ g^-2 m_a^-1/2
+M^+ ∝ g^4  m_a^-2.
+```
+
+For a multiplicative axion-density normalization `N`, the threshold equations imply `M^- ∝ N^-1` and `M^+ ∝ N^2`. Applying the normalization factor required to reconcile the printed benchmark with the published lower-bound coefficient gives the reference coefficients
+
+```text
+M^-_correct ~= 3.0e5 M_sun
+M^+_conditional ~= 6.4e-27 M_sun
+```
+
+at `m_a=1e-6 eV`, `g=1e-11 GeV^-1`.
+
+Across the exact Figure-7 grid (`g=1e-10 ... 1e-13 GeV^-1`, `m_a=1e-7 ... 1e-3 eV`), no cell retains `M^- < M^+` under this shared-normalization hypothesis.
+
+The coupling required merely to reopen an enhancement interval is approximately
+
+```text
+m_a=1e-7 eV  -> g ~1.07e-6 GeV^-1
+m_a=1e-6 eV  -> g ~1.90e-6 GeV^-1
+m_a=1e-5 eV  -> g ~3.38e-6 GeV^-1
+m_a=1e-4 eV  -> g ~6.01e-6 GeV^-1
+m_a=1e-3 eV  -> g ~1.07e-5 GeV^-1
+```
+
+These values are far above existing helioscope / stellar limits in this mass range. The audit therefore flags the published radio-background exclusion curves as potentially dependent on the normalization issue. It does **not** replace them with new exclusion curves; doing that requires a fresh radial-profile and cosmological-intensity calculation.
 
 ## Local development
 
