@@ -1,5 +1,16 @@
 # Changelog
 
+## v8.10.2
+
+Conditional radio-constraint impact audit.
+
+- propagated the v8.10.1 normalization discrepancy into the published `M^-` / `M^+` threshold scalings under an explicit shared-normalization assumption;
+- evaluated the full Figure-7 `(g_agammagamma,m_a)` grid;
+- found no surviving enhancement interval in any grid cell under that assumption;
+- derived the coupling required to reopen `M^- < M^+`, approximately `1e-6–1e-5 GeV^-1` across `m_a=1e-7–1e-3 eV`;
+- kept the result classified as conditional: the diffuse-radio intensity and PBH-fraction exclusion curves are not replaced until the radial and cosmological calculation is recomputed from scratch;
+- added regression tests and updated model metadata.
+
 ## v8.10.1
 
 Photon-kinetics normalization-forensics patch.
