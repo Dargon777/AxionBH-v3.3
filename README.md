@@ -1,6 +1,6 @@
 # AxionBH
 
-**AxionBH v8.10.0** is an exploratory browser-based research workbench for testing a layered black-hole / plasma / pair-production / positron-transport model against Galactic 511-keV observables.
+**AxionBH v8.10.1** is an exploratory browser-based research workbench for testing a layered black-hole / plasma / pair-production / positron-transport model against Galactic 511-keV observables.
 
 > The project is a model-testing environment, not a validated astrophysical inference tool.
 
@@ -103,6 +103,24 @@ The November 2026 paper quotes a benchmark with `M_PBH=1e-6 M_sun`, `m_a=1e-6 eV
 AxionBH reproduces the quoted vacuum lifetime scale. However, when the quoted number density is explicitly converted from `cm^-3` to natural `GeV^3` before evaluating `nbar=16 pi^2 n/m_a^3`, the local `kappa>0` criterion is not met in the direct benchmark audit. This is retained as a **normalization discrepancy to investigate**, not “fixed” by changing units or fitting a hidden factor. It may reflect a convention, profile-normalization detail, implementation detail, or an issue in the preprint; AxionBH does not decide which without reproducing the authors' numerical pipeline.
 
 These PBH modules are therefore diagnostic research tools. They do not establish PBH axion clouds observationally and do not validate the original AxionBH axion→chirality hypothesis.
+
+## v8.10.1 normalization forensics
+
+A follow-up audit of arXiv:2611.09132 now isolates the benchmark discrepancy more sharply.
+
+For the paper's Figure-3 benchmark (`M_PBH=1e-6 M_sun`, `m_a=1e-6 eV`, `g_agammagamma=1e-11 GeV^-1`, `n_a0=4.6e32 cm^-3`), the printed definitions give
+
+- `nbar = 16 pi^2 n / m_a^3`
+- `tau_onset = beta / nbar_a0`
+- `kappa = nbar_a0/beta - 1/tbar_esc`.
+
+With the dimensionally correct volume conversion `cm^-3 -> GeV^3`, AxionBH obtains `tau_onset ~= 1.34e-41`, while `tbar_esc ~= 4.43e-53`; therefore the local benchmark is non-enhanced.
+
+The forensics module also evaluates a **deliberately invalid counterfactual** in which the density is divided by only two powers of the `cm -> GeV^-1` conversion and the result is then treated numerically as a `GeV^3` density. That counterfactual gives `tau_onset ~= 2.65e-55`, which lies on the scale of the onset marker in the paper's Figure 3, and yields a lower PBH-mass threshold of `~5.97e-9 M_sun`, within a factor ~2 of the paper's `2.90e-9 M_sun`.
+
+This is **strong evidence for a density/unit-normalization inconsistency**, but it is not proof that the authors' code used exactly this two-power conversion. AxionBH preserves both the correct calculation and the counterfactual side by side so the discrepancy remains auditable.
+
+See `NORMALIZATION_AUDIT_2611_09132.md` for the numerical derivation.
 
 ## Local development
 
