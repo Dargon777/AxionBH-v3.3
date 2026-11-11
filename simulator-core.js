@@ -5,7 +5,7 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  const MODEL_VERSION = "8.10.0";
+  const MODEL_VERSION = "8.10.1";
   const STATE_SCHEMA_VERSION = 14;
 
   const CONSTANTS = Object.freeze({
@@ -2072,6 +2072,162 @@
           : "normalization-discrepancy-needs-audit",
       note:
         "The lifetime reproduces the stated benchmark scale. With direct cm^-3 -> natural-unit conversion, the local kappa criterion may disagree with the paper's stated stimulated benchmark; this is intentionally surfaced rather than calibrated away."
+    };
+  }
+
+
+  function pbhAxionPhotonNormalizationForensicsAudit() {
+    const benchmark =
+      pbhAxionPhotonPublishedBenchmarkAudit();
+    const r =
+      benchmark.directNaturalUnitEvaluation;
+    const nCm3 =
+      benchmark.paper.axionNumberDensityCm3;
+    const mGeV =
+      r.decay.massGeV;
+    const beta =
+      r.timescales.beta;
+    const tbarEsc =
+      r.tbarEscape;
+
+    const correctDensityGeV3 =
+      densityCm3ToNatural(nCm3);
+    const correctDensityEv3 =
+      correctDensityGeV3 * 1e27;
+    const correctNbar =
+      16 * Math.PI * Math.PI *
+      correctDensityGeV3 /
+      Math.pow(mGeV, 3);
+    const correctOnsetTau =
+      beta / correctNbar;
+
+    // Deliberately dimensionally invalid counterfactual:
+    // divide a volume density by only two powers of the
+    // cm -> GeV^-1 conversion and then *pretend* the
+    // numerical result were a GeV^3 density.  This is
+    // retained only to diagnose the published benchmark.
+    const twoPowerPseudoDensity =
+      nCm3 /
+      Math.pow(CONSTANTS.CM_TO_GEV_INV, 2);
+    const twoPowerPseudoDensityEv3 =
+      twoPowerPseudoDensity * 1e27;
+    const twoPowerPseudoNbar =
+      16 * Math.PI * Math.PI *
+      twoPowerPseudoDensity /
+      Math.pow(mGeV, 3);
+    const twoPowerPseudoOnsetTau =
+      beta / twoPowerPseudoNbar;
+
+    const escapeTerm =
+      1 / tbarEsc;
+    const stimulatedCorrect =
+      correctNbar / beta;
+    const stimulatedTwoPower =
+      twoPowerPseudoNbar / beta;
+
+    // In the flat soliton core of the paper, the benchmark
+    // scalings imply nbar/beta ∝ M_PBH^2 and
+    // 1/tbar_esc ∝ M_PBH.  Therefore a local benchmark
+    // gives M^- = M0 * (escape/stimulated).
+    const benchmarkMassSolar =
+      benchmark.paper.massSolar;
+    const inferredLowerMassCorrectSolar =
+      benchmarkMassSolar *
+      escapeTerm /
+      stimulatedCorrect;
+    const inferredLowerMassTwoPowerSolar =
+      benchmarkMassSolar *
+      escapeTerm /
+      stimulatedTwoPower;
+    const publishedLowerMassSolar =
+      2.90e-9;
+
+    const normalizationFactorNeededForPublishedLowerMass =
+      inferredLowerMassCorrectSolar /
+      publishedLowerMassSolar;
+    const twoPowerRelativeToCorrect =
+      twoPowerPseudoDensity /
+      correctDensityGeV3;
+    const publishedFactorToTwoPowerRatio =
+      normalizationFactorNeededForPublishedLowerMass /
+      twoPowerRelativeToCorrect;
+
+    const alphaAtBenchmark =
+      r.timescales.alpha;
+    const alphaOneMassSolar =
+      benchmarkMassSolar / alphaAtBenchmark;
+
+    return {
+      source:"arXiv:2611.09132 v1",
+      benchmark,
+      printedDefinitions:{
+        normalizedDensity:
+          "nbar = 16 pi^2 n / m_a^3",
+        enhancement:
+          "kappa = nbar_a0/beta - 1/tbar_esc",
+        onset:
+          "tau_onset = beta/nbar_a0",
+        publishedLowerMassSolar
+      },
+      correctVolumeConversion:{
+        densityGeV3:correctDensityGeV3,
+        densityEv3:correctDensityEv3,
+        nbar:correctNbar,
+        onsetTau:correctOnsetTau,
+        tbarEscape:tbarEsc,
+        onsetToEscapeRatio:
+          correctOnsetTau / tbarEsc,
+        kappa:r.kappa,
+        stimulatedEnhanced:r.stimulatedEnhanced,
+        inferredLowerMassSolar:
+          inferredLowerMassCorrectSolar
+      },
+      twoPowerCounterfactual:{
+        dimensionalValidity:false,
+        operation:
+          "n_cm^-3 / (CM_TO_GEV_INV)^2, then numerically treated as GeV^3",
+        pseudoDensityGeV3:
+          twoPowerPseudoDensity,
+        pseudoDensityEv3:
+          twoPowerPseudoDensityEv3,
+        nbar:twoPowerPseudoNbar,
+        onsetTau:twoPowerPseudoOnsetTau,
+        onsetToEscapeRatio:
+          twoPowerPseudoOnsetTau / tbarEsc,
+        kappa:
+          stimulatedTwoPower - escapeTerm,
+        stimulatedEnhanced:
+          stimulatedTwoPower > escapeTerm,
+        inferredLowerMassSolar:
+          inferredLowerMassTwoPowerSolar
+      },
+      comparison:{
+        densityBoostTwoPowerVsCorrect:
+          twoPowerRelativeToCorrect,
+        lowerMassCorrectToPublishedRatio:
+          inferredLowerMassCorrectSolar /
+          publishedLowerMassSolar,
+        lowerMassTwoPowerToPublishedRatio:
+          inferredLowerMassTwoPowerSolar /
+          publishedLowerMassSolar,
+        normalizationFactorNeededForPublishedLowerMass,
+        publishedFactorToTwoPowerRatio,
+        alphaOneMassSolar,
+        correctLowerMassToAlphaOneRatio:
+          inferredLowerMassCorrectSolar /
+          alphaOneMassSolar,
+        nonRelativisticCoreOverlapUnderCorrectConversion:
+          inferredLowerMassCorrectSolar <
+          alphaOneMassSolar
+      },
+      finding:{
+        status:"strong-normalization-inconsistency",
+        likelyClass:
+          "unit/density normalization mismatch",
+        proofOfSpecificCodingError:false,
+        note:
+          "The direct cubic cm^-3 -> GeV^3 conversion makes the printed benchmark non-enhanced. A deliberately invalid two-power conversion moves tau_onset into the Figure-3 scale and reproduces the published lower-mass coefficient to order unity. This is strong evidence for a normalization inconsistency, but does not prove the authors' implementation used exactly this mistake."
+      }
     };
   }
 
@@ -5444,7 +5600,7 @@
         title: "PBH axion <-> photon kinetics",
         state: "standalone local equilibrium audit",
         detail:
-          "v8.10 implements the Choi-Joh-Kadota 2026 local semi-analytic stimulated/spontaneous branches with explicit cgs-to-natural-unit conversion. It also exposes a benchmark-normalization cross-check instead of tuning discrepancies away."
+          "v8.10.1 implements the Choi-Joh-Kadota 2026 local semi-analytic stimulated/spontaneous branches with explicit cgs-to-natural-unit conversion, plus a normalization-forensics audit comparing the correct cubic density conversion with a deliberately invalid two-power counterfactual."
       },
       {
         id: "superradiance_rate",
@@ -5605,6 +5761,7 @@
     pbhAxionPhotonTimescales,
     pbhAxionPhotonKineticsAudit,
     pbhAxionPhotonPublishedBenchmarkAudit,
+    pbhAxionPhotonNormalizationForensicsAudit,
     electronPairDensitiesNatural,
     electronNetDensityNatural,
     electronNetDensityCm3,
