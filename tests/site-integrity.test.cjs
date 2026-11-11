@@ -18,7 +18,7 @@ assert.deepEqual(duplicateIds(index), []);
 assert.deepEqual(duplicateIds(sim), []);
 
 assert.ok(index.includes('<html lang="en"'));
-assert.ok(index.includes("AxionBH v8.9.1"));
+assert.ok(index.includes("AxionBH v8.10.0"));
 assert.ok(index.includes('rel="canonical" href="https://dargon777.github.io/AxionBH-v3.3/"'));
 assert.ok(index.includes('rel="manifest" href="site.webmanifest"'));
 assert.ok(index.includes('href="favicon.svg"'));
@@ -30,7 +30,7 @@ for (const lang of ["en", "ru", "de", "zh"]) {
 assert.ok(index.includes('url.searchParams.set("lang", lang)'));
 assert.ok(index.includes('aria-pressed'));
 
-assert.ok(sim.includes("AxionBH — Research Workbench v8.9.1"));
+assert.ok(sim.includes("AxionBH — Research Workbench v8.10.0"));
 assert.ok(sim.includes('id="resetBtn"'));
 assert.ok(sim.includes('value="baseline">Sgr A* · EHT-context baseline'));
 assert.ok(sim.includes('value="legacy">Legacy AxionBH baseline'));
@@ -44,7 +44,7 @@ assert.ok(sitemap.includes("https://dargon777.github.io/AxionBH-v3.3/"));
 assert.ok(sitemap.includes("https://dargon777.github.io/AxionBH-v3.3/sim.html"));
 assert.ok(robots.includes("sitemap.xml"));
 
-assert.ok(readme.includes("AxionBH v8.9.1"));
+assert.ok(readme.includes("AxionBH v8.10.0"));
 assert.ok(readme.includes("Legacy AxionBH baseline"));
 assert.ok(readme.includes("SCIENTIFIC_STATUS.md"));
 assert.ok(scientific.includes("The current implementation does not establish:"));
