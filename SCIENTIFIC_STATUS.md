@@ -1,6 +1,6 @@
 # AxionBH scientific status
 
-This document separates established ingredients, idealized closures, phenomenological assumptions, and open hypotheses in **AxionBH v8.10.1**.
+This document separates established ingredients, idealized closures, phenomenological assumptions, and open hypotheses in **AxionBH v8.10.2**.
 
 ## Reading the model correctly
 
@@ -92,7 +92,7 @@ At `T = 10^7 K`, electrons are not in the ultrarelativistic massless regime. The
 
 ### Sgr A* accretion baseline
 
-The historical AxionBH default corresponds to roughly `10^-3 M☉/yr`. The EHT 2023 promising model cluster quoted `5.2–9.5 × 10^-9 M☉/yr`. In v8.10.1:
+The historical AxionBH default corresponds to roughly `10^-3 M☉/yr`. The EHT 2023 promising model cluster quoted `5.2–9.5 × 10^-9 M☉/yr`. In v8.10.2:
 
 - **Sgr A* · EHT-context baseline** uses the geometric midpoint of that cluster and the accretion-density plasma closure;
 - **Legacy AxionBH baseline** preserves the historical parameter set for reproducibility.
@@ -129,7 +129,7 @@ The Choi–Joh–Kadota 2026 module implements the published local escape/fillin
 
 The published benchmark is also exposed as a regression/audit case. The quoted vacuum lifetime is reproduced, but the direct unit-converted evaluation currently gives a different sign for the local `kappa` enhancement test than the behavior described in the preprint. This is recorded as an **open normalization discrepancy**, not evidence that either calculation is correct by fiat. The correct next step is independent reproduction of the paper's density profile and numerical normalization.
 
-## arXiv:2611.09132 normalization forensics (v8.10.1)
+## arXiv:2611.09132 normalization forensics (v8.10.2)
 
 The published benchmark quotes `n_a0 ~= 4.6e32 cm^-3` and defines `nbar = 16 pi^2 n/m_a^3`. A number density is a volume density, so converting it to natural units requires **three** powers of the length conversion. Under that conversion the Figure-3 benchmark gives `kappa<0` and an onset time many orders of magnitude later than photon escape.
 
@@ -137,9 +137,17 @@ A deliberately dimensionally invalid two-power conversion is retained only as a 
 
 The correct natural-unit branch remains canonical. No downstream AxionBH observable is allowed to use the counterfactual branch.
 
+## Conditional radio-constraint impact (v8.10.2)
+
+AxionBH now propagates the normalization discrepancy into the paper's analytic enhancement boundaries **only under the explicit assumption** that the same multiplicative density normalization affects both the core-side lower boundary and spike-side upper boundary.
+
+Under that assumption, none of the Figure-7 parameter-grid cells retains an interval with `M^- < M^+`. This means the local prerequisite for the paper's stimulated radio source is absent before any cosmological intensity integral is evaluated.
+
+This is not yet a corrected observational exclusion. The full radial source `Q_gamma(r)`, enhancement radius, filling budget, redshift integral and ARCADE-2 comparison must be recomputed from a dimensionally consistent profile before a replacement bound on `f_PBH` can be claimed.
+
 ## Reproducibility policy
 
-- Model version: `8.10.1`
+- Model version: `8.10.2`
 - Shared-state schema: kept backward compatible with v8.9.0
 - Historical baseline preserved as a separate preset
 - Diagnostic exports contain a deterministic state ID
