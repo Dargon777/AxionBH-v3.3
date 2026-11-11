@@ -1,6 +1,6 @@
 # AxionBH scientific status
 
-This document separates established ingredients, idealized closures, phenomenological assumptions, and open hypotheses in **AxionBH v8.9.1**.
+This document separates established ingredients, idealized closures, phenomenological assumptions, and open hypotheses in **AxionBH v8.10.0**.
 
 ## Reading the model correctly
 
@@ -92,7 +92,7 @@ At `T = 10^7 K`, electrons are not in the ultrarelativistic massless regime. The
 
 ### Sgr A* accretion baseline
 
-The historical AxionBH default corresponds to roughly `10^-3 M☉/yr`. The EHT 2023 promising model cluster quoted `5.2–9.5 × 10^-9 M☉/yr`. In v8.9.1:
+The historical AxionBH default corresponds to roughly `10^-3 M☉/yr`. The EHT 2023 promising model cluster quoted `5.2–9.5 × 10^-9 M☉/yr`. In v8.10.0:
 
 - **Sgr A* · EHT-context baseline** uses the geometric midpoint of that cluster and the accretion-density plasma closure;
 - **Legacy AxionBH baseline** preserves the historical parameter set for reproducibility.
@@ -115,9 +115,23 @@ The branch remains a reduced stationary model and does not replace GRPIC.
 
 v8.8–v8.9 explicitly separate source production from the observed annihilation morphology. The current reduced ISM model exposes large regime dependence rather than hiding it in one smearing parameter.
 
+## PBH stimulated-capture and axion-photon modules (v8.10)
+
+Two new modules are intentionally kept separate from the Sgr A* 511-keV pipeline.
+
+### Stimulated self-interaction capture
+
+The Branco–Rosa 2026 module implements the published local ground-state growth rate, gravitational-focusing parameter, critical self-interaction density and approximate maximum cloud mass. These are classified as **literature-model calculations**. AxionBH does not yet evolve the early-Universe density/velocity history, the transition time `t_*`, stripping, reabsorption and repeated bosenova cycles self-consistently.
+
+### Local axion ↔ photon kinetics
+
+The Choi–Joh–Kadota 2026 module implements the published local escape/filling prescriptions and semi-analytic equilibrium equations for spontaneous/stimulated decay and inverse decay. Number densities supplied in `cm^-3` are explicitly converted to natural units before the dimensionless `nbar` normalization is formed.
+
+The published benchmark is also exposed as a regression/audit case. The quoted vacuum lifetime is reproduced, but the direct unit-converted evaluation currently gives a different sign for the local `kappa` enhancement test than the behavior described in the preprint. This is recorded as an **open normalization discrepancy**, not evidence that either calculation is correct by fiat. The correct next step is independent reproduction of the paper's density profile and numerical normalization.
+
 ## Reproducibility policy
 
-- Model version: `8.9.1`
+- Model version: `8.10.0`
 - Shared-state schema: kept backward compatible with v8.9.0
 - Historical baseline preserved as a separate preset
 - Diagnostic exports contain a deterministic state ID
