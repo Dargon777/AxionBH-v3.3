@@ -1,5 +1,17 @@
 # Changelog
 
+## v8.10.1
+
+Photon-kinetics normalization-forensics patch.
+
+- added a dedicated audit for the arXiv:2611.09132 Figure-3 benchmark;
+- exposed the correct cubic `cm^-3 -> GeV^3` conversion and resulting `tau_onset`, `kappa`, and inferred core lower-mass threshold;
+- added a deliberately invalid two-power conversion counterfactual for diagnosis only;
+- found that the counterfactual reproduces the plotted onset scale and the published lower-mass coefficient to order unity, while the correct conversion does not;
+- added nonrelativistic-validity overlap checks;
+- explicitly forbid the counterfactual from feeding any canonical AxionBH observable;
+- added regression tests and detailed documentation.
+
 ## v8.10.0
 
 PBH axion-cloud literature-integration release.

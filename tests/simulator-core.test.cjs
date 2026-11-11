@@ -732,7 +732,7 @@ console.log("AxionBH simulator-core tests passed");
 
 
 {
-  assert.equal(A.MODEL_VERSION, "8.10.0");
+  assert.equal(A.MODEL_VERSION, "8.10.1");
   assert.equal(A.STATE_SCHEMA_VERSION, 14);
 }
 
@@ -800,7 +800,7 @@ console.log("AxionBH simulator-core tests passed");
     },
     "cme"
   );
-  assert.equal(report.modelVersion, "8.10.0");
+  assert.equal(report.modelVersion, "8.10.1");
   assert.equal(report.stateSchemaVersion, 14);
   assert.equal(report.layers.length, A.MODEL_LAYERS.length);
   assert.ok(report.accretion);
@@ -820,7 +820,7 @@ console.log("AxionBH simulator-core tests passed");
 }
 
 {
-  assert.equal(A.MODEL_VERSION, "8.10.0");
+  assert.equal(A.MODEL_VERSION, "8.10.1");
   const eht = A.ACCRETION_CALIBRATIONS.eht2023;
   const baselineRate = A.mdotMsunPerYearFromGs(A.PRESETS.baseline.mdot);
   assert.ok(baselineRate >= eht.minMsunPerYear);
@@ -1013,7 +1013,7 @@ console.log("AxionBH simulator-core tests passed");
 {const a=A.gapParallelElectricField(A.DEFAULTS,{screeningFraction:.1}),b=A.gapParallelElectricField(A.DEFAULTS,{screeningFraction:1});assert.ok(a.parallelElectricFieldVcm<b.parallelElectricFieldVcm);}
 
 {
-  assert.equal(A.MODEL_VERSION,"8.10.0");
+  assert.equal(A.MODEL_VERSION,"8.10.1");
   assert.equal(A.CONSTANTS.POSITRON_RATE_OBS_511,2e43);
   assert.equal(A.CONSTANTS.POSITRON_RATE_GALAXY_511,5e43);
   const base=A.cme(A.DEFAULTS);
@@ -1530,4 +1530,54 @@ console.log("AxionBH simulator-core tests passed");
   const nat=A.energyDensityGeVCm3ToNatural(rho);
   const back=A.energyDensityNaturalToGeVCm3(nat);
   assert.ok(Math.abs(back/rho-1)<1e-14);
+}
+
+
+{
+  const audit=A.pbhAxionPhotonNormalizationForensicsAudit();
+  const c=audit.correctVolumeConversion;
+  const w=audit.twoPowerCounterfactual;
+  const cmp=audit.comparison;
+
+  assert.equal(audit.finding.status,"strong-normalization-inconsistency");
+  assert.equal(audit.finding.proofOfSpecificCodingError,false);
+
+  assert.ok(c.densityEv3>3e18&&c.densityEv3<4e18);
+  assert.ok(c.onsetTau>1e-42&&c.onsetTau<2e-41);
+  assert.ok(c.onsetToEscapeRatio>1e10);
+  assert.equal(c.stimulatedEnhanced,false);
+
+  assert.equal(w.dimensionalValidity,false);
+  assert.ok(w.onsetTau>1e-56&&w.onsetTau<1e-54);
+  assert.ok(w.onsetToEscapeRatio<0.1);
+  assert.equal(w.stimulatedEnhanced,true);
+
+  assert.ok(
+    cmp.densityBoostTwoPowerVsCorrect>4e13 &&
+    cmp.densityBoostTwoPowerVsCorrect<6e13
+  );
+  assert.ok(
+    c.inferredLowerMassSolar>1e5 &&
+    c.inferredLowerMassSolar<1e6
+  );
+  assert.ok(
+    w.inferredLowerMassSolar>3e-9 &&
+    w.inferredLowerMassSolar<1e-8
+  );
+  assert.ok(
+    cmp.lowerMassTwoPowerToPublishedRatio>1 &&
+    cmp.lowerMassTwoPowerToPublishedRatio<3
+  );
+  assert.ok(
+    cmp.normalizationFactorNeededForPublishedLowerMass>5e13 &&
+    cmp.normalizationFactorNeededForPublishedLowerMass<2e14
+  );
+  assert.ok(
+    cmp.publishedFactorToTwoPowerRatio>1 &&
+    cmp.publishedFactorToTwoPowerRatio<3
+  );
+  assert.equal(
+    cmp.nonRelativisticCoreOverlapUnderCorrectConversion,
+    false
+  );
 }

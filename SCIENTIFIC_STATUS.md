@@ -1,6 +1,6 @@
 # AxionBH scientific status
 
-This document separates established ingredients, idealized closures, phenomenological assumptions, and open hypotheses in **AxionBH v8.10.0**.
+This document separates established ingredients, idealized closures, phenomenological assumptions, and open hypotheses in **AxionBH v8.10.1**.
 
 ## Reading the model correctly
 
@@ -92,7 +92,7 @@ At `T = 10^7 K`, electrons are not in the ultrarelativistic massless regime. The
 
 ### Sgr A* accretion baseline
 
-The historical AxionBH default corresponds to roughly `10^-3 M☉/yr`. The EHT 2023 promising model cluster quoted `5.2–9.5 × 10^-9 M☉/yr`. In v8.10.0:
+The historical AxionBH default corresponds to roughly `10^-3 M☉/yr`. The EHT 2023 promising model cluster quoted `5.2–9.5 × 10^-9 M☉/yr`. In v8.10.1:
 
 - **Sgr A* · EHT-context baseline** uses the geometric midpoint of that cluster and the accretion-density plasma closure;
 - **Legacy AxionBH baseline** preserves the historical parameter set for reproducibility.
@@ -129,9 +129,17 @@ The Choi–Joh–Kadota 2026 module implements the published local escape/fillin
 
 The published benchmark is also exposed as a regression/audit case. The quoted vacuum lifetime is reproduced, but the direct unit-converted evaluation currently gives a different sign for the local `kappa` enhancement test than the behavior described in the preprint. This is recorded as an **open normalization discrepancy**, not evidence that either calculation is correct by fiat. The correct next step is independent reproduction of the paper's density profile and numerical normalization.
 
+## arXiv:2611.09132 normalization forensics (v8.10.1)
+
+The published benchmark quotes `n_a0 ~= 4.6e32 cm^-3` and defines `nbar = 16 pi^2 n/m_a^3`. A number density is a volume density, so converting it to natural units requires **three** powers of the length conversion. Under that conversion the Figure-3 benchmark gives `kappa<0` and an onset time many orders of magnitude later than photon escape.
+
+A deliberately dimensionally invalid two-power conversion is retained only as a forensic counterfactual. Numerically, it moves the onset marker to the scale plotted in Figure 3 and moves the inferred lower PBH-mass threshold close to the published Eq. (3.27) coefficient. The result is classified as a **strong normalization inconsistency**, not as a demonstrated coding mistake by the paper's authors.
+
+The correct natural-unit branch remains canonical. No downstream AxionBH observable is allowed to use the counterfactual branch.
+
 ## Reproducibility policy
 
-- Model version: `8.10.0`
+- Model version: `8.10.1`
 - Shared-state schema: kept backward compatible with v8.9.0
 - Historical baseline preserved as a separate preset
 - Diagnostic exports contain a deterministic state ID
