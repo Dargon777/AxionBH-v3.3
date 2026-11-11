@@ -5,7 +5,7 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  const MODEL_VERSION = "8.10.1";
+  const MODEL_VERSION = "8.10.2";
   const STATE_SCHEMA_VERSION = 14;
 
   const CONSTANTS = Object.freeze({
@@ -2227,6 +2227,166 @@
         proofOfSpecificCodingError:false,
         note:
           "The direct cubic cm^-3 -> GeV^3 conversion makes the printed benchmark non-enhanced. A deliberately invalid two-power conversion moves tau_onset into the Figure-3 scale and reproduces the published lower-mass coefficient to order unity. This is strong evidence for a normalization inconsistency, but does not prove the authors' implementation used exactly this mistake."
+      }
+    };
+  }
+
+
+  function pbhAxionPhotonConditionalConstraintImpactAudit(options = {}) {
+    const forensic =
+      pbhAxionPhotonNormalizationForensicsAudit();
+
+    const referenceMassEv = 1e-6;
+    const referenceCouplingGevInv = 1e-11;
+    const publishedLowerCoefficientSolar = 2.90e-9;
+    const publishedUpperCoefficientSolar = 69.6;
+
+    const inferredLowerCoefficientSolar =
+      forensic.correctVolumeConversion.inferredLowerMassSolar;
+    const normalizationFactor =
+      forensic.comparison.normalizationFactorNeededForPublishedLowerMass;
+
+    // Conditional impact estimate:
+    // if the same multiplicative density normalization that reconciles
+    // M^- is also present in the spike-side M^+ derivation, then
+    // M^- ∝ N^{-1} and M^+ ∝ N^2.  Correcting the normalization
+    // therefore divides the published M^+ coefficient by N^2.
+    const conditionalUpperCoefficientSolar =
+      publishedUpperCoefficientSolar /
+      (normalizationFactor * normalizationFactor);
+
+    const couplings =
+      Array.isArray(options.couplingsGevInv) &&
+      options.couplingsGevInv.length
+        ? options.couplingsGevInv.map(Number)
+        : [1e-10, 1e-11, 1e-12, 1e-13];
+    const masses =
+      Array.isArray(options.axionMassesEv) &&
+      options.axionMassesEv.length
+        ? options.axionMassesEv.map(Number)
+        : [1e-7, 1e-6, 1e-5, 1e-4, 1e-3];
+
+    couplings.forEach((g) =>
+      assertFinitePositive(g, "coupling")
+    );
+    masses.forEach((m) =>
+      assertFinitePositive(m, "axionMass")
+    );
+
+    function publishedBounds(g, m) {
+      const gr = g / referenceCouplingGevInv;
+      const mr = m / referenceMassEv;
+      return {
+        lowerSolar:
+          publishedLowerCoefficientSolar *
+          Math.pow(gr, -2) *
+          Math.pow(mr, -0.5),
+        upperSolar:
+          publishedUpperCoefficientSolar *
+          Math.pow(gr, 4) *
+          Math.pow(mr, -2)
+      };
+    }
+
+    function conditionalCorrectedBounds(g, m) {
+      const gr = g / referenceCouplingGevInv;
+      const mr = m / referenceMassEv;
+      return {
+        lowerSolar:
+          inferredLowerCoefficientSolar *
+          Math.pow(gr, -2) *
+          Math.pow(mr, -0.5),
+        upperSolar:
+          conditionalUpperCoefficientSolar *
+          Math.pow(gr, 4) *
+          Math.pow(mr, -2)
+      };
+    }
+
+    const grid = [];
+    for (const g of couplings) {
+      for (const m of masses) {
+        const published =
+          publishedBounds(g, m);
+        const corrected =
+          conditionalCorrectedBounds(g, m);
+        grid.push({
+          gAggGevInv:g,
+          axionMassEv:m,
+          published:{
+            ...published,
+            enhancementIntervalExists:
+              published.lowerSolar <
+              published.upperSolar
+          },
+          conditionalCorrected:{
+            ...corrected,
+            enhancementIntervalExists:
+              corrected.lowerSolar <
+              corrected.upperSolar,
+            lowerToUpperRatio:
+              corrected.lowerSolar /
+              corrected.upperSolar
+          }
+        });
+      }
+    }
+
+    const couplingForOverlapByMass =
+      masses.map((m) => {
+        const mr =
+          m / referenceMassEv;
+        const ratio =
+          (
+            inferredLowerCoefficientSolar /
+            conditionalUpperCoefficientSolar
+          ) *
+          Math.pow(mr, 1.5);
+        const g =
+          referenceCouplingGevInv *
+          Math.pow(ratio, 1 / 6);
+        return {
+          axionMassEv:m,
+          minimumCouplingForAnyIntervalGevInv:g
+        };
+      });
+
+    const allGridCellsLoseEnhancement =
+      grid.every(
+        (cell) =>
+          !cell.conditionalCorrected
+            .enhancementIntervalExists
+      );
+
+    return {
+      source:"arXiv:2611.09132 v1",
+      status:"conditional-impact-audit",
+      assumption:
+        "The same multiplicative density-normalization discrepancy inferred from M^- also enters the spike-side M^+ threshold.",
+      assumptionProven:false,
+      referenceMassEv,
+      referenceCouplingGevInv,
+      coefficients:{
+        publishedLowerSolar:
+          publishedLowerCoefficientSolar,
+        publishedUpperSolar:
+          publishedUpperCoefficientSolar,
+        correctedLowerSolar:
+          inferredLowerCoefficientSolar,
+        conditionalCorrectedUpperSolar:
+          conditionalUpperCoefficientSolar,
+        normalizationFactor
+      },
+      grid,
+      couplingForOverlapByMass,
+      allGridCellsLoseEnhancement,
+      finding:{
+        conditionalConclusion:
+          allGridCellsLoseEnhancement
+            ? "Under the shared-normalization hypothesis, none of the Figure-7 (g,m_a) cells retains M^- < M^+."
+            : "At least one Figure-7 cell retains an enhancement interval.",
+        note:
+          "This does not recompute the full radio intensity or exclusion curve. It tests whether the prerequisite local enhancement interval survives a consistent density renormalization."
       }
     };
   }
@@ -5762,6 +5922,7 @@
     pbhAxionPhotonKineticsAudit,
     pbhAxionPhotonPublishedBenchmarkAudit,
     pbhAxionPhotonNormalizationForensicsAudit,
+    pbhAxionPhotonConditionalConstraintImpactAudit,
     electronPairDensitiesNatural,
     electronNetDensityNatural,
     electronNetDensityCm3,
