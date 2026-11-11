@@ -124,8 +124,8 @@ for (const feature of [
   );
 }
 
-assert.ok(html.includes("v8.9.1"));
-assert.ok(app.includes("AxionBH research workbench v8.9.1"));
+assert.ok(html.includes("v8.10.0"));
+assert.ok(app.includes("AxionBH research workbench v8.10.0"));
 
 
 for (const feature of [
